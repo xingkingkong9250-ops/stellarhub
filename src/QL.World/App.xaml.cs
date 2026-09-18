@@ -231,6 +231,7 @@ public partial class App : Application
                 _services.ImageQuery,
                 _services.Watcher,
                 _services.LegacyImporter,
+                new ModelDownloadService(_services.Settings.DataRoot, WriteLog),
                 _services.Notifications,
                 _logDirectory);
             settingsViewModel.ThemeChanged += theme =>

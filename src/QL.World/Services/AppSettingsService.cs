@@ -28,6 +28,7 @@ public sealed class AppSettingsService
     };
 
     private readonly string _settingsPath;
+    private readonly string _dataRoot;
     private readonly Action<string> _log;
     private readonly bool _settingsExistedAtStartup;
     private AppSettings _settings = new();
@@ -35,12 +36,16 @@ public sealed class AppSettingsService
     public AppSettingsService(string dataRoot, Action<string>? log = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(dataRoot);
+        _dataRoot = dataRoot;
         _settingsPath = Path.Combine(dataRoot, AppDataRootResolver.ConfigFileName);
         _log = log ?? (_ => { });
         _settingsExistedAtStartup =
             File.Exists(_settingsPath) ||
             File.Exists(AtomicTextFile.GetBackupPath(_settingsPath));
     }
+
+    /// <summary>The QL World data root this settings file lives in (e.g. for the models directory).</summary>
+    public string DataRoot => _dataRoot;
 
     public event Action? Changed;
 
@@ -222,6 +227,11 @@ public sealed class AppSettingsService
     /// </summary>
     public string CloudEncryptedApiKey => _settings.CloudAi.EncryptedApiKey;
 
+    /// <summary>
+    /// M3-D: source file chosen via 手动导入 (the copy that is actually used
+    /// for inference lives in {DataRoot}\models\). Kept only as a convenience
+    /// so the file dialog can preselect the last location.
+    /// </summary>
     public string? LocalModelPath
     {
         get => _settings.LocalModelPath;

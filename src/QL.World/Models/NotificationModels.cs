@@ -12,6 +12,7 @@ public enum NotificationKind
     AiBatchProgress,
     AiBatchCompleted,
     ColorAnalysisCompleted,
+    LocalModelDownloadCompleted,
 }
 
 /// <summary>A single session-scoped notification entry.</summary>

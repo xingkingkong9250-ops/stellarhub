@@ -10,8 +10,9 @@ namespace QL.World.ViewModels;
 
 /// <summary>
 /// W3 settings window. A1 general (theme / integrity), A2 thumbnails,
-/// A4 watcher directories, A5 legacy import & diagnostics. A3 (AI) is an
-/// M3 placeholder. Every change saves immediately through AppSettingsService.
+/// A3 AI (cloud config + local model download), A4 watcher directories,
+/// A5 legacy import & diagnostics. Every change saves immediately through
+/// AppSettingsService.
 /// </summary>
 public sealed class SettingsViewModel : ObservableObject
 {
@@ -20,6 +21,7 @@ public sealed class SettingsViewModel : ObservableObject
     private readonly ImageQueryService _imageQuery;
     private readonly FileWatcherService _watcher;
     private readonly LegacyPythonImporter _legacyImporter;
+    private readonly ModelDownloadService _modelDownload;
     private readonly NotificationService _notifications;
     private readonly string _logsDirectory;
 
@@ -29,8 +31,13 @@ public sealed class SettingsViewModel : ObservableObject
     private string _legacyStatusText = string.Empty;
     private string _statusBarText = string.Empty;
     private string _legacyDbPath;
+    private string _localStatusText = string.Empty;
+    private LocalModelState _localModelState = LocalModelState.NotDownloaded;
     private bool _isLegacyImporting;
     private bool _isTestingConnection;
+    private bool _isDownloading;
+    private double _downloadPercent;
+    private CancellationTokenSource? _downloadCts;
 
     public SettingsViewModel(
         AppSettingsService settings,
@@ -38,6 +45,7 @@ public sealed class SettingsViewModel : ObservableObject
         ImageQueryService imageQuery,
         FileWatcherService watcher,
         LegacyPythonImporter legacyImporter,
+        ModelDownloadService modelDownload,
         NotificationService notifications,
         string logsDirectory)
     {
@@ -46,6 +54,7 @@ public sealed class SettingsViewModel : ObservableObject
         _imageQuery = imageQuery;
         _watcher = watcher;
         _legacyImporter = legacyImporter;
+        _modelDownload = modelDownload;
         _notifications = notifications;
         _logsDirectory = logsDirectory;
 
@@ -69,7 +78,19 @@ public sealed class SettingsViewModel : ObservableObject
         TestCloudConnectionCommand = new AsyncRelayCommand(
             TestCloudConnectionAsync,
             () => IsCloudConfigured && !_isTestingConnection);
+        DownloadModelCommand = new AsyncRelayCommand(
+            DownloadModelAsync,
+            () => !_isDownloading && _localModelState != LocalModelState.Ready);
+        CancelDownloadCommand = new RelayCommand(
+            CancelDownload, () => _isDownloading);
+        SelectModelFileCommand = new AsyncRelayCommand(
+            SelectModelFileAsync,
+            () => !_isDownloading);
+        DeleteModelCommand = new RelayCommand(
+            DeleteModel,
+            () => !_isDownloading && _localModelState != LocalModelState.NotDownloaded);
 
+        RefreshLocalModelState();
         RefreshStatistics();
     }
 
@@ -239,6 +260,151 @@ public sealed class SettingsViewModel : ObservableObject
             _isTestingConnection = false;
             TestCloudConnectionCommand.RaiseCanExecuteChanged();
         }
+    }
+
+    // ─── A3 本地模型 ────────────────────────────────────────────────────────
+
+    /// <summary>Human-readable download/import state of the local model file.</summary>
+    public string LocalModelStateText => _localModelState switch
+    {
+        LocalModelState.Ready => "模型已就绪",
+        LocalModelState.Corrupted => "模型文件不完整，请删除后重新下载或手动导入",
+        _ => "尚未下载",
+    };
+
+    /// <summary>File name / size / license / source line shown under the buttons.</summary>
+    public string LocalModelInfoText =>
+        $"{ModelManifest.ModelFileName} · {ModelManifest.ModelSizeBytes / (1024 * 1024)} MB · "
+        + $"许可证 {ModelManifest.License} · 来源 huggingface.co（失败自动切换 hf-mirror.com 镜像）";
+
+    public string LocalStatusText
+    {
+        get => _localStatusText;
+        private set => SetProperty(ref _localStatusText, value);
+    }
+
+    public bool IsDownloading
+    {
+        get => _isDownloading;
+        private set
+        {
+            if (!SetProperty(ref _isDownloading, value)) return;
+            DownloadModelCommand.RaiseCanExecuteChanged();
+            CancelDownloadCommand.RaiseCanExecuteChanged();
+            SelectModelFileCommand.RaiseCanExecuteChanged();
+            DeleteModelCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    public double DownloadPercent
+    {
+        get => _downloadPercent;
+        private set => SetProperty(ref _downloadPercent, value);
+    }
+
+    public AsyncRelayCommand DownloadModelCommand { get; }
+    public RelayCommand CancelDownloadCommand { get; }
+    public AsyncRelayCommand SelectModelFileCommand { get; }
+    public RelayCommand DeleteModelCommand { get; }
+
+    private async Task DownloadModelAsync()
+    {
+        if (IsDownloading) return;
+        if (_localModelState == LocalModelState.Ready) return;
+
+        _downloadCts = new CancellationTokenSource();
+        DownloadPercent = 0;
+        IsDownloading = true;
+        LocalStatusText = "正在下载…";
+        try
+        {
+            var progress = new Progress<ModelDownloadProgress>(p =>
+            {
+                if (p.Phase == ModelDownloadPhase.Downloading)
+                    DownloadPercent = p.Percent;
+            });
+            await _modelDownload.DownloadAsync(progress, _downloadCts.Token);
+            LocalStatusText = "模型下载完成，校验通过。";
+            _notifications.Publish(NotificationKind.LocalModelDownloadCompleted,
+                "本地模型", "模型下载完成，本地 AI 分析已可用。");
+        }
+        catch (OperationCanceledException)
+        {
+            LocalStatusText = "已取消下载（已下载部分保留，下次自动续传）。";
+        }
+        catch (Exception ex)
+        {
+            LocalStatusText = $"下载失败：{ex.Message}";
+        }
+        finally
+        {
+            IsDownloading = false;
+            _downloadCts?.Dispose();
+            _downloadCts = null;
+            RefreshLocalModelState();
+        }
+    }
+
+    private void CancelDownload()
+    {
+        _downloadCts?.Cancel();
+    }
+
+    private async Task SelectModelFileAsync()
+    {
+        if (IsDownloading) return;
+
+        var dialog = new OpenFileDialog
+        {
+            Title = "选择本地模型文件",
+            Filter = "ONNX 模型 (*.onnx)|*.onnx|所有文件 (*.*)|*.*",
+        };
+        if (dialog.ShowDialog() != true) return;
+
+        IsDownloading = true; // reuse the busy state so every button revalidates
+        LocalStatusText = "正在导入并校验…";
+        try
+        {
+            await _modelDownload.ImportManualAsync(dialog.FileName, CancellationToken.None);
+            LocalStatusText = "模型导入完成，校验通过。";
+            _notifications.Publish(NotificationKind.LocalModelDownloadCompleted,
+                "本地模型", "手动导入的模型校验通过。");
+        }
+        catch (Exception ex)
+        {
+            LocalStatusText = $"导入失败：{ex.Message}";
+        }
+        finally
+        {
+            IsDownloading = false;
+            RefreshLocalModelState();
+        }
+    }
+
+    private void DeleteModel()
+    {
+        try
+        {
+            _modelDownload.DeleteModel();
+            LocalStatusText = "已删除本地模型。";
+        }
+        catch (Exception ex)
+        {
+            LocalStatusText = $"删除失败：{ex.Message}";
+        }
+        RefreshLocalModelState();
+    }
+
+    /// <summary>
+    /// Re-checks the model file on disk (stat + full SHA-256). Synchronous on
+    /// purpose: deterministic for tests; production cost is ~1 s for 350 MB.
+    /// </summary>
+    private void RefreshLocalModelState()
+    {
+        _localModelState = _modelDownload.CheckLocalState();
+        OnPropertyChanged(nameof(LocalModelStateText));
+        DownloadModelCommand.RaiseCanExecuteChanged();
+        DeleteModelCommand.RaiseCanExecuteChanged();
     }
 
     // ─── A4 监控目录 ────────────────────────────────────────────────────────

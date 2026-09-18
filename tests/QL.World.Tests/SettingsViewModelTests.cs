@@ -1,6 +1,7 @@
 using System.IO;
 using QL.World.Models;
 using QL.World.Services;
+using QL.World.Services.Ai;
 using QL.World.Tests.Support;
 using QL.World.ViewModels;
 
@@ -30,6 +31,7 @@ public sealed class SettingsViewModelTests : IDisposable
             imageQuery,
             watcher,
             new LegacyPythonImporter(_lib.Db),
+            new ModelDownloadService(_lib.DirectoryRoot),
             _notifications,
             Path.Combine(_lib.DirectoryRoot, "logs"));
     }
@@ -52,6 +54,7 @@ public sealed class SettingsViewModelTests : IDisposable
                 new ImportService(_lib.Db, new ImageInspector()),
                 query, _notifications),
             new LegacyPythonImporter(_lib.Db),
+            new ModelDownloadService(_lib.DirectoryRoot),
             _notifications,
             Path.Combine(_lib.DirectoryRoot, "logs"));
 

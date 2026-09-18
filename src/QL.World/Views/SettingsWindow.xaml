@@ -119,16 +119,38 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- 本地模型占位 -->
+                    <!-- 本地 ONNX 模型 -->
                     <Border Margin="0,12,0,0" Padding="10,8"
                             BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1"
                             IsEnabled="{Binding IsLocalSectionEnabled}">
                         <StackPanel>
                             <TextBlock Text="本地 ONNX 模型（离线）"
                                        Style="{StaticResource SectionCaptionStyle}" />
-                            <TextBlock Text="模型下载与推理将在 M3-D 提供。"
-                                       Margin="0,6,0,0"
-                                       Foreground="{DynamicResource TextMutedBrush}" />
+                            <TextBlock Text="{Binding LocalModelStateText}"
+                                       Margin="0,6,0,0" FontWeight="Bold" />
+                            <ProgressBar Height="6" Margin="0,8,0,0"
+                                         Minimum="0" Maximum="100"
+                                         Value="{Binding DownloadPercent, Mode=OneWay}"
+                                         Visibility="{Binding IsDownloading, Converter={StaticResource BoolVis}}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <Button Content="下载模型" Command="{Binding DownloadModelCommand}"
+                                        Padding="14,4" Margin="0,0,8,0" MinWidth="88" />
+                                <Button Content="取消" Command="{Binding CancelDownloadCommand}"
+                                        Padding="14,4" Margin="0,0,8,0" MinWidth="64" />
+                                <Button Content="手动导入…" Command="{Binding SelectModelFileCommand}"
+                                        Padding="14,4" Margin="0,0,8,0" MinWidth="96" />
+                                <Button Content="删除模型" Command="{Binding DeleteModelCommand}"
+                                        Padding="14,4" MinWidth="88" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding LocalStatusText}"
+                                       Margin="0,8,0,0" FontSize="12"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Visibility="{Binding LocalStatusText, Converter={StaticResource NullVis}}" />
+                            <TextBlock Text="{Binding LocalModelInfoText}"
+                                       Margin="0,8,0,0" FontSize="11"
+                                       Foreground="{DynamicResource TextMutedBrush}"
+                                       TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
                 </StackPanel>
