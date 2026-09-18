@@ -151,6 +151,9 @@
                     <Button Margin="8,0,0,0" Style="{StaticResource SubtleButtonStyle}"
                             Content="AI 分析" ToolTip="{Binding TopBar.AiDisabledReason}"
                             Command="{Binding TopBar.AiCommand}" />
+                    <Button Margin="8,0,0,0" Style="{StaticResource SubtleButtonStyle}"
+                            Content="分析颜色" ToolTip="为缺失主色调的图片批量回填 dominant_colors"
+                            Command="{Binding TopBar.ColorCommand}" />
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"

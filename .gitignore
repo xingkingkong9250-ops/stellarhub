@@ -8,3 +8,5 @@ artifacts/
 *.cache
 TestResults/
 .manual-test/
+tools/spike/models/
+tools/spike/spike-images/

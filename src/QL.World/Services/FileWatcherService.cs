@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using QL.World.Models;
+using QL.World.Services.Colors;
 
 namespace QL.World.Services;
 
@@ -32,6 +33,7 @@ public sealed class FileWatcherService : IDisposable
     private readonly ImportService _import;
     private readonly ImageQueryService _query;
     private readonly NotificationService _notifications;
+    private readonly ColorAnalysisService? _colors;
     private readonly Action<string>? _log;
     private readonly List<IFileWatcher> _watchers = [];
     private System.Threading.Timer? _debounceTimer;
@@ -45,13 +47,15 @@ public sealed class FileWatcherService : IDisposable
         ImportService import,
         ImageQueryService query,
         NotificationService notifications,
-        Action<string>? log = null)
+        Action<string>? log = null,
+        ColorAnalysisService? colors = null)
     {
         _settings = settings;
         _import = import;
         _query = query;
         _notifications = notifications;
         _log = log;
+        _colors = colors;
     }
 
     public void Start()
@@ -198,8 +202,19 @@ public sealed class FileWatcherService : IDisposable
             ImportReport report = _import.ImportAsync(options, null, CancellationToken.None)
                 .GetAwaiter().GetResult();
             if (report.AddedCount > 0)
+            {
                 _notifications.Publish(NotificationKind.WatcherImported,
                     "监控导入", $"自动导入 {report.AddedCount} 张新图片");
+                // Fire-and-forget dominant-color backfill for the new images.
+                _ = Task.Run(async () =>
+                {
+                    try { await _colors!.RunPendingAsync(); }
+                    catch (Exception colorEx)
+                    {
+                        _log?.Invoke($"[WATCHER] Color backfill failed: {colorEx.Message}");
+                    }
+                });
+            }
         }
         catch (Exception ex)
         {

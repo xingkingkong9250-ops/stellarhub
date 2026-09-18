@@ -3,6 +3,7 @@ using QL.World.Helpers;
 using QL.World.Models;
 using QL.World.Services;
 using QL.World.Services.Ai;
+using QL.World.Services.Colors;
 
 namespace QL.World.ViewModels;
 
@@ -12,23 +13,29 @@ public sealed class TopBarViewModel : ObservableObject
     private const int SEARCH_DEBOUNCE_MS = 300;
 
     private readonly GalleryViewModel _gallery;
+    private readonly NotificationService _notifications;
     private readonly IAiService _ai;
     private readonly AiAnalysisService _aiAnalysis;
+    private readonly ColorAnalysisService _colors;
     private readonly DispatcherTimer _searchTimer;
     private string _searchText = string.Empty;
     private SearchMode _searchMode = SearchMode.Tag;
     private bool _isImporting;
+    private bool _isColorRunning;
 
     public TopBarViewModel(
         GalleryViewModel gallery,
         Func<Task> importAsync,
         NotificationService notifications,
         IAiService ai,
-        AiAnalysisService aiAnalysis)
+        AiAnalysisService aiAnalysis,
+        ColorAnalysisService colors)
     {
         _gallery = gallery;
+        _notifications = notifications;
         _ai = ai;
         _aiAnalysis = aiAnalysis;
+        _colors = colors;
         Notifications = new NotificationListViewModel(notifications);
         ImportCommand = new AsyncRelayCommand(importAsync, () => !_isImporting);
         NotificationsCommand = new RelayCommand(() => Notifications.TogglePopup());
@@ -37,6 +44,8 @@ public sealed class TopBarViewModel : ObservableObject
             () => SettingsRequested?.Invoke());
         // AI batch analysis — enabled only when the backend is available.
         AiCommand = new AsyncRelayCommand(RunAiAnalysisAsync, () => _ai.IsAvailable && !_aiAnalysis.IsRunning);
+        // Dominant-color backfill — independent of the AI mode (PRD).
+        ColorCommand = new AsyncRelayCommand(RunColorAnalysisAsync, () => !_isColorRunning);
 
         _searchTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(SEARCH_DEBOUNCE_MS) };
         _searchTimer.Tick += async (_, _) =>
@@ -51,6 +60,7 @@ public sealed class TopBarViewModel : ObservableObject
     public RelayCommand NotificationsCommand { get; }
     public RelayCommand SettingsCommand { get; }
     public AsyncRelayCommand AiCommand { get; }
+    public AsyncRelayCommand ColorCommand { get; }
 
     public bool IsImporting
     {
@@ -78,6 +88,24 @@ public sealed class TopBarViewModel : ObservableObject
         AiCommand.RaiseCanExecuteChanged();
         await _aiAnalysis.RunBatchAsync();
         AiCommand.RaiseCanExecuteChanged();
+    }
+
+    private async Task RunColorAnalysisAsync()
+    {
+        if (_isColorRunning) return;
+        _isColorRunning = true;
+        ColorCommand.RaiseCanExecuteChanged();
+        try
+        {
+            int written = await _colors.RunPendingAsync();
+            _notifications.Publish(NotificationKind.ColorAnalysisCompleted, "颜色分析完成",
+                $"共回填 {written} 张图片的主色调。");
+        }
+        finally
+        {
+            _isColorRunning = false;
+            ColorCommand.RaiseCanExecuteChanged();
+        }
     }
 
     public string SearchText

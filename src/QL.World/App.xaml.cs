@@ -4,6 +4,7 @@ using QL.World.Data;
 using QL.World.Helpers;
 using QL.World.Services;
 using QL.World.Services.Ai;
+using QL.World.Services.Colors;
 using QL.World.ViewModels;
 using QL.World.Views;
 
@@ -85,7 +86,9 @@ public partial class App : Application
             var tagService = new TagService(_database);
             var collectionService = new CollectionService(_database);
             var notifications = new NotificationService();
-            var watcher = new FileWatcherService(settings, importService, imageQuery, notifications, WriteLog);
+            var colorAnalysis = new ColorAnalysisService(_database, WriteLog);
+            var watcher = new FileWatcherService(settings, importService, imageQuery, notifications, WriteLog,
+                colorAnalysis);
             var legacyImporter = new LegacyPythonImporter(_database);
             IAiService aiService = AiServiceFactory.Create(settings);
             var aiAnalysis = new AiAnalysisService(aiService, _database, tagService, notifications, WriteLog);
@@ -105,7 +108,8 @@ public partial class App : Application
                 watcher,
                 legacyImporter,
                 aiService,
-                aiAnalysis);
+                aiAnalysis,
+                colorAnalysis);
             _services = services;
 
             SetTheme(settings.Theme);

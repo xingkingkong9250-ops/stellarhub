@@ -30,7 +30,8 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
         ThumbnailProvider = new GalleryThumbnailProvider(services.Thumbnails);
         Gallery = new GalleryViewModel(services.ImageQuery, services.Settings, ThumbnailProvider);
-        TopBar = new TopBarViewModel(Gallery, ImportAsync, services.Notifications, services.Ai, services.AiAnalysis);
+        TopBar = new TopBarViewModel(Gallery, ImportAsync, services.Notifications, services.Ai,
+            services.AiAnalysis, services.Colors);
         TagTree = new TagTreeViewModel(Gallery, services.ImageQuery, services.Tags);
         CollectionTree = new CollectionTreeViewModel(Gallery, services.Collections);
         Detail = new DetailViewModel(services.ImageQuery, services.Tags, Gallery);
@@ -158,12 +159,29 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
             {
                 await Gallery.RefreshAsync();
                 StatusBar.PublishMessage($"已导入 {vm.AddedOnClose} 张图片");
+                RunColorBackfill();
             }
         }
         finally
         {
             TopBar.IsImporting = false;
         }
+    }
+
+    /// <summary>Fire-and-forget dominant-color backfill after new imports.</summary>
+    private void RunColorBackfill()
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _services.Colors.RunPendingAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[color] backfill failed: {ex.Message}");
+            }
+        });
     }
 
     private string GetSuggestedImportFolder()

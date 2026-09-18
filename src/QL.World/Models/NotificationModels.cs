@@ -11,6 +11,7 @@ public enum NotificationKind
     WatcherDirectoryError,
     AiBatchProgress,
     AiBatchCompleted,
+    ColorAnalysisCompleted,
 }
 
 /// <summary>A single session-scoped notification entry.</summary>

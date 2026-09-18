@@ -1,5 +1,6 @@
 using QL.World.Data;
 using QL.World.Services.Ai;
+using QL.World.Services.Colors;
 
 namespace QL.World.Services;
 
@@ -24,6 +25,7 @@ public sealed class ServiceRegistry
     public LegacyPythonImporter LegacyImporter { get; }
     public IAiService Ai { get; }
     public AiAnalysisService AiAnalysis { get; }
+    public ColorAnalysisService Colors { get; }
 
     public ServiceRegistry(
         AppSettingsService settings,
@@ -38,7 +40,8 @@ public sealed class ServiceRegistry
         FileWatcherService watcher,
         LegacyPythonImporter legacyImporter,
         IAiService ai,
-        AiAnalysisService aiAnalysis)
+        AiAnalysisService aiAnalysis,
+        ColorAnalysisService colors)
     {
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
         Database = database ?? throw new ArgumentNullException(nameof(database));
@@ -53,5 +56,6 @@ public sealed class ServiceRegistry
         LegacyImporter = legacyImporter ?? throw new ArgumentNullException(nameof(legacyImporter));
         Ai = ai ?? throw new ArgumentNullException(nameof(ai));
         AiAnalysis = aiAnalysis ?? throw new ArgumentNullException(nameof(aiAnalysis));
+        Colors = colors ?? throw new ArgumentNullException(nameof(colors));
     }
 }
