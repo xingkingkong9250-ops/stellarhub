@@ -1,0 +1,130 @@
+<Window x:Class="QL.World.Views.ImportDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:conv="clr-namespace:QL.World.Views.Converters"
+        mc:Ignorable="d"
+        Width="520" Height="480"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize" MinWidth="460" MinHeight="420"
+        Title="导入图片到素材库">
+
+    <Window.Resources>
+        <conv:BoolToVisibilityConverter x:Key="BoolVis" />
+        <conv:BoolToVisibilityConverter x:Key="InverseBoolVis" Parameter="Invert" />
+        <conv:NullToVisibilityConverter x:Key="NullVis" />
+    </Window.Resources>
+
+    <DockPanel Margin="18">
+        <!-- Footer -->
+        <Grid DockPanel.Dock="Bottom" Margin="0,12,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                <Button Content="开始导入" Style="{StaticResource AccentButtonStyle}"
+                        Command="{Binding StartCommand}" />
+                <Button Content="取消导入" Margin="8,0,0,0"
+                        Visibility="{Binding IsRunning, Converter={StaticResource BoolVis}}"
+                        Command="{Binding CancelCommand}" />
+            </StackPanel>
+            <Button Content="完成" HorizontalAlignment="Right" MinWidth="88"
+                    IsDefault="True"
+                    Visibility="{Binding IsFinished, Converter={StaticResource BoolVis}}"
+                    Command="{Binding FinishCommand}" />
+            <Button Content="关闭" HorizontalAlignment="Right" MinWidth="88"
+                    IsCancel="True"
+                    Visibility="{Binding IsFinished, Converter={StaticResource InverseBoolVis}}" />
+        </Grid>
+
+        <StackPanel>
+            <TextBlock Text="导入来源" Style="{StaticResource SectionCaptionStyle}" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" CornerRadius="6" Padding="8,6"
+                        Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                    <TextBlock Text="{Binding SourceSummary}" TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                </Border>
+                <Button Grid.Column="1" Margin="8,0,0,0" Content="选择文件夹…"
+                        Command="{Binding PickFolderCommand}" />
+                <Button Grid.Column="2" Margin="8,0,0,0" Content="选择文件…"
+                        Command="{Binding PickFilesCommand}" />
+            </Grid>
+
+            <TextBlock Text="选项" Margin="0,14,0,0" Style="{StaticResource SectionCaptionStyle}" />
+            <StackPanel Orientation="Horizontal">
+                <CheckBox Content="包含子文件夹" IsChecked="{Binding RecurseSubfolders}"
+                          IsEnabled="{Binding CanEditOptions}" />
+                <CheckBox Content="跳过隐藏/系统文件" Margin="20,0,0,0"
+                          IsChecked="{Binding SkipHidden}"
+                          IsEnabled="{Binding CanEditOptions}" />
+            </StackPanel>
+
+            <TextBlock Text="文件格式" Margin="0,12,0,0" Style="{StaticResource SectionCaptionStyle}" />
+            <ItemsControl ItemsSource="{Binding ExtensionToggles}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <CheckBox Margin="0,0,16,4" Content="{Binding Display}"
+                                  IsChecked="{Binding Enabled, Mode=TwoWay}"
+                                  IsEnabled="{Binding DataContext.CanEditOptions, RelativeSource={RelativeSource AncestorType=Window}}" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Progress -->
+            <Border Margin="0,14,0,0" Padding="12,10" CornerRadius="8"
+                    Background="{DynamicResource SurfaceVariantBrush}"
+                    BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1"
+                    Visibility="{Binding IsRunning, Converter={StaticResource BoolVis}}">
+                <StackPanel>
+                    <ProgressBar Minimum="0" Maximum="1"
+                                 Value="{Binding ProgressFraction, Mode=OneWay}" />
+                    <Grid Margin="0,8,0,0">
+                        <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Text="{Binding CurrentFile}" TextTrimming="CharacterEllipsis" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <TextBlock FontSize="12" Foreground="{DynamicResource AccentDimBrush}"
+                                       Text="{Binding Added, StringFormat='新增 {0}'}" />
+                            <TextBlock FontSize="12" Margin="12,0,0,0"
+                                       Foreground="{DynamicResource TextMutedBrush}"
+                                       Text="{Binding Skipped, StringFormat='跳过 {0}'}" />
+                            <TextBlock FontSize="12" Margin="12,0,0,0"
+                                       Foreground="{DynamicResource TextMutedBrush}">
+                                <Run Text="{Binding Processed, Mode=OneWay}" />
+                                <Run Text="/" />
+                                <Run Text="{Binding ScannedTotal, Mode=OneWay}" />
+                            </TextBlock>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Margin="0,12,0,4" Style="{StaticResource SectionCaptionStyle}"
+                       Text="{Binding ResultSummary}"
+                       Visibility="{Binding ResultSummary, Converter={StaticResource NullVis}}" />
+
+            <TextBlock Text="日志" Margin="0,8,0,4" Style="{StaticResource SectionCaptionStyle}" />
+            <Border CornerRadius="6" Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
+                <ListBox ItemsSource="{Binding LogLines}" MaxHeight="120"
+                         BorderThickness="0" Background="Transparent">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" FontSize="11"
+                                       TextOptions.TextFormattingMode="Display"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
+        </StackPanel>
+    </DockPanel>
+</Window>

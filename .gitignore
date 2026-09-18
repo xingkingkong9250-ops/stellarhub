@@ -1,0 +1,10 @@
+bin/
+obj/
+dist/
+artifacts/
+*.user
+.vs/
+*.suo
+*.cache
+TestResults/
+.manual-test/

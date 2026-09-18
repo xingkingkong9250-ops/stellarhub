@@ -1,0 +1,93 @@
+using System.IO;
+using System.Text.RegularExpressions;
+using QL.World.Data;
+using QL.World.Services;
+using QL.World.Services.Ai;
+using QL.World.ViewModels;
+
+namespace QL.World.Tests;
+
+public sealed class ShellViewModelTests : IDisposable
+{
+    private readonly string _directory;
+    private readonly DatabaseService _database;
+    private readonly ThumbnailService _thumbnails;
+    private readonly ShellViewModel _viewModel;
+
+    public ShellViewModelTests()
+    {
+        _directory = Path.Combine(
+            Path.GetTempPath(),
+            "ql-world-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(_directory);
+
+        var settings = new AppSettingsService(_directory);
+        settings.Load();
+
+        _database = new DatabaseService(_directory);
+        _database.Initialize();
+
+        var inspector = new ImageInspector();
+        var import = new ImportService(_database, inspector);
+        _thumbnails = new ThumbnailService(_directory, settings);
+        var imageQuery = new ImageQueryService(_database);
+        var tags = new TagService(_database);
+        var collections = new CollectionService(_database);
+        var notifications = new NotificationService();
+        var watcher = new FileWatcherService(settings, import, imageQuery, notifications);
+        var legacyImporter = new LegacyPythonImporter(_database);
+
+        var ai = new DisabledAiService();
+        var aiAnalysis = new AiAnalysisService(ai, _database, tags, notifications);
+        var services = new ServiceRegistry(
+            settings, _database, inspector, import, _thumbnails, imageQuery,
+            tags, collections, notifications, watcher, legacyImporter, ai, aiAnalysis);
+        _viewModel = new ShellViewModel(services);
+    }
+
+    [Fact]
+    public void Title_contains_product_name()
+    {
+        Assert.Contains("QL World", _viewModel.Title);
+    }
+
+    [Fact]
+    public void Version_text_uses_three_part_version_from_assembly()
+    {
+        Assert.Matches(
+            new Regex(@"^v\d+\.\d+\.\d+$"),
+            _viewModel.VersionText);
+    }
+
+    [Fact]
+    public void M1_status_strings_are_non_empty()
+    {
+        Assert.False(string.IsNullOrWhiteSpace(_viewModel.StatusBar.StatusText));
+        Assert.False(string.IsNullOrWhiteSpace(_viewModel.AiStatusText));
+        Assert.False(string.IsNullOrWhiteSpace(_viewModel.StatusBar.AiStatusText));
+    }
+
+    [Fact]
+    public void Gallery_starts_empty_with_default_view_mode()
+    {
+        Assert.Empty(_viewModel.Gallery.Items);
+        Assert.True(
+            _viewModel.Gallery.IsGridView || _viewModel.Gallery.IsListView);
+    }
+
+    public void Dispose()
+    {
+        try { _viewModel.Dispose(); }
+        catch (IOException) { /* Best effort. */ }
+
+        try { _thumbnails.Dispose(); }
+        catch (IOException) { /* Best effort. */ }
+
+        _database.Dispose();
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+
+        try { Directory.Delete(_directory, recursive: true); }
+        catch (IOException) { /* Temp cleanup is best effort. */ }
+    }
+}

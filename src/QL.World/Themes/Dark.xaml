@@ -1,0 +1,54 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ═══════════════════════════════════════════════════════════
+         QL World — Dark theme baseline (M0)
+         Neutral charcoal surfaces with a violet accent.
+         M1 adds control styles; M2 adds the matching Light.xaml.
+         ═══════════════════════════════════════════════════════════ -->
+
+    <!-- Base Colors -->
+    <Color x:Key="Background">#0D0E12</Color>
+    <Color x:Key="Surface">#17171C</Color>
+    <Color x:Key="SurfaceVariant">#202027</Color>
+    <Color x:Key="SurfaceHover">#2C2C36</Color>
+    <Color x:Key="SurfaceActive">#3A3A46</Color>
+    <Color x:Key="Border">#3A3A46</Color>
+    <Color x:Key="BorderSubtle">#2A2A33</Color>
+
+    <!-- Text -->
+    <Color x:Key="TextPrimary">#F2F2F5</Color>
+    <Color x:Key="TextSecondary">#A8A8B3</Color>
+    <Color x:Key="TextMuted">#6E6E7A</Color>
+
+    <!-- Accent (violet) -->
+    <Color x:Key="Accent">#7C5CFF</Color>
+    <Color x:Key="AccentDim">#A48BFF</Color>
+    <Color x:Key="AccentBg">#2A2150</Color>
+
+    <!-- Status -->
+    <Color x:Key="Danger">#FF5A52</Color>
+    <Color x:Key="DangerBg">#3B1410</Color>
+    <Color x:Key="Warning">#FFB020</Color>
+    <Color x:Key="WarningBg">#3B2A05</Color>
+
+    <!-- Brushes -->
+    <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource Background}" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource Surface}" />
+    <SolidColorBrush x:Key="SurfaceVariantBrush" Color="{StaticResource SurfaceVariant}" />
+    <SolidColorBrush x:Key="SurfaceHoverBrush" Color="{StaticResource SurfaceHover}" />
+    <SolidColorBrush x:Key="SurfaceActiveBrush" Color="{StaticResource SurfaceActive}" />
+    <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource Border}" />
+    <SolidColorBrush x:Key="BorderSubtleBrush" Color="{StaticResource BorderSubtle}" />
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimary}" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondary}" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMuted}" />
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource Accent}" />
+    <SolidColorBrush x:Key="AccentDimBrush" Color="{StaticResource AccentDim}" />
+    <SolidColorBrush x:Key="AccentBgBrush" Color="{StaticResource AccentBg}" />
+    <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource Danger}" />
+    <SolidColorBrush x:Key="DangerBgBrush" Color="{StaticResource DangerBg}" />
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource Warning}" />
+    <SolidColorBrush x:Key="WarningBgBrush" Color="{StaticResource WarningBg}" />
+
+</ResourceDictionary>

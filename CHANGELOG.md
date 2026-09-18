@@ -1,0 +1,87 @@
+# Changelog
+
+本项目遵循语义化版本（major.minor.patch）。里程碑：M0 骨架 → M1 核心素材管理 →
+M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
+
+## [Unreleased]
+
+## [0.3.0] — M3 AI 分析（第一阶段）
+
+- AI 配置（W3/A3）：三档单选（关闭 / 本地 ONNX / 云端服务），切换即时生效
+- DPAPI 加密：API Key 经 Windows DPAPI（CurrentUser）加密后 Base64 存储，
+  config.json 不含明文，日志不含明文；PasswordBox 直接转发加密不落绑定属性
+- 云端推理：`CloudAiService` 实现 OpenAI 兼容 chat/completions（分类+标签，
+  JSON 输出）与 embeddings；仅 HTTPS；失败返回错误结果不抛异常；
+  HttpMessageHandler 注入便于 mock 测试
+- AI 服务抽象：`IAiService` 接口 + `AiServiceFactory` 按模式路由；
+  `DisabledAiService` 保证 AI 未启用时基础功能不受影响
+- 批量分析（A1-2 AI 按钮）：`AiAnalysisService` 后台批量处理未分析图片，
+  写 AI 标签（source='ai'，手动标签永不覆盖）+ embedding + primary_category；
+  可取消；进度/完成通知进消息中心；始终写 embedding 行标记已分析避免重处理
+- 状态栏 AI 档位动态显示（关闭/云端/本地）
+- 安全：云端 URL 强制 HTTPS，非 HTTPS 静默拒绝
+
+## [0.2.0] — M2 组织与可靠性
+
+- 浅色主题：`Light.xaml`（17 键与 Dark 一一对应）+ Dark 补齐 `Background`
+  键（修复 ShellWindow 引用未定义资源的隐患）；设置中即时切换
+- 收藏夹（B1-2）：`CollectionService` 全套 CRUD（封面/去重加入/排序/级联删除）；
+  收藏夹树单击筛选、再点清除；右键 新建/重命名/删除/设封面/加入选中；
+  画廊卡片拖拽到收藏夹（DragDrop）加入
+- 文件缺失重定位（B3-2）：`ImageQueryService.RelocateFile` 重算 hash/尺寸、
+  清缺失标记；内容与库内其它记录重复时拒绝；`InputDialog` 通用输入对话框
+- 消息中心（A1-6）：`NotificationService`（会话级，未读计数/批量聚合/按类清除）；
+  铃铛红点徽标 + 弹层列表（全部已读/清空）；导入/缩略图/监控/缺失/旧版导入
+  事件发布通知
+- 文件监控（W3/A4）：`FileWatcherService`（2s 防抖聚合；新增自动导入、
+  删除标记缺失并通知、重命名跟随；目录 diff 热更新）；`IFileWatcher`
+  抽象便于测试；设置中管理目录列表与自动导入开关
+- 设置窗口（W3）：常规（主题/完整性）、缩略图（边长/质量/全部重建）、
+  AI 占位（M3）、监控目录、关于（版本/统计/旧版导入/日志）；全部即时保存
+- 旧版 Python 库导入器（W3/A5）：`LegacyPythonImporter` 只读连接读取
+  Python 库，列差异映射（补 sortable_name/updated_at/is_missing，空分类→NULL），
+  路径+hash 双去重，迁移标签/收藏夹关联，跳过 embeddings 与 dominant_colors
+- ServiceRegistry 7→11 参（+Collections/Notifications/Watcher/LegacyImporter）
+- 修复：`CollectionService.GetAll` 列索引错位（count 误读 cover 列）导致
+  收藏夹计数错误
+- 测试：40 → 92 项（主题资源/收藏夹/收藏夹树/通知/监控/重定位/旧版导入/设置）
+- 门禁：Release 0 警告 0 错误
+
+## [0.1.0] — M1 核心素材管理
+
+- 数据层：SQLite（WAL）六张表（images / image_tags / collections /
+  collection_images / image_embeddings / meta），状态原子写 + `.backup`
+- 服务层（不引用 UI，ServiceRegistry 七参构造注入）：`DatabaseService`、
+  `ImageInspectorService`（SixLabors.ImageSharp 3.1.x 元数据）、`ImportService`
+  （递归扫描/格式白名单/隐藏文件过滤/跳过重复/进度与取消/导入报告）、
+  `ThumbnailService`（两级分片目录 WebP + 占位图）、`ImageQueryService`
+  （筛选/排序/搜索/分页计数）、`TagService`
+- ViewModel 层：Shell/TopBar/Gallery/TagTree/Detail/StatusBar/Import，
+  纯手写 MVVM，`AsyncRelayCommand` 接入 `CommandManager.RequerySuggested`
+- W1/W2 界面：ShellWindow（左栏标签树、画廊网格+列表双视图与缩放、
+  详情栏、状态栏、搜索框）、导入对话框（来源选择、选项、进度条、滚动日志、
+  取消/完成）、Dark 主题与通用控件样式
+- 虚拟化瓦片面板 `VirtualizingTilePanel`（IScrollInfo 自绘，按 IScrollInfo
+  契约空库上报 `Size(0,0)`，禁止上报 `Size.Empty`——其值为负无穷）
+- UIA 端到端实测：空库启动 → 导入 12 张 → 列表/网格切换 → 搜索过滤 0/恢复 12
+  → 详情选中 → 硬杀进程；WAL 恢复完好，重开列出全部 12 张，优雅退出码 0
+- 修复：空库启动 ArgumentException（IScrollInfo 上报 `Size.Empty`）；
+  ImportDialog 缺少 `NullVis` 资源导致 XamlParseException；
+  ProgressBar.Value 双向绑定只读属性抛 InvalidOperationException；
+  AsyncRelayCommand 未接入 CommandManager 导致"开始导入"按钮永不启用
+- 测试：40 项（数据层/导入/缩略图/查询/标签/VM，xUnit 纯 Assert）
+- 门禁：Release 0 警告 0 错误；win-x64 ReadyToRun 自包含发布
+
+## [0.1.0-M0] — M0 工程骨架
+
+- 解决方案 `QL.World.sln`：`src/QL.World`（WPF, net10.0-windows）+ `tests/QL.World.Tests`（xUnit）
+- 基础设施：`ObservableObject`/`RelayCommand`/`AsyncRelayCommand`、`AppInfo`
+  （版本号唯一来自 csproj）、`AtomicTextFile`（原子替换 + `.backup` 恢复）、
+  `AppDataRootResolver`（`%APPDATA%\Qianlan_App\QL_World\`）、
+  `DebugUiTestMode`、`AppSettingsService`（config.json）、手写 `ServiceRegistry`
+- W1 主窗口空壳：A1 顶栏 / B1 左栏 / B2 画廊 / B3 详情栏 / C1 状态栏分区占位，
+  深色主题基线，PerMonitorV2 高 DPI，1400×850（最小 1100×700）
+- 单实例互斥体 + 命名事件优雅重启；异常落盘 `logs\error.log`
+- run 三件套（run.bat / run-hidden.vbs / run.ps1）；build 骨架（Prepare/Finalize）
+- 工程文档：GEMINI.md / AGENTS.md / README.md / docs/UI_NUMBERING.md / PRD 基线
+- 测试：14 项冒烟测试（数据根解析、原子写与备份恢复、设置持久化/钳制/损坏恢复、Shell VM）
