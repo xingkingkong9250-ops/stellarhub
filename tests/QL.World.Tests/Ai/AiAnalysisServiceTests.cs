@@ -200,4 +200,37 @@ public sealed class AiAnalysisServiceTests : IDisposable
 
         Assert.Contains(notifications.Items, e => e.Kind == NotificationKind.AiBatchCompleted);
     }
+
+    [Fact]
+    public async Task RunBatch_persists_local_embedding_with_model_id_and_dim()
+    {
+        long id = _lib.InsertImage();
+        var ai = new FakeAiService
+        {
+            AnalyzeFunc = _ => new AiAnalysisResult
+            {
+                PrimaryCategory = "贴图/纹理",
+                Tags = [new AiTag("硬表面", 0.98)],
+                Embedding = new float[512],
+                ModelId = ModelManifest.ModelId,
+            },
+        };
+        var notifications = new NotificationService();
+        var tags = new TagService(_lib.Db);
+        var analysis = new AiAnalysisService(ai, _lib.Db, tags, notifications);
+
+        await analysis.RunBatchAsync();
+
+        (string ModelId, long Dim) row = _lib.Db.Run(conn =>
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT model_id, dim FROM image_embeddings WHERE image_id = $id;";
+            cmd.Parameters.AddWithValue("$id", id);
+            using var reader = cmd.ExecuteReader();
+            reader.Read();
+            return (reader.GetString(0), reader.GetInt64(1));
+        });
+        Assert.Equal(ModelManifest.ModelId, row.ModelId);
+        Assert.Equal(512, row.Dim);
+    }
 }

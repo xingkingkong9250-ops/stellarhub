@@ -90,7 +90,7 @@ public partial class App : Application
             var watcher = new FileWatcherService(settings, importService, imageQuery, notifications, WriteLog,
                 colorAnalysis);
             var legacyImporter = new LegacyPythonImporter(_database);
-            IAiService aiService = AiServiceFactory.Create(settings);
+            IAiService aiService = AiServiceFactory.Create(settings, log: WriteLog);
             var aiAnalysis = new AiAnalysisService(aiService, _database, tagService, notifications, WriteLog);
             _watcher = watcher;
             watcher.Start();

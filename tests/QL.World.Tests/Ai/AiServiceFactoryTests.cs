@@ -2,6 +2,7 @@ using System.IO;
 using QL.World.Models;
 using QL.World.Services;
 using QL.World.Services.Ai;
+using QL.World.Services.Ai.Local;
 
 namespace QL.World.Tests.Ai;
 
@@ -47,9 +48,13 @@ public sealed class AiServiceFactoryTests : IDisposable
     }
 
     [Fact]
-    public void Local_mode_throws_not_supported()
+    public void Local_mode_returns_local_service()
     {
-        Assert.Throws<NotSupportedException>(
-            () => AiServiceFactory.Create(MakeSettings(AiMode.Local)));
+        IAiService ai = AiServiceFactory.Create(MakeSettings(AiMode.Local));
+        Assert.IsType<LocalAiService>(ai);
+        Assert.Equal("Local", ai.Mode);
+        Assert.True(ai.SupportsEmbeddings);
+        // No model file in the temp data root → not available.
+        Assert.False(ai.IsAvailable);
     }
 }

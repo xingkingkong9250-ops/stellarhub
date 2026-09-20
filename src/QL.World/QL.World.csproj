@@ -20,11 +20,13 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.22.1" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.10" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Data\Schema.v1.sql" />
+    <EmbeddedResource Include="Assets\Ml\text-embeddings-clip-vit-b32.json" />
   </ItemGroup>
 
 </Project>
