@@ -1,7 +1,11 @@
-﻿# QL World M3 UIA 冒烟测试 — W3/A3 三档切换 + AI 按钮置灰
+# QL World M3 UIA 冒烟测试 — W3/A3 三档切换 + AI 按钮置灰 + 本地区块/颜色按钮存在性
 # 用法: powershell -ExecutionPolicy Bypass -File tools\smoke\UiSmokeA3.ps1
 # 前置: .NET 10 SDK；脚本自建 Debug 构建并用隔离数据根，不影响真实数据。
 # 退出码: 0 = 全部通过；非 0 = 存在失败步骤。
+# 覆盖：W1/A1-2 AI 按钮、W1/A1-8 颜色按钮、W3/A3 三档单选 + 云端配置区 +
+#       W3/A3 本地 ONNX 区块（状态文本 + 进度条 + 四按钮存在性）。
+# 未覆盖（需图片选择/上下文菜单交互流，留待画廊级冒烟脚本）：
+#       W1/B2-3-CM1 图卡右键「找相似图」、W1/B3-8 详情栏「找相似」按钮
 
 $ErrorActionPreference = 'Stop'
 
@@ -124,6 +128,14 @@ try {
         Assert-Step 'AI 按钮初始置灰' (-not $aiButton.Current.IsEnabled) 'AI 模式为关闭时按钮不应可用'
     }
 
+    # ── 1b. W1/A1-8 颜色按钮存在（与 AI 档位无关，应始终可用）──────
+    Write-Host '[Smoke] Step 1b: W1/A1-8 color button exists'
+    $colorButton = Find-FirstByName $mainWin '分析颜色' ([System.Windows.Automation.ControlType]::Button)
+    Assert-Step '颜色按钮存在 (W1/A1-8)' ($null -ne $colorButton) '未找到 Name="分析颜色" 的按钮'
+    if ($colorButton -ne $null) {
+        Assert-Step '颜色按钮初始可用' ($colorButton.Current.IsEnabled) '颜色按钮与 AI 档位无关，应可用'
+    }
+
     # ── 2. 打开设置窗口 ─────────────────────────────────────────
     Write-Host '[Smoke] Step 2: open settings'
     $gear = Find-FirstByName $mainWin ([char]0x2699) ([System.Windows.Automation.ControlType]::Button)
@@ -167,6 +179,32 @@ try {
             if ($null -ne $radioCloud) {
                 ($radioCloud.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)).Select()
                 Start-Sleep -Milliseconds 800
+            }
+
+            # ── 4b. W3/A3 本地 ONNX 区块控件存在性 ─────────────
+            # 该区块始终存在于 AI 页签内（IsEnabled 由 IsLocalSectionEnabled 绑定，
+            # 但元素树恒可定位）；切到 Local 单选使区块可用后再断言四按钮存在。
+            Write-Host '[Smoke] Step 4b: W3/A3 local ONNX section controls'
+            if ($null -ne $radioLocal) {
+                ($radioLocal.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)).Select()
+                Start-Sleep -Milliseconds 800
+
+                $btnDownload = Find-FirstByName $settingsWin '下载模型' ([System.Windows.Automation.ControlType]::Button)
+                $btnCancel   = Find-FirstByName $settingsWin '取消' ([System.Windows.Automation.ControlType]::Button)
+                $btnImport   = Find-FirstByName $settingsWin '手动导入…' ([System.Windows.Automation.ControlType]::Button)
+                $btnDelete   = Find-FirstByName $settingsWin '删除模型' ([System.Windows.Automation.ControlType]::Button)
+                Assert-Step '本地区块：下载模型按钮存在' ($null -ne $btnDownload) '未找到 Name="下载模型" 按钮'
+                Assert-Step '本地区块：取消按钮存在' ($null -ne $btnCancel) '未找到 Name="取消" 按钮'
+                Assert-Step '本地区块：手动导入按钮存在' ($null -ne $btnImport) '未找到 Name="手动导入…" 按钮'
+                Assert-Step '本地区块：删除模型按钮存在' ($null -ne $btnDelete) '未找到 Name="删除模型" 按钮'
+
+                # 进度条控件存在性（Visibility=Collapsed 当 IsDownloading=false，
+                # UIA 仍可枚举到元素，仅 IsOffscreen=true；这里只断言元素存在）
+                $pbCond = New-Object System.Windows.Automation.PropertyCondition(
+                    [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                    [System.Windows.Automation.ControlType]::ProgressBar)
+                $progressBar = $settingsWin.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $pbCond)
+                Assert-Step '本地区块：进度条元素存在' ($null -ne $progressBar) '未找到 ProgressBar 元素'
             }
 
             # ── 5. 切回关闭（恢复初始态）──────────────────────

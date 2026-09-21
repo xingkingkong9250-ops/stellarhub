@@ -5,7 +5,64 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
-## [0.3.1] — M3-E1 语义搜索
+## [0.4.0] — M3 第二阶段（本地 ONNX + 颜色分析 + 语义搜索）
+
+### D-A：颜色分析（无新依赖）
+
+- `ColorExtractor`：纯静态 `Extract(Image) → IReadOnlyList<string>`；降采样 ≤64×64
+  → K-means（k=4，固定种子确定性）→ 3–5 个 `"#RRGGBB"`
+- `ColorAnalysisService`（服务 #14）：`RunPendingAsync(batchLimit=500, ct)`
+  后台查询 `dominant_colors IS NULL OR ''` 逐张回填；仅回填 NULL/空不覆盖
+  （确定性算法回填即幂等）；文件缺失/解码失败跳过记日志
+- 导入完成 + FileWatcher 自动导入后 fire-and-forget 触发；手动批量按钮
+  「分析颜色」(W1/A1-8)，与 AI 档位无关
+- 测试：`ColorExtractorTests`（纯色→单 hex、上下分区→多簇、确定性、灰度/透明）、
+  `ColorAnalysisServiceTests`（NULL 回填/非 NULL 不动/缺文件不崩）
+
+### D-B：模型下载器 + 设置 UI
+
+- `ModelManifest`：常量（ModelId=`clip-vit-b32-fp32`、SHA-256、体积 351,685,709 字节、
+  License MIT、SourceUrl + hf-mirror.com 镜像、PromptTemplateVersion）
+- `ModelDownloadService`：`CheckLocalState() → NotDownloaded/Corrupted/Ready`
+  （stat + SHA 流式校验）；`DownloadAsync(IProgress<ModelDownloadProgress>, ct)`
+  使用 `.part` 临时文件 + HTTP Range 断点续传（416/200 重启）；主源连续失败切镜像；
+  完成后 SHA 校验失败删 `.part`；`ImportManualAsync(sourceFile)` 复制+校验；
+  `DeleteModel()`
+- `ModelDownloadProgress`：record(Phase, Percent, BytesReceived, TotalBytes, Message)
+- `SettingsViewModel` 本地区块：`LocalModelStateText`、`IsDownloading`、
+  `DownloadPercent`、`DownloadModelCommand`/`CancelDownloadCommand`/
+  `SelectModelFileCommand`/`DeleteModelCommand`；进度走 `IProgress<T>` 自动回 UI 线程；
+  完成失败发 NotificationService
+- `SettingsWindow.xaml` W3/A3：替换占位 → 状态文本 + ProgressBar + 四按钮 +
+  体积/许可/来源小字行（PRD 硬性要求展示）
+- 测试 `ModelDownloadServiceTests`：HttpMessageHandler stub 模拟 Range/416/断流/
+  镜像切换/校验失败/手动导入
+- `AppSettingsService` 新增只读 `DataRoot` 属性；`LocalModelPath` 收窄为手动导入源
+
+### D-C：LocalAiService + 工厂 + 管道集成
+
+- `ClipPreprocessor`：纯静态 Resize 短边 224 → 中心裁剪 224×224 → CLIP mean/std
+  归一化 → NCHW float32
+- `ClipTextIndex`：加载 `Assets/Ml/text-embeddings-clip-vit-b32.json`；
+  `RankGroups(imageEmb)` 分类组 argmax+阈值 → PrimaryCategory；四类标签组内
+  top-k(≤3)+阈值 → Tags；纯预计算向量余弦，无 ONNX
+- `LocalAiService`（IAiService 实现）：惰性创建 `InferenceSession`，`lock` 包裹
+  `session.Run`；intra-op = 核数一半；`IsAvailable` 动态 stat 模型文件（会话中途下载
+  完成即生效）；`ModelId = ModelManifest.ModelId`；输出 512 维 embedding；
+  `internal` 构造重载注入 `Func<string, InferenceSession>` 供测试 fake；全异常捕获 →
+  ErrorMessage；`TestConnectionAsync` = CheckLocalState==Ready
+- `QL.World.csproj` 加 `Microsoft.ML.OnnxRuntime` 1.22.1（仅 CPU 包）
+- `AiServiceFactory`：`AiMode.Local => new LocalAiService(settings, log)` 不抛异常
+  （未下载模型时 IsAvailable=false，TopBar 置灰自动生效）
+- 测试：`ClipPreprocessorTests`、`ClipTextIndexTests`、`LocalAiServiceTests`
+  （fake session：正常路径/异常→ErrorMessage/文件缺失→IsAvailable=false）；
+  `AiAnalysisServiceTests` 增补 Local 持久化用例（dim=512）
+- **M3-D Spike 结论**（决定默认档）：fp32（vision_model.onnx 351,685,709 字节，
+  sha256 fd6e1402…7d40，ModelId=clip-vit-b32-fp32）；int8 四判据中质量两项 FAIL
+  （分类一致率 54.2%<95%，余弦 0.938<0.98），速度 1.62×/体积 25% 两项 PASS；
+  完整决策表见 `tools/spike/ClipSpike/README.md`
+
+### E1：语义搜索（图→图 + 文→图 Cloud 模式）
 
 - 新增 `SemanticSearchService`（服务 #15）：内存缓存 `image_embeddings` 全表，
   余弦相似度排序，top-50 返回；千级库 <100ms；`Invalidate()` 由
