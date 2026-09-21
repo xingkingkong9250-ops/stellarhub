@@ -25,6 +25,13 @@ public enum SearchMode
 
     /// <summary>Substring match over file name and notes.</summary>
     FileNameNotes,
+
+    /// <summary>
+    /// Semantic search via CLIP embedding cosine similarity. Text→image requires
+    /// IAiService.EmbedTextAsync (Cloud only in M3-E1; Local deferred to M3-E2);
+    /// image→image uses stored image_embeddings and works in any AI mode.
+    /// </summary>
+    Semantic,
 }
 
 /// <summary>

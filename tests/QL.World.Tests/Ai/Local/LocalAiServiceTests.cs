@@ -152,6 +152,20 @@ public sealed class LocalAiServiceTests : IDisposable
         Assert.False(await corrupted.TestConnectionAsync(CancellationToken.None));
     }
 
+    [Fact]
+    public async Task EmbedText_returns_null_without_creating_session()
+    {
+        // LocalAiService.EmbedTextAsync 在 M3-E1 中应直接返回 null，
+        // 不创建 InferenceSession（本地 CLIP text encoder 延后到 M3-E2）。
+        var ai = new LocalAiService(
+            ModelsDir,
+            sessionFactory: _ => throw new InvalidOperationException("session must not be created"));
+
+        float[]? emb = await ai.EmbedTextAsync("硬表面金属质感", CancellationToken.None);
+
+        Assert.Null(emb);
+    }
+
     private static float[] Normalize(float[] vector)
     {
         float norm = MathF.Sqrt(vector.Sum(x => x * x));

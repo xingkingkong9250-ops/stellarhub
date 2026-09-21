@@ -26,6 +26,13 @@ public interface IAiService
     Task<AiAnalysisResult> AnalyzeImageAsync(string imagePath, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Computes a text embedding vector for semantic search. Returns null when
+    /// the backend cannot produce text embeddings (Disabled / Local in M3-E1;
+    /// Local implementation deferred to M3-E2). Never throws — failures return null.
+    /// </summary>
+    Task<float[]?> EmbedTextAsync(string text, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Tests connectivity/authentication against the configured backend.
     /// Returns false on any failure (network, auth, misconfiguration).
     /// </summary>

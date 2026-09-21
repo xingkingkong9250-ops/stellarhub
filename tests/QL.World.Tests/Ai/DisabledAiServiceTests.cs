@@ -43,4 +43,12 @@ public sealed class DisabledAiServiceTests
         var ai = new DisabledAiService();
         Assert.False(await ai.TestConnectionAsync(CancellationToken.None));
     }
+
+    [Fact]
+    public async Task EmbedText_returns_null()
+    {
+        var ai = new DisabledAiService();
+        float[]? emb = await ai.EmbedTextAsync("test query", CancellationToken.None);
+        Assert.Null(emb);
+    }
 }

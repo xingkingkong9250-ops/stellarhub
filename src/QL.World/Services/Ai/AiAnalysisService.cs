@@ -186,6 +186,17 @@ public sealed class AiAnalysisService
             });
         }
 
+        PersistEmbedding(imageId, result);
+
+        // Notify SemanticSearchService so its in-memory cache is invalidated.
+        EmbeddingsUpdated?.Invoke();
+    }
+
+    /// <summary>Raised after PersistResult writes an embedding row. SemanticSearchService subscribes to invalidate its cache.</summary>
+    public event Action? EmbeddingsUpdated;
+
+    private void PersistEmbedding(long imageId, AiAnalysisResult result)
+    {
         // Embedding (self-describing BLOB). Always write a row on success —
         // even when the backend produced no vector — so GetPendingBatch's
         // NOT EXISTS check marks the image as analyzed and avoids re-processing.

@@ -26,6 +26,7 @@ public sealed class ServiceRegistry
     public IAiService Ai { get; }
     public AiAnalysisService AiAnalysis { get; }
     public ColorAnalysisService Colors { get; }
+    public SemanticSearchService SemanticSearch { get; }
 
     public ServiceRegistry(
         AppSettingsService settings,
@@ -41,7 +42,8 @@ public sealed class ServiceRegistry
         LegacyPythonImporter legacyImporter,
         IAiService ai,
         AiAnalysisService aiAnalysis,
-        ColorAnalysisService colors)
+        ColorAnalysisService colors,
+        SemanticSearchService semanticSearch)
     {
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
         Database = database ?? throw new ArgumentNullException(nameof(database));
@@ -57,5 +59,6 @@ public sealed class ServiceRegistry
         Ai = ai ?? throw new ArgumentNullException(nameof(ai));
         AiAnalysis = aiAnalysis ?? throw new ArgumentNullException(nameof(aiAnalysis));
         Colors = colors ?? throw new ArgumentNullException(nameof(colors));
+        SemanticSearch = semanticSearch ?? throw new ArgumentNullException(nameof(semanticSearch));
     }
 }

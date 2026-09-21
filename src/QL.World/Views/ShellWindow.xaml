@@ -468,6 +468,7 @@
                                         </MenuItem.ItemContainerStyle>
                                     </MenuItem>
                                     <MenuItem Header="重新生成缩略图" Command="{Binding RegenerateThumbnailsCommand}" />
+                                    <MenuItem Header="找相似图" Command="{Binding DataContext.FindSimilarCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                     <Separator Style="{StaticResource MenuSeparatorStyle}" />
                                     <MenuItem Header="从库中移除（Delete）" Command="{Binding RemoveCommand}" />
                                 </ContextMenu>
@@ -546,6 +547,10 @@
                                         Content="定位" Command="{Binding Detail.RevealLocationCommand}" />
                                 <Button Style="{StaticResource SubtleButtonStyle}" Margin="4,0,0,0"
                                         Content="复制路径" Command="{Binding Detail.CopyPathCommand}" />
+                                <Button Style="{StaticResource SubtleButtonStyle}" Margin="4,0,0,0"
+                                        Content="找相似"
+                                        Command="{Binding FindSimilarCommand}"
+                                        ToolTip="按 CLIP embedding 余弦相似度找出最相近的 50 张图" />
                             </StackPanel>
 
                             <TextBlock Text="评分" Margin="2,14,0,0" Style="{StaticResource SectionCaptionStyle}" />

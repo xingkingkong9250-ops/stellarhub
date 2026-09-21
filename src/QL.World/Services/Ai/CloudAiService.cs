@@ -129,7 +129,10 @@ public sealed class CloudAiService : IAiService
             {
                 try
                 {
-                    embedding = await GetEmbeddingAsync(category ?? string.Empty, tags, cancellationToken);
+                    string input = string.IsNullOrWhiteSpace(category)
+                        ? string.Join(" ", tags.Select(t => t.Tag))
+                        : $"{category} {string.Join(" ", tags.Select(t => t.Tag))}";
+                    embedding = await GetEmbeddingAsync(input, cancellationToken);
                 }
                 catch
                 {
@@ -154,12 +157,20 @@ public sealed class CloudAiService : IAiService
         }
     }
 
-    private async Task<float[]?> GetEmbeddingAsync(string category, List<AiTag> tags, CancellationToken ct)
+    /// <summary>
+    /// Computes a text embedding for semantic search via the /embeddings endpoint.
+    /// Returns null on any failure (no network, auth, config) — never throws.
+    /// </summary>
+    public async Task<float[]?> EmbedTextAsync(string text, CancellationToken cancellationToken)
     {
-        string input = string.IsNullOrWhiteSpace(category)
-            ? string.Join(" ", tags.Select(t => t.Tag))
-            : $"{category} {string.Join(" ", tags.Select(t => t.Tag))}";
+        ArgumentNullException.ThrowIfNull(text);
+        if (!IsAvailable || !SupportsEmbeddings) return null;
+        try { return await GetEmbeddingAsync(text, cancellationToken); }
+        catch { return null; }
+    }
 
+    private async Task<float[]?> GetEmbeddingAsync(string input, CancellationToken ct)
+    {
         var payload = new { model = _config.EmbeddingModelName, input };
         using var request = new HttpRequestMessage(HttpMethod.Post, NormalizeUrl("embeddings"))
         {

@@ -7,25 +7,6 @@ using QL.World.Tests.Support;
 
 namespace QL.World.Tests.Ai;
 
-/// <summary>Configurable mock IAiService for AiAnalysisService tests.</summary>
-internal sealed class FakeAiService : IAiService
-{
-    public string Mode => "Fake";
-    public bool IsAvailable { get; set; } = true;
-    public bool SupportsEmbeddings { get; set; } = true;
-
-    public Func<string, AiAnalysisResult>? AnalyzeFunc { get; set; }
-
-    public Task<AiAnalysisResult> AnalyzeImageAsync(string imagePath, CancellationToken ct)
-    {
-        AiAnalysisResult result = AnalyzeFunc?.Invoke(imagePath)
-            ?? new AiAnalysisResult { ErrorMessage = "no func" };
-        return Task.FromResult(result);
-    }
-
-    public Task<bool> TestConnectionAsync(CancellationToken ct) => Task.FromResult(true);
-}
-
 public sealed class AiAnalysisServiceTests : IDisposable
 {
     private readonly TestLibrary _lib = new();

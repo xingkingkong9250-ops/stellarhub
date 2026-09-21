@@ -144,4 +144,43 @@ public sealed class CloudAiServiceTests
             File.Delete(path);
         }
     }
+
+    [Fact]
+    public async Task EmbedText_returns_vector_on_success()
+    {
+        string json = "{\"data\":[{\"embedding\":[0.1,0.2,0.3]}]}";
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(json),
+        };
+        var handler = new StubHttpHandler(_ => response);
+        var ai = new CloudAiService(MakeConfig(), handler);
+
+        float[]? emb = await ai.EmbedTextAsync("硬表面金属质感", CancellationToken.None);
+
+        Assert.NotNull(emb);
+        Assert.Equal(new float[] { 0.1f, 0.2f, 0.3f }, emb!.ToArray());
+    }
+
+    [Fact]
+    public async Task EmbedText_returns_null_on_http_error()
+    {
+        var handler = new StubHttpHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        var ai = new CloudAiService(MakeConfig(), handler);
+
+        float[]? emb = await ai.EmbedTextAsync("test", CancellationToken.None);
+        Assert.Null(emb);
+    }
+
+    [Fact]
+    public async Task EmbedText_returns_null_when_embeddings_not_configured()
+    {
+        var config = MakeConfig();
+        config.EmbeddingModelName = string.Empty;
+        var ai = new CloudAiService(config);
+
+        float[]? emb = await ai.EmbedTextAsync("test", CancellationToken.None);
+        Assert.Null(emb);
+    }
 }

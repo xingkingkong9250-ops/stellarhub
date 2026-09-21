@@ -60,6 +60,19 @@ public sealed class LocalAiService : IAiService
     public Task<bool> TestConnectionAsync(CancellationToken cancellationToken) =>
         Task.FromResult(_localStateCheck() == LocalModelState.Ready);
 
+    /// <summary>
+    /// Local CLIP text encoder is deferred to M3-E2 (text_model.onnx + BPE tokenizer
+    /// port has BytesToUnicode traps — see project_memory). M3-E1 returns null so
+    /// TopBarViewModel falls back to a notification; image→image still works in any
+    /// AI mode via SemanticSearchService.SearchByImageId.
+    /// </summary>
+    public Task<float[]?> EmbedTextAsync(string text, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        _log("[AI-LOCAL] text embed deferred to M3-E2");
+        return Task.FromResult<float[]?>(null);
+    }
+
     public async Task<AiAnalysisResult> AnalyzeImageAsync(string imagePath, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(imagePath);

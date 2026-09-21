@@ -23,4 +23,10 @@ public sealed class DisabledAiService : IAiService
 
     public Task<bool> TestConnectionAsync(CancellationToken cancellationToken) =>
         Task.FromResult(false);
+
+    public Task<float[]?> EmbedTextAsync(string text, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        return Task.FromResult<float[]?>(null);
+    }
 }

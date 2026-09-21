@@ -27,6 +27,16 @@ public sealed class LibraryFilter
 
     public bool OnlyMissing { get; set; }
 
+    /// <summary>
+    /// Pre-computed top-N image ids from semantic search (text→image or image→image).
+    /// When non-empty, the gallery restricts results to these ids (ignoring Text/Tag/Category filters).
+    /// Null = no semantic result active.
+    /// </summary>
+    public IReadOnlyList<long>? SemanticResultIds { get; set; }
+
+    /// <summary>Reference image id for image→image similar search (UI display only; filtering uses SemanticResultIds).</summary>
+    public long? SimilarToImageId { get; set; }
+
     public LibraryFilter Clone() => new()
     {
         Category = Category,
@@ -37,6 +47,8 @@ public sealed class LibraryFilter
         SearchMode = SearchMode,
         Sort = Sort,
         OnlyMissing = OnlyMissing,
+        SemanticResultIds = SemanticResultIds,
+        SimilarToImageId = SimilarToImageId,
     };
 }
 

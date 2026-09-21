@@ -13,6 +13,7 @@ public enum NotificationKind
     AiBatchCompleted,
     ColorAnalysisCompleted,
     LocalModelDownloadCompleted,
+    SemanticSearchUnavailable,
 }
 
 /// <summary>A single session-scoped notification entry.</summary>

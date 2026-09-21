@@ -5,6 +5,24 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.3.1] — M3-E1 语义搜索
+
+- 新增 `SemanticSearchService`（服务 #15）：内存缓存 `image_embeddings` 全表，
+  余弦相似度排序，top-50 返回；千级库 <100ms；`Invalidate()` 由
+  `AiAnalysisService.EmbeddingsUpdated` 事件触发失效缓存
+- 图→图相似搜索：图卡右键「找相似图」(W1/B2-3-CM1) + 详情栏「找相似」按钮
+  (W1/B3-8)；任意 AI 模式可用（依赖已存 embedding，不需实时模型调用）
+- 文→图语义搜索：搜索框下拉新增「语义」档 (W1/A1-5)，复用 300ms 防抖；
+  Cloud 模式经 `IAiService.EmbedTextAsync` 调 `/embeddings` 端点
+- Local/Disabled 模式文→图暂不可用（M3-E2 实现本地 CLIP text encoder）：
+  `EmbedTextAsync` 返回 null，UI 显示通知后回退 Tag 模式
+- `LibraryFilter` 新增 `SemanticResultIds` + `SimilarToImageId` 字段；
+  `ImageQueryService.AppendClauses` 优先走 `i.id IN (...)` 分支
+- `NotificationKind.SemanticSearchUnavailable` 新增
+- 测试：169 → 189（新增 SemanticSearchServiceTests 9 用例 +
+  ImageQueryServiceSemanticTests 4 用例 + Cloud/Disabled/Local EmbedTextAsync
+  扩展）
+
 ## [0.3.0] — M3 AI 分析（第一阶段）
 
 - AI 配置（W3/A3）：三档单选（关闭 / 本地 ONNX / 云端服务），切换即时生效

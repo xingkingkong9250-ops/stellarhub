@@ -414,6 +414,33 @@ public sealed class ImageQueryService
         List<(string Name, object? Value)> parameters,
         LibraryFilter filter)
     {
+        // Semantic results take precedence: restrict to pre-computed id list.
+        // Other filters (Text/Tag/Category) are intentionally ignored — the
+        // semantic query already defines the result set.
+        if (filter.SemanticResultIds is { Count: > 0 } ids)
+        {
+            sql.Append(HasWhere(sql) ? "\n  AND " : "\nWHERE ");
+            var placeholders = new List<string>(ids.Count);
+            int i = 0;
+            foreach (long id in ids)
+            {
+                string name = $"$sid{i++}";
+                placeholders.Add(name);
+                parameters.Add((name, id));
+            }
+            sql.Append($"i.id IN ({string.Join(", ", placeholders)})");
+            return;
+        }
+
+        if (filter.SearchMode == SearchMode.Semantic)
+        {
+            // Semantic mode active but no result ids (e.g., AI not configured,
+            // empty library, or EmbedTextAsync returned null). Yield zero rows
+            // so the UI shows "no matches" instead of all images.
+            sql.Append(HasWhere(sql) ? "\n  AND 1=0" : "\nWHERE 1=0");
+            return;
+        }
+
         if (filter.OnlyMissing)
             sql.Append("\nWHERE i.is_missing = 1");
 

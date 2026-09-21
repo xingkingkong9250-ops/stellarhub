@@ -92,6 +92,8 @@ public partial class App : Application
             var legacyImporter = new LegacyPythonImporter(_database);
             IAiService aiService = AiServiceFactory.Create(settings, log: WriteLog);
             var aiAnalysis = new AiAnalysisService(aiService, _database, tagService, notifications, WriteLog);
+            var semanticSearch = new SemanticSearchService(_database, aiService);
+            aiAnalysis.EmbeddingsUpdated += semanticSearch.Invalidate;
             _watcher = watcher;
             watcher.Start();
 
@@ -109,7 +111,8 @@ public partial class App : Application
                 legacyImporter,
                 aiService,
                 aiAnalysis,
-                colorAnalysis);
+                colorAnalysis,
+                semanticSearch);
             _services = services;
 
             SetTheme(settings.Theme);

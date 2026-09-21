@@ -31,7 +31,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         ThumbnailProvider = new GalleryThumbnailProvider(services.Thumbnails);
         Gallery = new GalleryViewModel(services.ImageQuery, services.Settings, ThumbnailProvider);
         TopBar = new TopBarViewModel(Gallery, ImportAsync, services.Notifications, services.Ai,
-            services.AiAnalysis, services.Colors);
+            services.AiAnalysis, services.Colors, services.SemanticSearch);
         TagTree = new TagTreeViewModel(Gallery, services.ImageQuery, services.Tags);
         CollectionTree = new CollectionTreeViewModel(Gallery, services.Collections);
         Detail = new DetailViewModel(services.ImageQuery, services.Tags, Gallery);
@@ -56,6 +56,9 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         CopyPathCommand = new RelayCommand(_ => CopySelectedPath(), _ => HasSelection());
         RemoveCommand = new RelayCommand(_ => RemoveSelected(), _ => HasSelection());
         RegenerateThumbnailsCommand = new RelayCommand(_ => RegenerateThumbnails(), _ => HasSelection());
+        FindSimilarCommand = new AsyncRelayCommand(
+            FindSimilarAsync,
+            () => HasSelection() && _services.SemanticSearch.HasAnyEmbeddings());
         SetRatingCommand = new RelayCommand(SetRatings, _ => HasSelection());
         SetCategoryCommand = new RelayCommand(SetCategories, _ => HasSelection());
         UndoCommand = new RelayCommand(UndoRemove, () => _undoVisible);
@@ -101,6 +104,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public RelayCommand CopyPathCommand { get; }
     public RelayCommand RemoveCommand { get; }
     public RelayCommand RegenerateThumbnailsCommand { get; }
+    public AsyncRelayCommand FindSimilarCommand { get; }
     public RelayCommand SetRatingCommand { get; }
     public RelayCommand SetCategoryCommand { get; }
     public RelayCommand UndoCommand { get; }
@@ -353,10 +357,43 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         Gallery.Filter.Tag = null;
         Gallery.Filter.CollectionId = null;
         Gallery.Filter.Text = null;
+        Gallery.Filter.SemanticResultIds = null;
+        Gallery.Filter.SimilarToImageId = null;
         TopBar.ClearSearchText();
         TagTree.ResetSelection();
         CollectionTree.ResetSelection();
         _ = Gallery.RefreshAsync();
+    }
+
+    /// <summary>
+    /// W1/B2-3-CM1 图卡右键「找相似图」/ W1/B3-8 详情栏「找相似」按钮。
+    /// 调 SemanticSearchService.SearchByImageId 获取 top-50 相似图片 id，
+    /// 设置 Gallery.Filter 进入语义模式并刷新画廊。
+    /// </summary>
+    private async Task FindSimilarAsync()
+    {
+        GalleryItemViewModel? primary = Gallery.PrimarySelected;
+        if (primary is null) return;
+
+        IReadOnlyList<long>? ids = _services.SemanticSearch.SearchByImageId(primary.Id);
+        if (ids is null || ids.Count == 0)
+        {
+            _services.Notifications.Publish(NotificationKind.SemanticSearchUnavailable,
+                "找相似图不可用", "暂无已分析图片。请先运行 AI 分析后再试。");
+            return;
+        }
+
+        // 清除其它筛选条件，进入语义模式。
+        Gallery.Filter.Category = null;
+        Gallery.Filter.Uncategorized = false;
+        Gallery.Filter.Tag = null;
+        Gallery.Filter.CollectionId = null;
+        Gallery.Filter.Text = null;
+        Gallery.Filter.SemanticResultIds = ids;
+        Gallery.Filter.SimilarToImageId = primary.Id;
+        Gallery.Filter.SearchMode = SearchMode.Semantic;
+        TopBar.SwitchToSemanticMode();
+        await Gallery.RefreshAsync();
     }
 
     private void ShowUndoBar(int count)
