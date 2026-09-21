@@ -27,6 +27,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Data\Schema.v1.sql" />
     <EmbeddedResource Include="Assets\Ml\text-embeddings-clip-vit-b32.json" />
+    <EmbeddedResource Include="Assets\Ml\vocab.json" />
+    <EmbeddedResource Include="Assets\Ml\merges.txt" />
   </ItemGroup>
 
 </Project>
