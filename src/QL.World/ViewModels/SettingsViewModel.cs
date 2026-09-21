@@ -272,9 +272,11 @@ public sealed class SettingsViewModel : ObservableObject
         _ => "尚未下载",
     };
 
-    /// <summary>File name / size / license / source line shown under the buttons.</summary>
+    /// <summary>File name / size / license / source line shown under the buttons.
+    /// Covers both the vision and text models in the M3-E2 bundle.</summary>
     public string LocalModelInfoText =>
-        $"{ModelManifest.ModelFileName} · {ModelManifest.ModelSizeBytes / (1024 * 1024)} MB · "
+        $"{ModelManifest.ModelFileName} · {ModelManifest.ModelSizeBytes / (1024 * 1024)} MB + "
+        + $"{ModelManifest.TextModelFileName} · {ModelManifest.TextModelSizeBytes / (1024 * 1024)} MB · "
         + $"许可证 {ModelManifest.License} · 来源 huggingface.co（失败自动切换 hf-mirror.com 镜像）";
 
     public string LocalStatusText
@@ -322,6 +324,8 @@ public sealed class SettingsViewModel : ObservableObject
             {
                 if (p.Phase == ModelDownloadPhase.Downloading)
                     DownloadPercent = p.Percent;
+                else if (p.Phase == ModelDownloadPhase.Verifying && !string.IsNullOrEmpty(p.Message))
+                    LocalStatusText = p.Message;
             });
             await _modelDownload.DownloadAsync(progress, _downloadCts.Token);
             LocalStatusText = "模型下载完成，校验通过。";
