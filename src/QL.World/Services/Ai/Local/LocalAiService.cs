@@ -17,10 +17,18 @@ public sealed class LocalAiService : IAiService
     private readonly string _modelsDirectory;
     private readonly Action<string> _log;
     private readonly Func<string, InferenceSession> _sessionFactory;
+    private readonly Func<string, InferenceSession>? _textSessionFactory;
     private readonly Func<LocalModelState> _localStateCheck;
 
     private readonly object _sessionLock = new();
     private InferenceSession? _session;
+
+    private readonly object _textSessionLock = new();
+    private InferenceSession? _textSession;
+
+    private readonly object _tokenizerLock = new();
+    private ClipTokenizer? _tokenizer;
+    private bool _tokenizerFailed;
 
     private readonly object _indexLock = new();
     private ClipTextIndex? _textIndex;
@@ -32,45 +40,91 @@ public sealed class LocalAiService : IAiService
         _modelsDirectory = Path.Combine(settings.DataRoot, "models");
         _log = log ?? (_ => { });
         _sessionFactory = CreateSession;
+        _textSessionFactory = null; // production: text session uses the same CreateSession
         _localStateCheck = DefaultLocalStateCheck;
     }
 
-    /// <summary>Test constructor: injects a session factory and/or state check.</summary>
+    /// <summary>Test constructor: injects session factories and/or a state check.</summary>
     internal LocalAiService(
         string modelsDirectory,
         Action<string>? log = null,
         Func<string, InferenceSession>? sessionFactory = null,
-        Func<LocalModelState>? localStateCheck = null)
+        Func<LocalModelState>? localStateCheck = null,
+        Func<string, InferenceSession>? textSessionFactory = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(modelsDirectory);
         _modelsDirectory = modelsDirectory;
         _log = log ?? (_ => { });
         _sessionFactory = sessionFactory ?? CreateSession;
+        _textSessionFactory = textSessionFactory; // null falls back to _sessionFactory
         _localStateCheck = localStateCheck ?? DefaultLocalStateCheck;
     }
 
     public string ModelFilePath => Path.Combine(_modelsDirectory, ModelManifest.ModelFileName);
+    public string TextModelFilePath => Path.Combine(_modelsDirectory, ModelManifest.TextModelFileName);
 
     public string Mode => "Local";
     public bool SupportsEmbeddings => true;
 
-    /// <summary>Dynamic stat — true as soon as the model file exists.</summary>
+    /// <summary>
+    /// Dynamic stat — true as soon as the vision model file exists. Image
+    /// analysis and image→image search work whenever vision is present;
+    /// text→image search additionally needs text_model.onnx (checked per-call
+    /// in EmbedTextAsync).
+    /// </summary>
     public bool IsAvailable => File.Exists(ModelFilePath);
 
     public Task<bool> TestConnectionAsync(CancellationToken cancellationToken) =>
         Task.FromResult(_localStateCheck() == LocalModelState.Ready);
 
     /// <summary>
-    /// Local CLIP text encoder is deferred to M3-E2 (text_model.onnx + BPE tokenizer
-    /// port has BytesToUnicode traps — see project_memory). M3-E1 returns null so
-    /// TopBarViewModel falls back to a notification; image→image still works in any
-    /// AI mode via SemanticSearchService.SearchByImageId.
+    /// Tokenizes the input via the local BPE tokenizer and runs text_model.onnx
+    /// to produce a 512-dim CLIP text embedding. Returns null (no throw) when:
+    /// - the text model file is missing (user hasn't downloaded the bundle yet)
+    /// - tokenizer resource extraction / parsing fails (sets a sticky flag)
+    /// - ONNX session creation or inference fails
+    /// Caller surfaces a notification and falls back to Tag-mode search.
     /// </summary>
-    public Task<float[]?> EmbedTextAsync(string text, CancellationToken cancellationToken)
+    public async Task<float[]?> EmbedTextAsync(string text, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(text);
-        _log("[AI-LOCAL] text embed deferred to M3-E2");
-        return Task.FromResult<float[]?>(null);
+        try
+        {
+            if (!File.Exists(TextModelFilePath))
+            {
+                _log("[AI-LOCAL] text model missing; EmbedTextAsync returns null");
+                return null;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            ClipTokenizer? tokenizer = GetTokenizer();
+            if (tokenizer is null)
+                return null;
+
+            int[] ids = await Task.Run(() => tokenizer.Encode(text), cancellationToken);
+            InferenceSession textSession = GetTextSession();
+
+            long[] idsLong = ids.Select(i => (long)i).ToArray();
+            var input = NamedOnnxValue.CreateFromTensor(
+                "input_ids", new DenseTensor<long>(idsLong, [1, 77]));
+
+            float[] embedding = await Task.Run(() =>
+            {
+                lock (_textSessionLock)
+                {
+                    using IDisposableReadOnlyCollection<DisposableNamedOnnxValue> results =
+                        textSession.Run([input], textSession.OutputNames.ToArray());
+                    return ExtractEmbedding(results);
+                }
+            }, cancellationToken);
+
+            return embedding;
+        }
+        catch (Exception ex)
+        {
+            _log($"[AI-LOCAL] EmbedTextAsync failed: {ex.Message}");
+            return null;
+        }
     }
 
     public async Task<AiAnalysisResult> AnalyzeImageAsync(string imagePath, CancellationToken cancellationToken)
@@ -129,6 +183,41 @@ public sealed class LocalAiService : IAiService
                 _session = _sessionFactory(ModelFilePath);
             }
             return _session;
+        }
+    }
+
+    private InferenceSession GetTextSession()
+    {
+        if (_textSession is not null) return _textSession;
+        lock (_textSessionLock)
+        {
+            if (_textSession is null)
+            {
+                _log($"[AI-LOCAL] creating text InferenceSession: {TextModelFilePath}");
+                Func<string, InferenceSession> factory = _textSessionFactory ?? _sessionFactory;
+                _textSession = factory(TextModelFilePath);
+            }
+            return _textSession;
+        }
+    }
+
+    private ClipTokenizer? GetTokenizer()
+    {
+        if (_tokenizer is not null || _tokenizerFailed) return _tokenizer;
+        lock (_tokenizerLock)
+        {
+            if (_tokenizer is not null || _tokenizerFailed) return _tokenizer;
+            try
+            {
+                (string vocabPath, string mergesPath) = ClipTokenizer.EnsureDistributed(_modelsDirectory);
+                _tokenizer = new ClipTokenizer(vocabPath, mergesPath);
+            }
+            catch (Exception ex)
+            {
+                _tokenizerFailed = true;
+                _log($"[AI-LOCAL] failed to load ClipTokenizer: {ex.Message}");
+            }
+            return _tokenizer;
         }
     }
 
