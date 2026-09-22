@@ -5,6 +5,7 @@ using QL.World.Helpers;
 using QL.World.Models;
 using QL.World.Services;
 using QL.World.Services.Ai;
+using QL.World.Services.Pbr;
 
 namespace QL.World.ViewModels;
 
@@ -47,7 +48,8 @@ public sealed class SettingsViewModel : ObservableObject
         LegacyPythonImporter legacyImporter,
         ModelDownloadService modelDownload,
         NotificationService notifications,
-        string logsDirectory)
+        string logsDirectory,
+        PbrGroupingService pbrGrouping)
     {
         _settings = settings;
         _thumbnails = thumbnails;
@@ -57,6 +59,7 @@ public sealed class SettingsViewModel : ObservableObject
         _modelDownload = modelDownload;
         _notifications = notifications;
         _logsDirectory = logsDirectory;
+        PbrRules = new PbrRulesViewModel(settings, pbrGrouping);
 
         _selectedTheme = settings.Theme;
         _legacyDbPath = LegacyPythonImporter.DefaultLegacyDbPath;
@@ -465,6 +468,10 @@ public sealed class SettingsViewModel : ObservableObject
     public AsyncRelayCommand RunLegacyImportCommand { get; }
     public RelayCommand OpenLogsFolderCommand { get; }
     public RelayCommand CloseCommand { get; }
+
+    // ─── A6 贴图组规则 ──────────────────────────────────────────────────────
+
+    public PbrRulesViewModel PbrRules { get; }
 
     // ─── Events ─────────────────────────────────────────────────────────────
 

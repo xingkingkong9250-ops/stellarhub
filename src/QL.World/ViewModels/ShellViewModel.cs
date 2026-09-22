@@ -34,6 +34,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
             services.AiAnalysis, services.Colors, services.SemanticSearch);
         TagTree = new TagTreeViewModel(Gallery, services.ImageQuery, services.Tags);
         CollectionTree = new CollectionTreeViewModel(Gallery, services.Collections);
+        PbrGroupTree = new PbrGroupTreeViewModel(Gallery, services.PbrGrouping);
         Detail = new DetailViewModel(services.ImageQuery, services.Tags, Gallery);
         StatusBar = new StatusBarViewModel(services.Thumbnails, services.Settings);
 
@@ -92,6 +93,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public TopBarViewModel TopBar { get; }
     public TagTreeViewModel TagTree { get; }
     public CollectionTreeViewModel CollectionTree { get; }
+    public PbrGroupTreeViewModel PbrGroupTree { get; }
     public DetailViewModel Detail { get; }
     public StatusBarViewModel StatusBar { get; }
 
@@ -348,6 +350,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         StatusBar.PublishCounts(Gallery.TotalCount, Gallery.FilteredCount);
         _ = TagTree.RefreshCountsAsync();
         _ = CollectionTree.RefreshAsync();
+        _ = PbrGroupTree.RefreshAsync();
     }
 
     private void ClearFilters()
@@ -356,12 +359,14 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         Gallery.Filter.Uncategorized = false;
         Gallery.Filter.Tag = null;
         Gallery.Filter.CollectionId = null;
+        Gallery.Filter.PbrGroupId = null;
         Gallery.Filter.Text = null;
         Gallery.Filter.SemanticResultIds = null;
         Gallery.Filter.SimilarToImageId = null;
         TopBar.ClearSearchText();
         TagTree.ResetSelection();
         CollectionTree.ResetSelection();
+        PbrGroupTree.ResetSelection();
         _ = Gallery.RefreshAsync();
     }
 
@@ -388,6 +393,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         Gallery.Filter.Uncategorized = false;
         Gallery.Filter.Tag = null;
         Gallery.Filter.CollectionId = null;
+        Gallery.Filter.PbrGroupId = null;
         Gallery.Filter.Text = null;
         Gallery.Filter.SemanticResultIds = ids;
         Gallery.Filter.SimilarToImageId = primary.Id;

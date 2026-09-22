@@ -2,6 +2,7 @@ using System.IO;
 using QL.World.Models;
 using QL.World.Services;
 using QL.World.Services.Ai;
+using QL.World.Services.Pbr;
 using QL.World.Tests.Support;
 using QL.World.ViewModels;
 
@@ -33,7 +34,8 @@ public sealed class SettingsViewModelTests : IDisposable
             new LegacyPythonImporter(_lib.Db),
             new ModelDownloadService(_lib.DirectoryRoot),
             _notifications,
-            Path.Combine(_lib.DirectoryRoot, "logs"));
+            Path.Combine(_lib.DirectoryRoot, "logs"),
+            new PbrGroupingService(_lib.Db, _settings));
     }
 
     [Fact]
@@ -56,7 +58,8 @@ public sealed class SettingsViewModelTests : IDisposable
             new LegacyPythonImporter(_lib.Db),
             new ModelDownloadService(_lib.DirectoryRoot),
             _notifications,
-            Path.Combine(_lib.DirectoryRoot, "logs"));
+            Path.Combine(_lib.DirectoryRoot, "logs"),
+            new PbrGroupingService(_lib.Db, _settings));
 
         Assert.Equal("图片 2 张，其中缺失 1 张", fresh.StatisticsText);
     }

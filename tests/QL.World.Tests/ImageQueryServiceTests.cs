@@ -2,6 +2,7 @@ using System.IO;
 using QL.World.Helpers;
 using QL.World.Models;
 using QL.World.Services;
+using QL.World.Services.Pbr;
 using QL.World.Tests.Support;
 
 namespace QL.World.Tests;
@@ -73,6 +74,37 @@ public sealed class ImageQueryServiceTests
             Text = "生锈", SearchMode = SearchMode.FileNameNotes,
         });
         Assert.Single(byNotes);
+    }
+
+    [Fact]
+    public void Pbr_group_filter_restricts_to_group_members()
+    {
+        using var library = new TestLibrary();
+        var settings = new AppSettingsService(library.DirectoryRoot);
+        settings.Load();
+        var grouping = new PbrGroupingService(library.Db, settings);
+        var query = new ImageQueryService(library.Db);
+
+        string dir = Path.Combine(library.DirectoryRoot, "tex");
+        Directory.CreateDirectory(dir);
+        long color = library.InsertImage(Path.Combine(dir, "T_A_BaseColor.png"));
+        long normal = library.InsertImage(Path.Combine(dir, "T_A_Normal.png"));
+        long outside = library.InsertImage(Path.Combine(dir, "T_B_BaseColor.png"));
+
+        Assert.Equal(1, grouping.RescanAll().GroupsCreated);
+
+        long groupId = library.Db.Run(conn =>
+        {
+            using var command = conn.CreateCommand();
+            command.CommandText = "SELECT id FROM pbr_groups LIMIT 1;";
+            return Convert.ToInt64(command.ExecuteScalar());
+        });
+
+        var result = query.QueryGallery(new LibraryFilter { PbrGroupId = groupId });
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, r => r.Id == color);
+        Assert.Contains(result, r => r.Id == normal);
+        Assert.DoesNotContain(result, r => r.Id == outside);
     }
 
     [Fact]

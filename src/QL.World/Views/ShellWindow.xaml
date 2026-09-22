@@ -359,6 +359,27 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+
+                        <TextBlock Text="贴图组" Margin="2,16,0,0"
+                                   Style="{StaticResource SectionCaptionStyle}" />
+                        <ItemsControl ItemsSource="{Binding PbrGroupTree.GroupNodes}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <ToggleButton Style="{StaticResource TreeToggleStyle}"
+                                                  AutomationProperties.Name="{Binding DisplayName}"
+                                                  IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                                  Command="{Binding SelectCommand}">
+                                        <Grid>
+                                            <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" />
+                                            <TextBlock HorizontalAlignment="Right" FontSize="11"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource TextMutedBrush}"
+                                                       Text="{Binding MemberCount}" />
+                                        </Grid>
+                                    </ToggleButton>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
                 </ScrollViewer>
             </Border>

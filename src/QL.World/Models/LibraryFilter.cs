@@ -18,6 +18,9 @@ public sealed class LibraryFilter
     /// <summary>Collection filter arrives in M2.</summary>
     public long? CollectionId { get; set; }
 
+    /// <summary>PBR texture-group filter from B1-4; null = no group filter.</summary>
+    public long? PbrGroupId { get; set; }
+
     /// <summary>Free text interpreted per <see cref="SearchMode"/>.</summary>
     public string? Text { get; set; }
 
@@ -43,6 +46,7 @@ public sealed class LibraryFilter
         Uncategorized = Uncategorized,
         Tag = Tag,
         CollectionId = CollectionId,
+        PbrGroupId = PbrGroupId,
         Text = Text,
         SearchMode = SearchMode,
         Sort = Sort,

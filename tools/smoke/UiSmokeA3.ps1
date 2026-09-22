@@ -1,9 +1,10 @@
-# QL World M3 UIA 冒烟测试 — W3/A3 三档切换 + AI 按钮置灰 + 本地区块/颜色按钮存在性
+﻿# QL World M3 UIA 冒烟测试 — W3/A3 三档切换 + AI 按钮置灰 + 本地区块/颜色按钮存在性
 # 用法: powershell -ExecutionPolicy Bypass -File tools\smoke\UiSmokeA3.ps1
 # 前置: .NET 10 SDK；脚本自建 Debug 构建并用隔离数据根，不影响真实数据。
 # 退出码: 0 = 全部通过；非 0 = 存在失败步骤。
 # 覆盖：W1/A1-2 AI 按钮、W1/A1-8 颜色按钮、W3/A3 三档单选 + 云端配置区 +
-#       W3/A3 本地 ONNX 区块（状态文本 + 进度条 + 四按钮存在性）。
+#       W3/A3 本地 ONNX 区块（状态文本 + 进度条 + 四按钮存在性）、
+#       W3/A6 贴图组页签（四操作按钮 + 默认规则行存在性）。
 # 未覆盖（需图片选择/上下文菜单交互流，留待画廊级冒烟脚本）：
 #       W1/B2-3-CM1 图卡右键「找相似图」、W1/B3-8 详情栏「找相似」按钮
 
@@ -198,19 +199,45 @@ try {
                 Assert-Step '本地区块：手动导入按钮存在' ($null -ne $btnImport) '未找到 Name="手动导入…" 按钮'
                 Assert-Step '本地区块：删除模型按钮存在' ($null -ne $btnDelete) '未找到 Name="删除模型" 按钮'
 
-                # 进度条控件存在性（Visibility=Collapsed 当 IsDownloading=false，
-                # UIA 仍可枚举到元素，仅 IsOffscreen=true；这里只断言元素存在）
+                # 进度条控件在未下载时应「隐藏」：WPF UIA 不暴露非 Visible 元素
+                # （Collapsed/Hidden 均不出现在 UIA 树），故未找到 = 隐藏正确；
+                # 若找到则要求 IsOffscreen=true（下载中或保留布局的变体）。
                 $pbCond = New-Object System.Windows.Automation.PropertyCondition(
                     [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
                     [System.Windows.Automation.ControlType]::ProgressBar)
                 $progressBar = $settingsWin.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $pbCond)
-                Assert-Step '本地区块：进度条元素存在' ($null -ne $progressBar) '未找到 ProgressBar 元素'
+                $hiddenOk = ($null -eq $progressBar) -or $progressBar.Current.IsOffscreen
+                Assert-Step '本地区块：进度条未下载时隐藏' $hiddenOk '未下载时进度条不应可见'
             }
 
             # ── 5. 切回关闭（恢复初始态）──────────────────────
             if ($null -ne $radioOff) {
                 ($radioOff.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)).Select()
                 Start-Sleep -Milliseconds 500
+            }
+        }
+
+        # ── 6. W3/A6 贴图组页签控件存在性 ──────────────────────────
+        Write-Host '[Smoke] Step 6: W3/A6 PBR rules tab controls'
+        if ($null -ne $settingsWin) {
+            $pbrTab = Find-FirstByName $settingsWin '贴图组' ([System.Windows.Automation.ControlType]::TabItem)
+            Assert-Step '贴图组页签存在 (W3/A6)' ($null -ne $pbrTab) '未找到 Name="贴图组" TabItem'
+            if ($null -ne $pbrTab) {
+                ($pbrTab.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)).Select()
+                Start-Sleep -Milliseconds 800
+
+                $btnAdd    = Find-FirstByName $settingsWin '＋ 添加规则' ([System.Windows.Automation.ControlType]::Button)
+                $btnSave   = Find-FirstByName $settingsWin '保存并重建' ([System.Windows.Automation.ControlType]::Button)
+                $btnRescan = Find-FirstByName $settingsWin '仅重建' ([System.Windows.Automation.ControlType]::Button)
+                $btnReset  = Find-FirstByName $settingsWin '恢复默认' ([System.Windows.Automation.ControlType]::Button)
+                Assert-Step 'A6：添加规则按钮存在' ($null -ne $btnAdd) '未找到 Name="＋ 添加规则" 按钮'
+                Assert-Step 'A6：保存并重建按钮存在' ($null -ne $btnSave) '未找到 Name="保存并重建" 按钮'
+                Assert-Step 'A6：仅重建按钮存在' ($null -ne $btnRescan) '未找到 Name="仅重建" 按钮'
+                Assert-Step 'A6：恢复默认按钮存在' ($null -ne $btnReset) '未找到 Name="恢复默认" 按钮'
+
+                # 默认规则 17 条 → 规则列表应有行；至少能找到一个「启用」复选框
+                $enableCheck = Find-FirstByName $settingsWin '启用规则' ([System.Windows.Automation.ControlType]::CheckBox)
+                Assert-Step 'A6：默认规则行存在（启用复选框）' ($null -ne $enableCheck) '未找到任何 Name="启用规则" 复选框'
             }
         }
 

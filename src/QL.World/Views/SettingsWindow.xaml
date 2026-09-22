@@ -220,6 +220,70 @@
                             Command="{Binding OpenLogsFolderCommand}" />
                 </StackPanel>
             </TabItem>
+
+            <!-- ═══ A6 贴图组规则 ═══ -->
+            <TabItem Header="贴图组">
+                <Grid Margin="14,12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0"
+                               Text="文件名尾缀 → 贴图角色（尾缀不区分大小写，按目录+基名成组）"
+                               Style="{StaticResource SectionCaptionStyle}" />
+                    <ListBox Grid.Row="1" Margin="0,6,0,0"
+                             ItemsSource="{Binding PbrRules.Rules}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="170" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0" Margin="0,0,6,0"
+                                             Text="{Binding Pattern, UpdateSourceTrigger=PropertyChanged}"
+                                             AutomationProperties.Name="尾缀模式" />
+                                    <ComboBox Grid.Column="1" Margin="0,0,6,0" VerticalAlignment="Center"
+                                              ItemsSource="{Binding DataContext.PbrRules.RoleOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              SelectedValue="{Binding Role}"
+                                              SelectedValuePath="Value"
+                                              DisplayMemberPath="Display"
+                                              AutomationProperties.Name="贴图角色" />
+                                    <CheckBox Grid.Column="2" VerticalAlignment="Center" Margin="0,0,8,0"
+                                              IsChecked="{Binding Enabled}"
+                                              Content="启用"
+                                              AutomationProperties.Name="启用规则" />
+                                    <Button Grid.Column="3" Content="✕" Width="28"
+                                            Style="{StaticResource SubtleButtonStyle}"
+                                            Command="{Binding RemoveCommand}"
+                                            AutomationProperties.Name="删除规则" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
+                        <Button Content="＋ 添加规则" Style="{StaticResource SubtleButtonStyle}"
+                                Command="{Binding PbrRules.AddRuleCommand}" />
+                        <Button Content="保存并重建" Margin="8,0,0,0"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Command="{Binding PbrRules.SaveCommand}" />
+                        <Button Content="仅重建" Margin="8,0,0,0"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                Command="{Binding PbrRules.RescanCommand}" />
+                        <Button Content="恢复默认" Margin="8,0,0,0"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                Command="{Binding PbrRules.RestoreDefaultsCommand}" />
+                    </StackPanel>
+                    <TextBlock Grid.Row="3" Text="{Binding PbrRules.StatusText}" Margin="0,8,0,0"
+                               FontSize="12" TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Visibility="{Binding PbrRules.StatusText, Converter={StaticResource NullVis}}" />
+                </Grid>
+            </TabItem>
         </TabControl>
 
         <Border Grid.Row="1" Padding="12,8"

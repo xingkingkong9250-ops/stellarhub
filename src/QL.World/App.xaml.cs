@@ -239,7 +239,8 @@ public partial class App : Application
                 _services.LegacyImporter,
                 new ModelDownloadService(_services.Settings.DataRoot, WriteLog),
                 _services.Notifications,
-                _logDirectory);
+                _logDirectory,
+                _services.PbrGrouping);
             settingsViewModel.ThemeChanged += theme =>
             {
                 SetTheme(theme);

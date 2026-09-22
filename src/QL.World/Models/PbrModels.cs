@@ -17,3 +17,6 @@ public static class PbrRoles
 /// mapped to a texture role. Serialized into config.json (pbrRules).
 /// </summary>
 public sealed record PbrRule(string Pattern, string Role, bool Enabled);
+
+/// <summary>B1-4 贴图组树节点数据：组名 + 成员数。</summary>
+public sealed record PbrGroupInfo(long Id, string Name, int MemberCount);

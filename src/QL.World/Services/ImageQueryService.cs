@@ -476,6 +476,16 @@ public sealed class ImageQueryService
             parameters.Add(("$collection", collectionId));
         }
 
+        if (filter.PbrGroupId is long pbrGroupId)
+        {
+            sql.Append(HasWhere(sql) ? "\n  AND " : "\nWHERE ");
+            sql.Append("""
+                EXISTS (SELECT 1 FROM pbr_group_images pgi
+                        WHERE pgi.image_id = i.id AND pgi.group_id = $pbrGroup)
+                """);
+            parameters.Add(("$pbrGroup", pbrGroupId));
+        }
+
         if (!string.IsNullOrWhiteSpace(filter.Text))
         {
             sql.Append(HasWhere(sql) ? "\n  AND " : "\nWHERE ");

@@ -39,6 +39,26 @@ public sealed class PbrGroupingService
         return Rebuild(grouped, affectedIds: null, scannedCount: images.Count);
     }
 
+    /// <summary>All groups with member counts, ordered by name (case-insensitive).</summary>
+    public IReadOnlyList<PbrGroupInfo> GetGroups() =>
+        _db.Run(conn =>
+        {
+            var groups = new List<PbrGroupInfo>();
+            using var command = conn.CreateCommand();
+            command.CommandText = """
+                SELECT g.id, g.name, COUNT(m.image_id)
+                FROM pbr_groups g
+                LEFT JOIN pbr_group_images m ON m.group_id = g.id
+                GROUP BY g.id, g.name
+                ORDER BY g.name COLLATE NOCASE;
+                """;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                groups.Add(new PbrGroupInfo(
+                    reader.GetInt64(0), reader.GetString(1), reader.GetInt32(2)));
+            return groups;
+        });
+
     public PbrRescanReport RescanDirectories(IReadOnlyCollection<string> directories)
     {
         var dirSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
