@@ -19,6 +19,7 @@ public sealed class ImportOptions
         {
             ".jpg", ".jpeg", ".png", ".bmp", ".gif",
             ".webp", ".tif", ".tiff", ".tga",
+            ".exr", ".hdr", ".psd",
         };
 }
 

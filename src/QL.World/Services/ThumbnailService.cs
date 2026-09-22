@@ -21,6 +21,7 @@ public sealed class ThumbnailService : IDisposable
 
     private readonly string _root;
     private readonly AppSettingsService _settings;
+    private readonly IMagickDecoder _magick;
 
     private readonly object _queueGate = new();
     private readonly PriorityQueue<string, long> _queue = new();
@@ -34,11 +35,12 @@ public sealed class ThumbnailService : IDisposable
     private bool _disposed;
     private Task? _placeholderTask;
 
-    public ThumbnailService(string dataRoot, AppSettingsService settings)
+    public ThumbnailService(string dataRoot, AppSettingsService settings, IMagickDecoder? magick = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(dataRoot);
         _root = Path.Combine(dataRoot, AppDataRootResolver.ThumbnailsFolderName);
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _magick = magick ?? new MagickDecoder();
         Directory.CreateDirectory(_root);
 
         _workers = Enumerable.Range(0, WORKER_COUNT)
@@ -183,7 +185,7 @@ public sealed class ThumbnailService : IDisposable
         int size = _settings.ThumbnailSize;
         int quality = _settings.ThumbnailQuality;
 
-        using Image image = Image.Load(job.SourcePath);
+        using Image image = LoadDecoded(job.SourcePath);
         image.Mutate(ctx => ctx.Resize(new ResizeOptions
         {
             Size = new Size(size, size),
@@ -200,6 +202,25 @@ public sealed class ThumbnailService : IDisposable
         finally
         {
             TryDelete(temporary);
+        }
+    }
+
+    /// <summary>
+    /// ImageSharp first; when it does not recognize the container
+    /// (tga/exr/hdr/psd) fall back to the Magick decoder. Rethrows as
+    /// <see cref="UnknownImageFormatException"/> when both fail.
+    /// </summary>
+    private Image LoadDecoded(string path)
+    {
+        try
+        {
+            return Image.Load(path);
+        }
+        catch (UnknownImageFormatException)
+        {
+            if (_magick.TryLoadFrame(path, out Image? frame) && frame is not null)
+                return frame;
+            throw;
         }
     }
 
