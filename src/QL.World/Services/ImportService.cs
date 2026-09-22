@@ -3,6 +3,7 @@ using Microsoft.Data.Sqlite;
 using QL.World.Data;
 using QL.World.Helpers;
 using QL.World.Models;
+using QL.World.Services.Pbr;
 
 namespace QL.World.Services;
 
@@ -17,11 +18,13 @@ public sealed class ImportService
 
     private readonly DatabaseService _db;
     private readonly ImageInspector _inspector;
+    private readonly PbrGroupingService? _pbrGrouping;
 
-    public ImportService(DatabaseService db, ImageInspector inspector)
+    public ImportService(DatabaseService db, ImageInspector inspector, PbrGroupingService? pbrGrouping = null)
     {
         _db = db;
         _inspector = inspector;
+        _pbrGrouping = pbrGrouping;
     }
 
     public Task<ImportReport> ImportAsync(
@@ -47,6 +50,7 @@ public sealed class ImportService
 
         var state = new ImportProgress { ScannedTotal = files.Count };
         var pending = new List<PendingImage>(BATCH_SIZE);
+        var affectedDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         void Flush()
         {
@@ -56,9 +60,30 @@ public sealed class ImportService
 
             List<ImportedItem> inserted = InsertBatch(batch);
             report.Added.AddRange(inserted);
+            foreach (ImportedItem item in inserted)
+            {
+                string? dir = Path.GetDirectoryName(item.FilePath);
+                if (dir is not null)
+                    affectedDirs.Add(dir);
+            }
             state.Added = report.Added.Count;
             state.Skipped = report.SkippedCount;
             progress?.Report(CloneProgress(state));
+        }
+
+        // PBR auto-grouping for the touched directories; never blocks the import result.
+        void RescanPbrGroups()
+        {
+            if (affectedDirs.Count == 0 || _pbrGrouping is null)
+                return;
+            try
+            {
+                _pbrGrouping.RescanDirectories(affectedDirs);
+            }
+            catch (Exception ex)
+            {
+                report.LogLines.Add($"贴图组扫描失败（不影响导入结果）：{ex.Message}");
+            }
         }
 
         foreach (string file in files)
@@ -66,6 +91,7 @@ public sealed class ImportService
             if (cancellationToken.IsCancellationRequested)
             {
                 Flush();
+                RescanPbrGroups();
                 report.Cancelled = true;
                 return report;
             }
@@ -129,6 +155,7 @@ public sealed class ImportService
         }
 
         Flush();
+        RescanPbrGroups();
         state.CurrentFile = string.Empty;
         state.Added = report.Added.Count;
         state.Skipped = report.SkippedCount;

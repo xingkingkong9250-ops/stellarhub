@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using QL.World.Interop;
 using QL.World.Models;
+using QL.World.Services.Pbr;
 
 namespace QL.World.Services;
 
@@ -238,6 +239,25 @@ public sealed class AppSettingsService
         set => SetAndSave(value,
             () => _settings.LocalModelPath,
             next => _settings.LocalModelPath = next);
+    }
+
+    // ─── PBR grouping (M4) ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Active PBR suffix rules. Null/empty in config.json resolves to the
+    /// built-in defaults.
+    /// </summary>
+    public IReadOnlyList<PbrRule> PbrRules =>
+        _settings.PbrRules is { Count: > 0 } ? _settings.PbrRules : PbrRuleSet.Defaults;
+
+    /// <summary>
+    /// Persists custom rules; null/empty restores the built-in defaults.
+    /// </summary>
+    public void SetPbrRules(IReadOnlyList<PbrRule>? rules)
+    {
+        _settings.PbrRules = rules is { Count: > 0 } ? [.. rules] : null;
+        if (TrySaveNow())
+            Changed?.Invoke();
     }
 
     private void SetAndSave<T>(T value, Func<T> get, Action<T> set)

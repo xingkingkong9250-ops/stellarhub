@@ -47,4 +47,12 @@ public sealed class AppSettings
 
     /// <summary>Path to the local ONNX model file (M3-D). Null when not downloaded.</summary>
     public string? LocalModelPath { get; set; }
+
+    // ─── PBR grouping (M4) ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Editable PBR suffix rules. Null/empty means the built-in defaults
+    /// (PbrRuleSet.Defaults) are active.
+    /// </summary>
+    public List<PbrRule>? PbrRules { get; set; }
 }

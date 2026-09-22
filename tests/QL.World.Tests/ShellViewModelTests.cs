@@ -4,6 +4,7 @@ using QL.World.Data;
 using QL.World.Services;
 using QL.World.Services.Ai;
 using QL.World.Services.Colors;
+using QL.World.Services.Pbr;
 using QL.World.ViewModels;
 
 namespace QL.World.Tests;
@@ -43,10 +44,11 @@ public sealed class ShellViewModelTests : IDisposable
         var aiAnalysis = new AiAnalysisService(ai, _database, tags, notifications);
         var colors = new ColorAnalysisService(_database);
         var semanticSearch = new SemanticSearchService(_database, ai);
+        var pbrGrouping = new PbrGroupingService(_database, settings);
         var services = new ServiceRegistry(
             settings, _database, inspector, import, _thumbnails, imageQuery,
             tags, collections, notifications, watcher, legacyImporter, ai, aiAnalysis,
-            colors, semanticSearch);
+            colors, semanticSearch, pbrGrouping);
         _viewModel = new ShellViewModel(services);
     }
 

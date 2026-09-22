@@ -1,6 +1,7 @@
 using QL.World.Data;
 using QL.World.Services.Ai;
 using QL.World.Services.Colors;
+using QL.World.Services.Pbr;
 
 namespace QL.World.Services;
 
@@ -27,6 +28,7 @@ public sealed class ServiceRegistry
     public AiAnalysisService AiAnalysis { get; }
     public ColorAnalysisService Colors { get; }
     public SemanticSearchService SemanticSearch { get; }
+    public PbrGroupingService PbrGrouping { get; }
 
     public ServiceRegistry(
         AppSettingsService settings,
@@ -43,7 +45,8 @@ public sealed class ServiceRegistry
         IAiService ai,
         AiAnalysisService aiAnalysis,
         ColorAnalysisService colors,
-        SemanticSearchService semanticSearch)
+        SemanticSearchService semanticSearch,
+        PbrGroupingService pbrGrouping)
     {
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
         Database = database ?? throw new ArgumentNullException(nameof(database));
@@ -60,5 +63,6 @@ public sealed class ServiceRegistry
         AiAnalysis = aiAnalysis ?? throw new ArgumentNullException(nameof(aiAnalysis));
         Colors = colors ?? throw new ArgumentNullException(nameof(colors));
         SemanticSearch = semanticSearch ?? throw new ArgumentNullException(nameof(semanticSearch));
+        PbrGrouping = pbrGrouping ?? throw new ArgumentNullException(nameof(pbrGrouping));
     }
 }

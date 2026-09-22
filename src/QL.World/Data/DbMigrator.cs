@@ -11,7 +11,7 @@ namespace QL.World.Data;
 /// </summary>
 internal static class DbMigrator
 {
-    private const int CURRENT_VERSION = 1;
+    private const int CURRENT_VERSION = 2;
 
     public static void Migrate(SqliteConnection connection)
     {
@@ -45,7 +45,7 @@ internal static class DbMigrator
         return Convert.ToInt32(command.ExecuteScalar());
     }
 
-    private static string LoadSchemaSql(int version)
+    internal static string LoadSchemaSql(int version)
     {
         Assembly assembly = typeof(DbMigrator).Assembly;
         string resourceName = $"QL.World.Data.Schema.v{version}.sql";

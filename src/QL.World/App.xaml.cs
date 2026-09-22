@@ -5,6 +5,7 @@ using QL.World.Helpers;
 using QL.World.Services;
 using QL.World.Services.Ai;
 using QL.World.Services.Colors;
+using QL.World.Services.Pbr;
 using QL.World.ViewModels;
 using QL.World.Views;
 
@@ -80,7 +81,8 @@ public partial class App : Application
             _database.Initialize();
 
             var inspector = new ImageInspector();
-            var importService = new ImportService(_database, inspector);
+            var pbrGrouping = new PbrGroupingService(_database, settings, WriteLog);
+            var importService = new ImportService(_database, inspector, pbrGrouping);
             _thumbnails = new ThumbnailService(dataRoot, settings);
             var imageQuery = new ImageQueryService(_database);
             var tagService = new TagService(_database);
@@ -112,7 +114,8 @@ public partial class App : Application
                 aiService,
                 aiAnalysis,
                 colorAnalysis,
-                semanticSearch);
+                semanticSearch,
+                pbrGrouping);
             _services = services;
 
             SetTheme(settings.Theme);
