@@ -5,6 +5,31 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.5.0] — M3-E2 本地 CLIP 文本编码
+
+- 本地文→图语义搜索打通：`LocalAiService.EmbedTextAsync` 从 M3-E1 的 null
+  占位实现改为真实链路——BPE tokenize → `text_model.onnx`（Xenova/
+  clip-vit-base-patch32，254 MB，fp32）推理 → 512 维 CLIP 文本向量；
+  Local 模式语义搜索与 Cloud 模式行为对齐
+- `ClipTokenizer`（E-A）：从 M3-D Spike 移植的 CLIP BPE tokenizer（77 context，
+  SOT/EOT，GPT-2 预分词正则，BytesToUnicode 字节映射，BPE 合并缓存）；
+  `vocab.json`（49408 条）+ `merges.txt` 作为 EmbeddedResource 分发，
+  `EnsureDistributed` 首次使用时解压到 models 目录（幂等）
+- 模型包捆绑下载（E-C）：`ModelDownloadService` 重构为多文件 bundle——
+  vision_model.onnx（351 MB）+ text_model.onnx（254 MB）顺序下载、单进度条
+  跨两阶段（0–50 / 50–100）、各自 SHA-256 校验；任一文件失败回滚已下载文件，
+  不留半安装包；`CheckLocalState`/`DeleteModel` 覆盖整个 bundle
+- 向后兼容：仅存在 vision_model.onnx 的旧安装，图像分析 + 图→图搜索照常，
+  文→图降级为 null + 通知（设置面板提示下载完整模型包）；手动导入仍仅
+  支持 vision 单文件，文本模型经下载通道获取
+- 设置 W3/A3：本地区块信息行扩展显示两模型体积；Verifying 阶段展示
+  当前校验文件名；语义搜索不可用通知文案更新（关闭档/缺文本模型两种指引）
+- 测试：189 → 204（新增 ClipTokenizerTests 6 用例：BPE token 数回归、
+  BytesToUnicode 守护、资源解压幂等等；LocalAiService EmbedText 4 用例：
+  stub text session 512 维输出/缺模型降级/session 异常/旧版兼容；
+  ModelDownloadService bundle 6 用例：双文件下载/失败回滚/组合状态/删除/
+  进度边界；MiniOnnx 新增 text stub 图构造）
+
 ## [0.4.0] — M3 第二阶段（本地 ONNX + 颜色分析 + 语义搜索）
 
 ### D-A：颜色分析（无新依赖）

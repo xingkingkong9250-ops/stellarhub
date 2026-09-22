@@ -234,7 +234,9 @@ public sealed class TopBarViewModel : ObservableObject
                 if (ids is null)
                 {
                     _notifications.Publish(NotificationKind.SemanticSearchUnavailable,
-                        "语义搜索不可用", "AI 档不支持文本 embedding，或本地未实现（M3-E2）。");
+                        "语义搜索不可用",
+                        "当前 AI 档无法生成文本 embedding：关闭档请切换到本地/云端；"
+                        + "本地档请在设置中下载完整模型包（含文本模型）。");
                     // 回退到 Tag 模式让用户至少能用搜索。
                     _searchMode = SearchMode.Tag;
                     _gallery.Filter.SearchMode = SearchMode.Tag;
