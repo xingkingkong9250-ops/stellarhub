@@ -15,6 +15,9 @@ internal static class MiniOnnx
     public const string InputName = "pixel_values";
     public const string OutputName = "image_embeds";
 
+    public const string TextInputName = "input_ids";
+    public const string TextOutputName = "text_embeds";
+
     public static byte[] BuildClipStubModel()
     {
         byte[] shape1d = Init("shape_1d", [1], 150528);
@@ -37,6 +40,43 @@ internal static class MiniOnnx
             WriteMsg(b, 5, shapeOut);
             WriteMsg(b, 11, ValueInfo(InputName, TensorType(elemType: 1, Shape(1, 3, 224, 224))));
             WriteMsg(b, 12, ValueInfo(OutputName, TensorType(elemType: 1, Shape(1, 512))));
+        });
+
+        byte[] opset = Msg(b =>
+        {
+            WriteString(b, 1, "");
+            WriteVarintField(b, 2, 17);
+        });
+
+        return Msg(b =>
+        {
+            WriteVarintField(b, 1, 8); // ir_version
+            WriteMsg(b, 7, graph);
+            WriteMsg(b, 8, opset);
+        });
+    }
+
+    /// <summary>
+    /// Stub text model: input_ids [1,77] int64 (accepted but ignored) →
+    /// text_embeds [1,512] float, equal to a fixed pattern (0.001 * index
+    /// for index in 0..511). Lets LocalAiService EmbedTextAsync tests assert
+    /// the returned embedding without depending on real CLIP weights.
+    /// </summary>
+    public static byte[] BuildClipTextStubModel()
+    {
+        float[] stubValues = Enumerable.Range(0, 512).Select(i => i * 0.001f).ToArray();
+        byte[] constShape = Init("text_const_shape", [2], 1, 512);
+        byte[] constData = InitFloat("text_const_data", [1, 512], stubValues);
+
+        byte[] graph = Msg(b =>
+        {
+            // Reshape(const_data, const_shape) → text_embeds
+            WriteMsg(b, 1, Node("Reshape", ["text_const_data", "text_const_shape"], [TextOutputName]));
+            WriteMsg(b, 5, constShape);
+            WriteMsg(b, 5, constData);
+            // input_ids declared as graph input (caller must provide) but unused
+            WriteMsg(b, 11, ValueInfo(TextInputName, TensorType(elemType: 7, Shape(1, 77))));
+            WriteMsg(b, 12, ValueInfo(TextOutputName, TensorType(elemType: 1, Shape(1, 512))));
         });
 
         byte[] opset = Msg(b =>
@@ -101,6 +141,17 @@ internal static class MiniOnnx
             WriteMsg(b, 9, Le64(values)); // raw_data
         });
 
+    private static byte[] InitFloat(string name, long[] dims, float[] values) =>
+        Msg(b =>
+        {
+            var packed = new List<byte>();
+            foreach (long dim in dims) WriteVarint(packed, (ulong)dim);
+            WriteMsg(b, 1, [.. packed]); // dims
+            WriteVarintField(b, 2, 1);   // data_type = FLOAT
+            WriteString(b, 8, name);
+            WriteMsg(b, 9, Le32(values)); // raw_data
+        });
+
     // ── protobuf wire format primitives ────────────────────────────────
 
     private static byte[] Msg(Action<List<byte>> build)
@@ -148,6 +199,14 @@ internal static class MiniOnnx
             for (int j = 0; j < 8; j++)
                 bytes[i * 8 + j] = (byte)(bits >> (8 * j));
         }
+        return bytes;
+    }
+
+    private static byte[] Le32(float[] values)
+    {
+        var bytes = new byte[values.Length * 4];
+        for (int i = 0; i < values.Length; i++)
+            BitConverter.TryWriteBytes(bytes.AsSpan(i * 4, 4), values[i]);
         return bytes;
     }
 }

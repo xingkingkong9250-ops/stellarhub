@@ -153,16 +153,76 @@ public sealed class LocalAiServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task EmbedText_returns_null_without_creating_session()
+    public async Task EmbedText_returns_null_when_text_model_missing_without_touching_vision()
     {
-        // LocalAiService.EmbedTextAsync 在 M3-E1 中应直接返回 null，
-        // 不创建 InferenceSession（本地 CLIP text encoder 延后到 M3-E2）。
+        // M3-E2: text_model.onnx absent → EmbedTextAsync returns null and must
+        // not create the vision session (image path is never invoked).
         var ai = new LocalAiService(
             ModelsDir,
-            sessionFactory: _ => throw new InvalidOperationException("session must not be created"));
+            sessionFactory: _ => throw new InvalidOperationException("session must not be created"),
+            textSessionFactory: _ => throw new InvalidOperationException("text session must not be created"));
 
         float[]? emb = await ai.EmbedTextAsync("硬表面金属质感", CancellationToken.None);
 
+        Assert.Null(emb);
+    }
+
+    [Fact]
+    public async Task EmbedText_with_stub_text_session_returns_512_dim_embedding()
+    {
+        // text_model.onnx present (stub graph) + injected text session factory.
+        // Vision factory must never be touched by EmbedTextAsync.
+        string textPath = Path.Combine(ModelsDir, ModelManifest.TextModelFileName);
+        File.WriteAllBytes(textPath, MiniOnnx.BuildClipTextStubModel());
+
+        bool textSessionCreated = false;
+        var ai = new LocalAiService(
+            ModelsDir,
+            sessionFactory: _ => throw new InvalidOperationException("vision session must not be created"),
+            textSessionFactory: path =>
+            {
+                textSessionCreated = true;
+                Assert.Equal(textPath, path);
+                return new InferenceSession(path);
+            });
+
+        float[]? emb = await ai.EmbedTextAsync("red car metal", CancellationToken.None);
+
+        Assert.True(textSessionCreated);
+        Assert.NotNull(emb);
+        Assert.Equal(512, emb.Length);
+        // Stub graph emits i * 0.001f regardless of input_ids.
+        Assert.Equal(0f, emb[0]);
+        Assert.Equal(0.511f, emb[511], 5);
+    }
+
+    [Fact]
+    public async Task EmbedText_returns_null_when_text_session_creation_throws()
+    {
+        string textPath = Path.Combine(ModelsDir, ModelManifest.TextModelFileName);
+        File.WriteAllBytes(textPath, MiniOnnx.BuildClipTextStubModel());
+
+        var ai = new LocalAiService(
+            ModelsDir,
+            sessionFactory: _ => throw new InvalidOperationException("vision must not load"),
+            textSessionFactory: _ => throw new InvalidOperationException("text model boom"));
+
+        float[]? emb = await ai.EmbedTextAsync("test query", CancellationToken.None);
+
+        Assert.Null(emb);
+    }
+
+    [Fact]
+    public async Task EmbedText_is_available_even_when_only_vision_model_exists()
+    {
+        // Backward compatibility: a pre-E2 install has only vision_model.onnx.
+        // IsAvailable (image analysis + image→image) stays true; text→image
+        // degrades to null without throwing.
+        WriteModelFile(MiniOnnx.BuildClipStubModel());
+        var ai = new LocalAiService(ModelsDir);
+
+        Assert.True(ai.IsAvailable);
+        float[]? emb = await ai.EmbedTextAsync("query", CancellationToken.None);
         Assert.Null(emb);
     }
 

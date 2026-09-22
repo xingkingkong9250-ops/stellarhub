@@ -183,6 +183,111 @@ public sealed class ModelDownloadServiceTests : IDisposable
         Assert.False(File.Exists(ModelPath));
     }
 
+    // ── M3-E2 bundle (vision + text) flows ───────────────────────────────
+
+    private static readonly byte[] TextPayload = Encoding.UTF8.GetBytes("ql-world-text-model-payload-254mb-placeholder");
+    private static readonly string TextPayloadSha =
+        Convert.ToHexString(SHA256.HashData(TextPayload)).ToLowerInvariant();
+
+    private const string VisionUrl = "https://huggingface.co/x/y/resolve/main/onnx/vision_model.onnx";
+    private const string TextUrl = "https://huggingface.co/x/y/resolve/main/onnx/text_model.onnx";
+
+    private string TextModelPath =>
+        Path.Combine(_library.DirectoryRoot, "models", ModelManifest.TextModelFileName);
+
+    private ModelDownloadService CreateBundleService() =>
+        new(_library.DirectoryRoot,
+        [
+            new ModelFileSpec(ModelManifest.ModelFileName, PayloadSha, Payload.Length, VisionUrl, VisionUrl),
+            new ModelFileSpec(ModelManifest.TextModelFileName, TextPayloadSha, TextPayload.Length, TextUrl, TextUrl),
+        ], httpHandler: _handler);
+
+    [Fact]
+    public async Task Bundle_download_writes_and_verifies_both_files()
+    {
+        _handler.Responder = request =>
+            request.RequestUri!.AbsolutePath.Contains("text_model") ? Ok(TextPayload) : Ok(Payload);
+        var service = CreateBundleService();
+
+        await service.DownloadAsync(null, CancellationToken.None);
+
+        Assert.Equal(Payload, await File.ReadAllBytesAsync(ModelPath));
+        Assert.Equal(TextPayload, await File.ReadAllBytesAsync(TextModelPath));
+        Assert.Equal(LocalModelState.Ready, service.CheckLocalState());
+    }
+
+    [Fact]
+    public async Task Bundle_rolls_back_first_file_when_second_download_fails()
+    {
+        _handler.Responder = request =>
+        {
+            if (request.RequestUri!.AbsolutePath.Contains("text_model"))
+                throw new HttpRequestException("text source down");
+            return Ok(Payload);
+        };
+        var service = CreateBundleService();
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => service.DownloadAsync(null, CancellationToken.None));
+
+        // Vision was completed before text failed → rollback deleted it,
+        // leaving no half-installed bundle.
+        Assert.False(File.Exists(ModelPath));
+        Assert.False(File.Exists(TextModelPath));
+        Assert.Equal(LocalModelState.NotDownloaded, service.CheckLocalState());
+    }
+
+    [Fact]
+    public void Bundle_check_state_reports_missing_text_as_not_downloaded()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(ModelPath)!);
+        File.WriteAllBytes(ModelPath, Payload);
+        var service = CreateBundleService();
+
+        Assert.Equal(LocalModelState.NotDownloaded, service.CheckLocalState());
+    }
+
+    [Fact]
+    public void Bundle_check_state_reports_wrong_size_text_as_corrupted()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(ModelPath)!);
+        File.WriteAllBytes(ModelPath, Payload);
+        File.WriteAllBytes(TextModelPath, TextPayload[..3]);
+        var service = CreateBundleService();
+
+        Assert.Equal(LocalModelState.Corrupted, service.CheckLocalState());
+    }
+
+    [Fact]
+    public void Bundle_delete_removes_both_files()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(ModelPath)!);
+        File.WriteAllBytes(ModelPath, Payload);
+        File.WriteAllBytes(TextModelPath, TextPayload);
+        var service = CreateBundleService();
+
+        Assert.True(service.DeleteModel());
+        Assert.False(File.Exists(ModelPath));
+        Assert.False(File.Exists(TextModelPath));
+    }
+
+    [Fact]
+    public async Task Bundle_progress_advances_through_second_half_during_text_download()
+    {
+        _handler.Responder = request =>
+            request.RequestUri!.AbsolutePath.Contains("text_model") ? Ok(TextPayload) : Ok(Payload);
+        var service = CreateBundleService();
+        var collector = new CollectingProgress();
+
+        await service.DownloadAsync(collector, CancellationToken.None);
+
+        // Per-file Verifying reports at phase boundaries: vision → 50, text → 100.
+        // (Downloading ticks are throttled to ~1/MB and may not fire for tiny test payloads.)
+        Assert.Contains(50.0, collector.Percents);
+        Assert.Contains(100.0, collector.Percents);
+        Assert.Contains(ModelDownloadPhase.Completed, collector.Phases);
+    }
+
     private static HttpResponseMessage Ok(byte[] bytes)
     {
         var response = new HttpResponseMessage(HttpStatusCode.OK)
@@ -209,7 +314,15 @@ public sealed class ModelDownloadServiceTests : IDisposable
     private sealed class CollectingProgress : IProgress<ModelDownloadProgress>
     {
         public List<ModelDownloadPhase> Phases { get; } = [];
-        public void Report(ModelDownloadProgress value) => Phases.Add(value.Phase);
+        public List<double> Percents { get; } = [];
+        public double? LastDownloadPercent { get; private set; }
+        public void Report(ModelDownloadProgress value)
+        {
+            Phases.Add(value.Phase);
+            Percents.Add(value.Percent);
+            if (value.Phase == ModelDownloadPhase.Downloading)
+                LastDownloadPercent = value.Percent;
+        }
     }
 
     private sealed class StubHandler : HttpMessageHandler
