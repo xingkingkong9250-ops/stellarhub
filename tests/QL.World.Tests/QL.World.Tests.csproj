@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
@@ -18,5 +18,7 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <ProjectReference Include="..\..\src\QL.World\QL.World.csproj" />
+    <!-- M4-F：契约测试直接引用 ReleaseTool 库，调用 ReleaseArtifacts.Produce 静态方法 -->
+    <ProjectReference Include="..\..\tools\ReleaseTool\ReleaseTool.csproj" />
   </ItemGroup>
 </Project>

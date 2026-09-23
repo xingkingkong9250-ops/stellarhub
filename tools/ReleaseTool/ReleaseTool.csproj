@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Exe 而非 Library：build.ps1 通过 PowerShell 5.1 兼容方式直接调用可执行文件，
+         避免 Add-Type 加载 .NET 10 程序集到 Windows PowerShell CLR 的不兼容问题。
+         测试工程仍可通过 ProjectReference 直接引用 ReleaseArtifacts 静态方法。 -->
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>QL.World.ReleaseTool</RootNamespace>
+    <AssemblyName>QL.World.ReleaseTool</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <!-- 关闭 XML 文档注释生成，避免缺失 public XML 注释警告 -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- M4-F 发布工具，加入 QL.World.sln 便于统一构建/测试门禁 -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="QL.World.Tests" />
+  </ItemGroup>
+
+</Project>
