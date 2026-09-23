@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- 主工程是 net10.0-windows（WPF），ProjectReference 要求 TFM 兼容，故此处同样用 windows TFM -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>StressGen</RootNamespace>
+    <!-- M4-D 压测工具，不进 QL.World.sln -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\QL.World\QL.World.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -62,6 +62,14 @@ public sealed class ImageQueryService
             var parameters = new List<(string Name, object? Value)>();
             AppendClauses(sql, parameters, filter);
             sql.Append(' ').Append(GetOrderBy(filter.Sort));
+            if (filter.Limit is int limit)
+            {
+                // Server-side pagination (M4-D). ORDER BY always carries an id
+                // tie-break, so OFFSET pages are stable across queries.
+                sql.Append("\nLIMIT $limit OFFSET $offset");
+                parameters.Add(("$limit", limit));
+                parameters.Add(("$offset", filter.Offset));
+            }
 
             using var command = conn.CreateCommand();
             command.CommandText = sql.ToString();
@@ -90,6 +98,28 @@ public sealed class ImageQueryService
                 });
             }
             return result;
+        });
+    }
+
+    /// <summary>
+    /// Filtered row count without loading rows (M4-D pagination support):
+    /// same WHERE clauses as <see cref="QueryGallery"/>, no ORDER BY/LIMIT.
+    /// </summary>
+    public int CountFiltered(LibraryFilter filter)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+
+        return _db.Run(conn =>
+        {
+            var sql = new StringBuilder("SELECT COUNT(*)\nFROM images i");
+            var parameters = new List<(string Name, object? Value)>();
+            AppendClauses(sql, parameters, filter);
+
+            using var command = conn.CreateCommand();
+            command.CommandText = sql.ToString();
+            foreach ((string name, object? value) in parameters)
+                command.Parameters.AddNullable(name, value);
+            return Convert.ToInt32(command.ExecuteScalar());
         });
     }
 

@@ -40,6 +40,15 @@ public sealed class LibraryFilter
     /// <summary>Reference image id for image→image similar search (UI display only; filtering uses SemanticResultIds).</summary>
     public long? SimilarToImageId { get; set; }
 
+    /// <summary>
+    /// Server-side pagination (M4-D): max rows returned; null = unlimited.
+    /// <see cref="Offset"/> is ignored unless Limit is set.
+    /// </summary>
+    public int? Limit { get; set; }
+
+    /// <summary>Row offset for pagination; only applied together with Limit.</summary>
+    public int Offset { get; set; }
+
     public LibraryFilter Clone() => new()
     {
         Category = Category,
@@ -53,6 +62,8 @@ public sealed class LibraryFilter
         OnlyMissing = OnlyMissing,
         SemanticResultIds = SemanticResultIds,
         SimilarToImageId = SimilarToImageId,
+        Limit = Limit,
+        Offset = Offset,
     };
 }
 

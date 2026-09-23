@@ -44,7 +44,7 @@ public sealed class DatabaseServiceTests
             command.CommandText = "PRAGMA user_version;";
             return Convert.ToInt32(command.ExecuteScalar());
         });
-        Assert.Equal(2, version);
+        Assert.Equal(3, version);
 
         // Second Initialize must not throw or duplicate anything.
         library.Db.Initialize();
@@ -98,7 +98,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(2, migrated);
+            Assert.Equal(3, migrated);
 
             var (tableCount, imageCount) = db.Run(conn =>
             {
@@ -116,7 +116,7 @@ public sealed class DatabaseServiceTests
             Assert.Equal(2, tableCount);
             Assert.Equal(1, imageCount); // v1 data survived the migration
 
-            // Re-running Initialize must stay at v2 (idempotent forward-only).
+            // Re-running Initialize must stay at v3 (idempotent forward-only).
             db.Initialize();
             Assert.Equal("ok", db.QuickIntegrityCheck());
         }

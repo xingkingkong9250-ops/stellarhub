@@ -263,6 +263,46 @@ public sealed class ImageQueryServiceTests
         }
     }
 
+    [Fact]
+    public void Limit_and_offset_page_through_results_without_overlap()
+    {
+        using var library = new TestLibrary();
+        var query = new ImageQueryService(library.Db);
+        for (int i = 0; i < 5; i++)
+            library.InsertImage(filePath: $@"X:\img{i:00}.png");
+
+        var page1 = query.QueryGallery(new LibraryFilter { Limit = 2, Offset = 0 });
+        var page2 = query.QueryGallery(new LibraryFilter { Limit = 2, Offset = 2 });
+        var page3 = query.QueryGallery(new LibraryFilter { Limit = 2, Offset = 4 });
+
+        Assert.Equal(2, page1.Count);
+        Assert.Equal(2, page2.Count);
+        Assert.Single(page3);
+        // Pages must tile the full sorted result set exactly, in order.
+        var all = query.QueryGallery(new LibraryFilter());
+        Assert.Equal(
+            all.Select(row => row.Id),
+            page1.Concat(page2).Concat(page3).Select(row => row.Id));
+    }
+
+    [Fact]
+    public void CountFiltered_matches_query_row_count_across_filters()
+    {
+        using var library = new TestLibrary();
+        var query = new ImageQueryService(library.Db);
+        var tags = new TagService(library.Db);
+        long a = library.InsertImage(category: Categories.Texture);
+        library.InsertImage(category: Categories.Texture);
+        library.InsertImage(category: null);
+        tags.AddTags([a], ["metal"], TagSource.Manual);
+
+        Assert.Equal(3, query.CountFiltered(new LibraryFilter()));
+        Assert.Equal(2, query.CountFiltered(new LibraryFilter { Category = Categories.Texture }));
+        Assert.Equal(1, query.CountFiltered(new LibraryFilter { Tag = "metal" }));
+        Assert.Equal(1, query.CountFiltered(new LibraryFilter { Uncategorized = true }));
+        Assert.Equal(0, query.CountFiltered(new LibraryFilter { SearchMode = SearchMode.Semantic }));
+    }
+
     private static string CreateTempDir()
     {
         string dir = Path.Combine(

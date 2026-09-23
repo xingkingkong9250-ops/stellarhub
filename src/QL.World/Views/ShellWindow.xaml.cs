@@ -24,6 +24,9 @@ public partial class ShellWindow : Window
     {
         Interval = TimeSpan.FromMilliseconds(ZOOM_DEBOUNCE_MS),
     };
+    /// <summary>Load the next page this many pixels before the bottom (M4-D).</summary>
+    private const double LOAD_MORE_THRESHOLD_PX = 500;
+    private ScrollViewer? _galleryScroll;
     private bool _syncingSelection;
 
     private Point _dragStart;
@@ -56,12 +59,47 @@ public partial class ShellWindow : Window
 
         GalleryList.PreviewMouseLeftButtonDown += GalleryList_PreviewMouseLeftButtonDown;
         GalleryList.MouseMove += GalleryList_MouseMove;
+        GalleryList.Loaded += (_, _) => HookGalleryScroll();
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         Loaded -= OnLoaded;
         await _viewModel.InitializeAsync();
+    }
+
+    // ─── Gallery endless scroll (M4-D server-side pagination) ─────────────
+
+    private void HookGalleryScroll()
+    {
+        if (_galleryScroll is not null)
+            _galleryScroll.ScrollChanged -= GalleryScroll_Changed;
+        _galleryScroll = FindDescendant<ScrollViewer>(GalleryList);
+        if (_galleryScroll is not null)
+            _galleryScroll.ScrollChanged += GalleryScroll_Changed;
+    }
+
+    private void GalleryScroll_Changed(object sender, ScrollChangedEventArgs e)
+    {
+        if (_galleryScroll is null || _galleryScroll.ScrollableHeight <= 0)
+            return;
+        if (_galleryScroll.VerticalOffset < _galleryScroll.ScrollableHeight - LOAD_MORE_THRESHOLD_PX)
+            return;
+        _ = _viewModel.Gallery.LoadMoreAsync();
+    }
+
+    private static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject
+    {
+        int count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < count; i++)
+        {
+            DependencyObject child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+            if (child is T match)
+                return match;
+            if (FindDescendant<T>(child) is T nested)
+                return nested;
+        }
+        return null;
     }
 
     private void FocusSearch()
