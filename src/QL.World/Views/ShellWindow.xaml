@@ -785,7 +785,7 @@
             </Border>
         </Grid>
 
-        <!-- ═══════════ C1 状态栏 ═══════════ -->
+        <!-- ═══════════ C1 状态栏（C1-L 状态 / C1-C 计数 / C1-R 快捷键提示+AI 档位） ═══════════ -->
         <Border Grid.Row="2" Background="{DynamicResource SurfaceVariantBrush}"
                 BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,1,0,0">
             <Grid Margin="12,0">
@@ -802,9 +802,15 @@
                     <TextBlock Text="{Binding StatusBar.TotalCount}" FontSize="12"
                                Foreground="{DynamicResource TextSecondaryBrush}" />
                 </StackPanel>
-                <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center"
-                           FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
-                           Text="{Binding StatusBar.AiStatusText}" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="{Binding StatusBar.ShortcutHint}" FontSize="11"
+                               Foreground="{DynamicResource TextMutedBrush}"
+                               VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <TextBlock Text="{Binding StatusBar.AiStatusText}" FontSize="12"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
             </Grid>
         </Border>
     </Grid>

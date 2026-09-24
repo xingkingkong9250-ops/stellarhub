@@ -39,6 +39,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         StatusBar = new StatusBarViewModel(services.Thumbnails, services.Settings);
 
         Gallery.Refreshed += OnGalleryRefreshed;
+        Gallery.SelectionChanged += OnSelectionChanged;
         TagTree.ClearFiltersRequested += ClearFilters;
         TopBar.SettingsRequested += () => ShowSettingsDialog?.Invoke();
 
@@ -348,10 +349,14 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     private void OnGalleryRefreshed()
     {
         StatusBar.PublishCounts(Gallery.TotalCount, Gallery.FilteredCount);
+        StatusBar.UpdateShortcutHint(Gallery.SelectedItems.Count, Gallery.TotalCount);
         _ = TagTree.RefreshCountsAsync();
         _ = CollectionTree.RefreshAsync();
         _ = PbrGroupTree.RefreshAsync();
     }
+
+    private void OnSelectionChanged()
+        => StatusBar.UpdateShortcutHint(Gallery.SelectedItems.Count, Gallery.TotalCount);
 
     private void ClearFilters()
     {
@@ -422,6 +427,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         _disposed = true;
         _undoTimer.Stop();
         Gallery.Refreshed -= OnGalleryRefreshed;
+        Gallery.SelectionChanged -= OnSelectionChanged;
         TagTree.ClearFiltersRequested -= ClearFilters;
         ThumbnailProvider.Dispose();
     }

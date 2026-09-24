@@ -12,6 +12,7 @@ public sealed class StatusBarViewModel : ObservableObject
     private readonly AppSettingsService _settings;
     private readonly DispatcherTimer _timer;
     private string _statusText = "就绪";
+    private string _shortcutHint = "Ctrl+I 导入";
     private int _thumbnailPending;
     private int _totalCount;
     private int _filteredCount;
@@ -56,6 +57,13 @@ public sealed class StatusBarViewModel : ObservableObject
         set => SetProperty(ref _filteredCount, value);
     }
 
+    /// <summary>C1-R 上下文相关快捷键提示。由 ShellViewModel 在选中态/刷新时更新。</summary>
+    public string ShortcutHint
+    {
+        get => _shortcutHint;
+        private set => SetProperty(ref _shortcutHint, value);
+    }
+
     public string AiStatusText
     {
         get
@@ -73,6 +81,23 @@ public sealed class StatusBarViewModel : ObservableObject
     {
         TotalCount = total;
         FilteredCount = filtered;
+    }
+
+    /// <summary>
+    /// C1-R 快捷键提示按上下文切换。优先级（高→低）：
+    /// 空库 → 多选 → 单选 → 无选中。
+    /// 仅显示 InputBindings 已绑定的快捷键，不引入新的。
+    /// </summary>
+    public void UpdateShortcutHint(int selectedCount, int totalCount)
+    {
+        string hint = (totalCount, selectedCount) switch
+        {
+            (0, _) => "Ctrl+I 导入",
+            (_, > 1) => "Ctrl+1…5 批量评分 · Del 批量移除",
+            (_, 1) => "Ctrl+1…5 评分 · Del 移除 · Ctrl+F 搜索",
+            _ => "Ctrl+I 导入 · Ctrl+F 搜索 · F5 刷新",
+        };
+        ShortcutHint = hint;
     }
 
     public void PublishMessage(string message) => StatusText = message;
