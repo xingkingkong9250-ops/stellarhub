@@ -216,6 +216,8 @@
 
 **落地提示**：[TagTree](file:///c:/AI_Programming/APP/QL_World_dotnet/docs/UI_NUMBERING.md) 节点渲染时绑定 `Count` 属性，格式 `名称 N`；性能考量：Count 走 ViewModel 缓存不实时查 SQLite。
 
+**状态**：经 U1-B 核实已落地（M1–M4 各阶段逐步实现）。B1 四类树节点（TagTree.CategoryNodes / CollectionTree.CollectionNodes / TagTree.TopTagNodes / PbrGroupTree.GroupNodes）的 Count/MemberCount 绑定均已落到 XAML（ShellWindow.xaml L274-382），ViewModel 通过 SQLite GROUP BY 查询填充。本节列为基线条款，后续新增树节点沿用此模式。
+
 ### 4.E 交互细节
 
 #### 4.E.1 底部快捷键提示（P0）
