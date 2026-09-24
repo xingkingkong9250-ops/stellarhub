@@ -1,9 +1,13 @@
-# QL World build/release script.
-# M0 skeleton: Prepare runs the full local gate (Release build with zero
-# warnings, all tests, self-contained staging publish).
-# M4-F: Finalize implements the five-piece release into dist/ and prints
+﻿# QL World build/release script.
+# Prepare runs the full local gate (Release build with zero warnings,
+# all tests, self-contained staging publish).
+# Finalize implements the five-piece release into dist/ and prints
 # the annotated tag command (build.ps1 is read-only on Git; tag is a manual step).
 # See GEMINI.md section 7 for the contract Finalize must satisfy.
+#
+# NOTE: this file MUST be saved as UTF-8 WITH BOM. Windows PowerShell 5.1
+# reads BOM-less UTF-8 as ANSI/GBK on zh-CN systems; CJK punctuation byte
+# pairs can swallow LF newlines and silently corrupt parsing (M4-Z lesson).
 [CmdletBinding()]
 param(
     [ValidateSet('Prepare', 'Finalize')]
@@ -21,18 +25,21 @@ $distRoot = Join-Path $projectRoot 'dist'
 Import-Module (Join-Path $projectRoot 'tools\release\ReleaseContract.psm1')
 
 <#
-    Prepare 门禁：restore + Release 0 警告编译 + 全绿测试 + self-contained win-x64
-    ReadyToRun 发布到 artifacts\staging\QL World_v{version}\。
-    Prepare 与 Finalize 共用此函数（M4-F 重构为复用入口，避免逻辑复制）。
+    Prepare gate: restore + Release zero-warning build + all tests +
+    self-contained win-x64 ReadyToRun publish into
+    artifacts\staging\QL World_v{version}\.
+    Shared by Prepare and Finalize (M4-F refactor, no logic duplication).
 #>
 function Invoke-PrepareGate {
     param([Parameter(Mandatory = $true)][string]$Version)
 
     $staging = Join-Path $projectRoot "artifacts\staging\QL World_v$Version"
 
-    # 原生命令的 stdout 必须捕获后经 Write-Host 输出：若直接执行，stdout 会进入
-    # 函数输出管道，污染 return $staging 的返回值（调用方拿到「全部输出+路径」数组）。
-    # 不用 2>&1：PS 5.1 下 $ErrorActionPreference='Stop' 时 stderr 重定向会抛 NativeCommandError。
+    # Native command stdout MUST be captured and re-emitted via Write-Host:
+    # un-captured stdout enters the function output pipeline and pollutes
+    # the return value (caller would receive "all output + path" array).
+    # Do NOT use 2>&1: on PS 5.1 with $ErrorActionPreference='Stop' a stderr
+    # redirect raises NativeCommandError.
     Write-Host "[QLWorld] Prepare v$Version : restore"
     $out = & dotnet restore $solutionPath --nologo
     $out | ForEach-Object { Write-Host $_ }
@@ -67,13 +74,13 @@ switch ($Mode) {
         $version = Get-ProjectVersion -CsprojPath $csprojPath
         $staging = Invoke-PrepareGate -Version $version
         Write-Host "[QLWorld] Prepare complete: $staging"
-        Write-Warning 'Finalize (five-piece dist/ release + annotated tag) is implemented in M4.'
     }
 
     'Finalize' {
         $version = Get-ProjectVersion -CsprojPath $csprojPath
 
-        # Gate 1: 工作区必须干净（强制清洁，PRD §7 约定 Finalize 只读 Git 不做写操作）
+        # Gate 1: working tree must be clean (Finalize is read-only on Git,
+        # per PRD section 7).
         $gitStatusOutput = & git -C $projectRoot status --porcelain
         if ($LASTEXITCODE -ne 0) { throw 'git status failed (is this a git repository?).' }
         $statusText = if ($null -eq $gitStatusOutput) { '' } else { $gitStatusOutput -join "`n" }
@@ -81,14 +88,15 @@ switch ($Mode) {
             throw 'Working tree is not clean. Commit or stash changes before Finalize.'
         }
 
-        # Gate 2: 完整 Prepare 门禁（build + test + publish staging）
+        # Gate 2: full Prepare gate (build + test + publish staging).
         $staging = Invoke-PrepareGate -Version $version
         Write-Host "[QLWorld] Finalize v$version : staging ready at $staging"
 
-        # 构建 ReleaseTool Exe（PS 5.1 无法用 Add-Type 加载 .NET 10 程序集，
-        # 通过调用 Exe 子进程保持 PS 5.1 兼容；GEMINI.md §7 工程约束 #7）
+        # Build the ReleaseTool exe (PS 5.1 cannot Add-Type a .NET 10 assembly,
+        # so we invoke it as a child process).
         Write-Host "[QLWorld] Finalize v$version : building ReleaseTool"
-        & dotnet build $releaseToolCsproj -c Release --nologo
+        $out = & dotnet build $releaseToolCsproj -c Release --nologo
+        $out | ForEach-Object { Write-Host $_ }
         if ($LASTEXITCODE -ne 0) { throw 'ReleaseTool build failed.' }
 
         $releaseToolExe = Join-Path $projectRoot 'tools\ReleaseTool\bin\Release\net10.0-windows\QL.World.ReleaseTool.exe'
@@ -96,11 +104,9 @@ switch ($Mode) {
             throw "ReleaseTool executable not found at expected path: $releaseToolExe"
         }
 
-        # 调用 ReleaseTool Exe 产出五件套；最后一行格式为 MANIFEST_SHA:<64hex>
-        # 不显式传 --release-notes / --user-guide，让 ReleaseTool 用 --project-root
-        # 解析默认路径 docs/release/RELEASE_NOTES.md 与 docs/USER_GUIDE.md，
-        # 文件不存在时自动回退最小占位（USER_GUIDE.md 由 M4-E 并行写，可能缺失）。
-        # PS 5.1 兼容：用 ; 分隔语句，不用 && / ||
+        # Produce the five artifacts. Release notes / user guide default to
+        # docs\release\RELEASE_NOTES.md and docs\USER_GUIDE.md under --project-root;
+        # missing files fall back to minimal placeholders.
         $toolOutput = & $releaseToolExe `
             --staging $staging `
             --version $version `
@@ -112,7 +118,7 @@ switch ($Mode) {
         }
         $toolOutput | ForEach-Object { Write-Host $_ }
 
-        # 从输出末尾解析 MANIFEST_SHA:<hex>
+        # Parse the final MANIFEST_SHA:<64hex> line.
         $manifestSha = $null
         foreach ($line in $toolOutput) {
             if ($line -match '^MANIFEST_SHA:([0-9a-f]{64})$') {
@@ -124,7 +130,8 @@ switch ($Mode) {
             throw 'ReleaseTool did not emit MANIFEST_SHA line; cannot produce tag command.'
         }
 
-        # PRD §7：build.ps1 只读 Git 不做写操作 → annotated tag 命令只打印不执行
+        # PRD section 7: build.ps1 is read-only on Git; the annotated tag
+        # command is printed, not executed.
         Write-Host ''
         Write-Host '[QLWorld] Finalize complete.'
         Write-Host "[QLWorld] Release dist dir: $distRoot\QL World_v$version"
