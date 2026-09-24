@@ -30,26 +30,33 @@ function Invoke-PrepareGate {
 
     $staging = Join-Path $projectRoot "artifacts\staging\QL World_v$Version"
 
+    # 原生命令的 stdout 必须捕获后经 Write-Host 输出：若直接执行，stdout 会进入
+    # 函数输出管道，污染 return $staging 的返回值（调用方拿到「全部输出+路径」数组）。
+    # 不用 2>&1：PS 5.1 下 $ErrorActionPreference='Stop' 时 stderr 重定向会抛 NativeCommandError。
     Write-Host "[QLWorld] Prepare v$Version : restore"
-    & dotnet restore $solutionPath --nologo
+    $out = & dotnet restore $solutionPath --nologo
+    $out | ForEach-Object { Write-Host $_ }
     if ($LASTEXITCODE -ne 0) { throw 'dotnet restore failed.' }
 
     Write-Host "[QLWorld] Prepare v$Version : Release build (zero-warning gate)"
-    & dotnet build $solutionPath -c Release --nologo
+    $out = & dotnet build $solutionPath -c Release --nologo
+    $out | ForEach-Object { Write-Host $_ }
     if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
 
     Write-Host "[QLWorld] Prepare v$Version : tests"
-    & dotnet test $solutionPath -c Release --nologo --no-build --verbosity minimal
+    $out = & dotnet test $solutionPath -c Release --nologo --no-build --verbosity minimal
+    $out | ForEach-Object { Write-Host $_ }
     if ($LASTEXITCODE -ne 0) { throw 'Tests failed.' }
 
     Write-Host "[QLWorld] Prepare v$Version : self-contained publish (win-x64, ReadyToRun)"
     if (Test-Path -LiteralPath $staging) {
         Remove-Item -LiteralPath $staging -Recurse -Force
     }
-    & dotnet publish $csprojPath `
+    $out = & dotnet publish $csprojPath `
         -c Release -r win-x64 --self-contained true `
         -p:PublishReadyToRun=true `
         --nologo -o $staging
+    $out | ForEach-Object { Write-Host $_ }
     if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed.' }
 
     return $staging
