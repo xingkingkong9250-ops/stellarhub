@@ -5,6 +5,115 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [1.0.0] — M4 专业化与发布
+
+### M4-A：PBR 贴图成组（schema v2）
+
+- 数据层 schema v2：新增 `pbr_groups` / `pbr_group_images` 两表
+  （`role` 字段标识 basecolor/normal/roughness/metallic/ao/height/other），
+  `PRIMARY KEY (group_id, image_id)` + `idx_pbr_group_images_image` 索引；
+  `DbMigrator.CURRENT_VERSION` 1 → 2，`Schema.v2.sql` 嵌入资源
+- `Services/Pbr/PbrRuleSet.cs`：first-match、大小写不敏感的尾缀规则集
+  （`BaseColor|Albedo|Diffuse|_D` → basecolor，`Normal|_N` → normal，
+  `Rough` → roughness，`Metal` → metallic，`AO|Occlusion` → ao，
+  `Height|Bump|Disp` → height）；剥尾部匹配段得基础名
+- `Services/Pbr/PbrGroupingService.cs`：`RescanAllAsync` 全库重扫
+  （按「目录 + 基础名」分组，≥2 张才成组；事务化全量重建 + 空组清理），
+  `ScanNewImportsAsync` 导入钩子增量路径；规则从 AppSettings 配置读取，
+  AtomicTextFile 原子写 + 损坏回退默认规则
+- `Services/ImportService.cs` 批量落库成功后调 `ScanNewImportsAsync`，
+  异常不阻断导入
+- 测试：规则匹配（命中/大小写/优先级/无后缀裸图）、单图不成组、
+  跨目录同名不成一组、RescanAll 重建幂等、空组清理、规则损坏回退默认、
+  迁移 v1→v2 幂等
+
+### M4-B：B1-4 贴图组树 + W3/A6 规则编辑
+
+- `ViewModels/PbrGroupTreeViewModel`：复刻 CollectionTreeViewModel 模式，
+  分组节点列表 + 点击切换筛选 + 再点清除 + 节点显示成员数
+- `ViewModels/PbrRulesViewModel`：A6 页签规则列表增删改
+  （Pattern/Role/Enabled/删除）、添加规则、保存并重建、仅重建、恢复默认、
+  状态文本
+- `Models/LibraryFilter` 新增 `PbrGroupId`；
+  `ImageQueryService.AppendClauses` 新增
+  `EXISTS (SELECT 1 FROM pbr_group_images ...)` 分支（语义分支优先级约定）
+- W1 XAML（B1 区）B1-4「贴图组」区块（ItemsControl 列组名 + 成员数）；
+  W3 XAML 新页签 A6「贴图组规则」
+- `docs/UI_NUMBERING.md`：新增 B1-4（B1-4-1 起）与 W3/A6 及其叶子编号
+- 测试：点组名画廊只显示组成员；规则编辑保存后重扫生效；
+  config.json 含 .backup；12 项新测试
+
+### M4-C：Magick.NET 专业格式接入
+
+- 新增依赖 `Magick.NET-Q8-AnyCPU` 14.17.1（Q8 非 HDRI——自动 8bit，
+  AnyCPU 与现有 win-x64 发布兼容）
+- `Services/MagickDecoder.cs`（internal）：封装 Magick 读取，
+  `TryReadMetadata`（宽高/格式名）+ `TryLoadFrame`（返回 8bit RGBA 像素；
+  PSD 用 `MagickImageCollection` flatten 取合成帧）
+- `Services/ImageInspector.cs`：ImageSharp `Identify` 抛
+  `UnknownImageFormatException` 时 fallback 到 `MagickDecoder`；
+  导入白名单扩展 tga/exr/hdr/psd（代码真源还含 tif/tiff）
+- `Services/ThumbnailService.cs` `ProcessJob`：`Image.Load` 失败时
+  走 `MagickDecoder.TryLoadFrame` → `Image.LoadPixelData` →
+  复用现有 WebP 缩略图管线（命名/目录约定不变）
+- 测试：用 Magick 生成 TGA/EXR/HDR/PSD 样例 → 元数据正确 + 缩略图成功；
+  损坏文件两解码器都失败 → 导入跳过计数正确；ImageSharp 原格式回归；
+  12 项新测试
+
+### M4-D：10 万级压测与服务端分页优化
+
+- 服务端分页：`LibraryFilter` 新增 `Limit`/`Offset`，
+  `ImageQueryService` 实现 `LIMIT/OFFSET` + `CountFiltered`；
+  `GalleryViewModel` `PageSize=1000` 增量加载；
+  `ShellWindow` endless scroll 触发翻页；schema v3 复合索引
+- 压测工具 `tools/StressGen/`（console 工程，不入主 sln 发布链）：
+  参数化生成合成库（`--count 100000 --out <dir>`），直插 SQLite
+  + 程序化生成真实小尺寸缩略图文件
+- 优化前后对比：万级画廊首次绘制 598ms → 4.7ms（≈127×）
+- 冒烟回收（M3 遗留）：`tools/smoke/UiSmokeB1.ps1` 覆盖
+  W1/B2-3-CM1 右键菜单 + W1/B3-8 找相似按钮（子代理未产出，deferred
+  不阻塞验收）
+- 测试：6 项新测试，总计 251 全绿
+
+### M4-E：用户手册
+
+- `docs/USER_GUIDE.md`：面向非技术最终用户的中文手册，12 章覆盖
+  安装/导入/画廊/筛选搜索/详情栏/AI 三档/语义搜索/设置窗口/消息中心/
+  数据安全/常见问题；43 处 UI 编号交叉引用（W1–W3 全部用户可见功能），
+  与 `docs/UI_NUMBERING.md` 真源逐项核对；导入白名单按代码真源补列 TIFF
+
+### M4-F：Finalize 五件套发布工具 + 契约测试
+
+- `tools/ReleaseTool/`（Exe 工程，net10.0-windows，加入 sln）：
+  `ReleaseArtifacts.Produce` 实现 GEMINI.md §7 五件套契约——
+  app.zip / source.zip(git archive) / 更新公告.txt / 使用说明.txt /
+  manifest.json 最后原子落地（tmpDir → Directory.Move）；
+  dist 永不覆盖；manifestSha 计算顺序：先序列化（manifestSha256 字段
+  null 被忽略）→ 算 SHA → 回填 → 重写；返回 manifest 文件自身 SHA
+  用于 annotated tag message
+- `build.ps1` Finalize 实现：工作区干净校验 → 复用 `Invoke-PrepareGate`
+  门禁 → 构建 ReleaseTool Exe → 调用解析 `MANIFEST_SHA` →
+  打印 annotated tag 命令（只读 Git 不执行）。Prepare 重构为
+  `Invoke-PrepareGate` 函数复用
+- `tests/QL.World.Tests/Release/ReleaseContractTests.cs`：8 项契约测试
+  覆盖五件套齐全/命名规范/manifest schema/SHA 一致/重复发布报错/
+  DryRun 无残留/app.zip 含 staging 内容/注入 source.zip/失败清理 tmp
+- `docs/release/RELEASE_NOTES.md`：更新公告模板（`v{x.y.z}` 占位）
+- PS 5.1 兼容：Exe 子进程调用避开 `Add-Type` 加载 .NET 10 程序集的
+  不兼容
+- 验证：dotnet build 0 警告；dotnet test 259 全绿（含 8 项新契约测试）；
+  CLI dry-run 端到端 EXIT=0、五件套齐全、manifest sha256 输出正确
+
+### M4-Z：收尾与真实发布
+
+- `QL.World.csproj` `<Version>` 0.5.0 → 1.0.0
+- `GEMINI.md` 里程碑状态更新为「M0–M4 全部完成，v1.0.0 已发布」
+- `docs/UI_NUMBERING.md` 全表冻结走查（B1-4 / W3/A6 已实现状态确认）
+- 门禁：`build.ps1 -Mode Prepare` 0 警告 + 全测试绿 + R2R publish
+- 真实发布：`build.ps1 -Mode Finalize` 产出 dist/ 五件套 +
+  annotated tag `v1.0.0`（消息含 `release-manifest-sha256:`）
+- staging 体积对比记录（0.5.0 → 1.0.0）
+
 ## [0.5.0] — M3-E2 本地 CLIP 文本编码
 
 - 本地文→图语义搜索打通：`LocalAiService.EmbedTextAsync` 从 M3-E1 的 null
