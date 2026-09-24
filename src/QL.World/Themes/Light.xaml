@@ -16,21 +16,29 @@
     <Color x:Key="Border">#D8D8DE</Color>
     <Color x:Key="BorderSubtle">#E6E6EA</Color>
 
-    <!-- Text -->
+    <!-- Text
+         TextMuted minimum contrast vs Surface/SurfaceVariant ≥ 4.5:1 (WCAG AA)
+         — #6E6E78 measures 5.0:1 on Surface, 4.5:1 on SurfaceVariant. -->
     <Color x:Key="TextPrimary">#1A1A22</Color>
     <Color x:Key="TextSecondary">#5A5A66</Color>
-    <Color x:Key="TextMuted">#9A9AA6</Color>
+    <Color x:Key="TextMuted">#6E6E78</Color>
 
     <!-- Accent (violet) -->
     <Color x:Key="Accent">#6B4DFF</Color>
     <Color x:Key="AccentDim">#4A2EE0</Color>
     <Color x:Key="AccentBg">#ECE8FF</Color>
 
-    <!-- Status -->
+    <!-- Status
+         Warning doubles as small-text color (rating ★, missing-file chip);
+         #8F6400 keeps ≥ 4.5:1 on Surface, SurfaceVariant and WarningBg. -->
     <Color x:Key="Danger">#D93832</Color>
     <Color x:Key="DangerBg">#FBE5E3</Color>
-    <Color x:Key="Warning">#B07700</Color>
+    <Color x:Key="Warning">#8F6400</Color>
     <Color x:Key="WarningBg">#FFF1D6</Color>
+
+    <!-- Translucent cover laid over gallery thumbnails (file-missing badge);
+         must adapt per theme instead of a hardcoded dark overlay. -->
+    <Color x:Key="Overlay">#CCFFFFFF</Color>
 
     <!-- Brushes -->
     <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource Background}" />
@@ -50,5 +58,6 @@
     <SolidColorBrush x:Key="DangerBgBrush" Color="{StaticResource DangerBg}" />
     <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource Warning}" />
     <SolidColorBrush x:Key="WarningBgBrush" Color="{StaticResource WarningBg}" />
+    <SolidColorBrush x:Key="OverlayBrush" Color="{StaticResource Overlay}" />
 
 </ResourceDictionary>

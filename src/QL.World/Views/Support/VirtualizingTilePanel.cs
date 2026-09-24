@@ -123,7 +123,14 @@ public sealed class VirtualizingTilePanel : VirtualizingPanel, IScrollInfo
 
         GetVisibleRange(columns, rows, itemCount, out int firstIndex, out int lastIndex);
 
-        IItemContainerGenerator generator = ItemContainerGenerator;
+        // During an ItemsPanel swap (Grid↔List view-mode switch) a pending
+        // measure can still reach this panel after WPF has unregistered it as
+        // the ItemsHost; ItemContainerGenerator is null then and must not be
+        // touched (NRE crash on view-mode switch).
+        IItemContainerGenerator? generator = ItemContainerGenerator;
+        if (generator is null)
+            return availableSize;
+
         GeneratorPosition start = generator.GeneratorPositionFromIndex(firstIndex);
         int childIndex = start.Offset == 0 ? start.Index : start.Index + 1;
 
@@ -145,7 +152,7 @@ public sealed class VirtualizingTilePanel : VirtualizingPanel, IScrollInfo
             }
         }
 
-        CleanupContainers(firstIndex, lastIndex);
+        CleanupContainers(firstIndex, lastIndex, generator);
         return availableSize;
     }
 
@@ -154,7 +161,12 @@ public sealed class VirtualizingTilePanel : VirtualizingPanel, IScrollInfo
         double itemWidth = ItemWidth;
         double itemHeight = ItemHeight;
         int columns = Math.Max(1, (int)(finalSize.Width / itemWidth));
-        IItemContainerGenerator generator = ItemContainerGenerator;
+
+        // Same teardown guard as MeasureOverride: the generator is gone while
+        // the outgoing panel drains its final layout pass.
+        IItemContainerGenerator? generator = ItemContainerGenerator;
+        if (generator is null)
+            return finalSize;
 
         for (int i = 0; i < InternalChildren.Count; i++)
         {
@@ -187,14 +199,15 @@ public sealed class VirtualizingTilePanel : VirtualizingPanel, IScrollInfo
         lastIndex = Math.Min(itemCount - 1, (lastRow + 1) * columns - 1);
     }
 
-    private void CleanupContainers(int firstIndex, int lastIndex)
+    private void CleanupContainers(
+        int firstIndex, int lastIndex, IItemContainerGenerator generator)
     {
         for (int i = InternalChildren.Count - 1; i >= 0; i--)
         {
-            int itemIndex = ItemContainerGenerator.IndexFromGeneratorPosition(
+            int itemIndex = generator.IndexFromGeneratorPosition(
                 new GeneratorPosition(i, 0));
             if (itemIndex >= 0 && (itemIndex < firstIndex || itemIndex > lastIndex))
-                ItemContainerGenerator.Remove(new GeneratorPosition(i, 0), 1);
+                generator.Remove(new GeneratorPosition(i, 0), 1);
         }
     }
 

@@ -57,7 +57,7 @@
                                        Visibility="{Binding Rating, Converter={StaticResource ZeroVis}, ConverterParameter=Invert}" />
                         </Grid>
                     </StackPanel>
-                    <Border Grid.RowSpan="2" Background="#CC17171C"
+                    <Border Grid.RowSpan="2" Background="{DynamicResource OverlayBrush}"
                             Visibility="{Binding IsMissing, Converter={StaticResource BoolVis}}">
                         <TextBlock Text="文件缺失" Foreground="{DynamicResource WarningBrush}"
                                    FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />

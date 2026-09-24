@@ -5,6 +5,29 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-09-24 补丁
+
+### 修复
+
+- VirtualizingTilePanel 在 Grid↔List 视图切换时偶发 NRE 崩溃：
+  ItemsPanel 切换期被换下的旧面板仍会收到 pending Measure/Arrange，
+  此时 `ItemContainerGenerator` 已被新面板接管返回 null，
+  直接调用 `GeneratorPositionFromIndex` 抛 NRE 且
+  DispatcherUnhandledException Handled=false 直接崩进程。
+  MeasureOverride/ArrangeOverride 在取 generator 后判 null 提前 return，
+  CleanupContainers 用捕获的局部 generator 而非重读属性
+
+### 改进
+
+- 主题对比度达 WCAG AA 基线：
+  - TextMuted Dark #6E6E7A → #9696A2（对 Surface 6.1:1，对 SurfaceVariant 5.5:1）
+  - TextMuted Light #9A9AA6 → #6E6E78（对 Surface 5.0:1，对 SurfaceVariant 4.5:1）
+  - Light Warning #B07700 → #8F6400（对 Surface/SurfaceVariant/WarningBg 均 ≥ 4.5:1）
+- 缩略图遮罩统一走主题 OverlayBrush：
+  Dark 新增 Overlay=#CC17171C；Light 新增 Overlay=#CCFFFFFF；
+  ShellWindow.xaml 缺失态遮罩从硬编码 `#CC17171C` 改为 `DynamicResource OverlayBrush`；
+  后续新增遮罩态一律走 OverlayBrush，禁止硬编码 hex
+
 ## [1.0.0] — M4 专业化与发布
 
 ### M4-A：PBR 贴图成组（schema v2）
