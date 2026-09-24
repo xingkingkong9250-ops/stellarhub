@@ -31,8 +31,20 @@
         <DataTemplate x:Key="GridCardTemplate">
             <Border Margin="4" Padding="6"
                     Background="{DynamicResource SurfaceVariantBrush}"
-                    BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1"
                     CornerRadius="8">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}" />
+                        <Setter Property="BorderThickness" Value="1" />
+                        <Style.Triggers>
+                            <!-- B2-3-SEL：选中态 2px Accent 外描边（不改底色，底色由 ListBoxItem AccentBg 提供） -->
+                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="BorderThickness" Value="2" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                     <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -68,8 +80,22 @@
 
         <!-- B2 list row -->
         <DataTemplate x:Key="ListRowTemplate">
-            <Border Height="{Binding DataContext.ListRowHeight, RelativeSource={RelativeSource AncestorType=ListBox}}"
-                    Padding="8,0" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1">
+            <Border Height="{Binding DataContext.ListRowHeight, RelativeSource={RelativeSource AncestorType=ListBox}}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Padding" Value="8,0" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}" />
+                        <Setter Property="BorderThickness" Value="0,0,0,1" />
+                        <Style.Triggers>
+                            <!-- B2-3-SEL 列表态：左 3px Accent 竖条 + 底线；Padding 同步减 3px 抵消 layout shift -->
+                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="BorderThickness" Value="3,0,0,1" />
+                                <Setter Property="Padding" Value="5,0,0,0" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />

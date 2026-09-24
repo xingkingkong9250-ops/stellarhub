@@ -25,6 +25,7 @@
 | W1/B2-1 | 计数条 | 已实现（M1） | 显示 N 张 / 共 M + 筛选摘要 |
 | W1/B2-2 | 排序下拉 | 已实现（M1） | 必须真实生效并持久化 |
 | W1/B2-3 | 图卡（网格/列表） | 已实现（M1） | VirtualizingTilePanel UI 虚拟化 |
+| W1/B2-3-SEL | 选中态视觉锚点 | 已实现（U1-A） | 网格 2px Accent 外描边；列表 3px 左竖条+底线（Padding 同步减 3px 抵消 layout shift）；底色由 ListBoxItem AccentBg 提供 |
 | W1/B2-3-CM1 | 图卡右键「找相似图」 | 已实现（M3-E1）/ 冒烟（M4-D） | 按 CLIP embedding 余弦相似度返回 top-50；无 embedding 时置灰；UiSmokeB1.ps1 覆盖 |
 | W1/B2-4 | 缩放滑杆（80–512） | 已实现（M1） | 网格/列表各一支，按视图显隐 |
 | W1/B3 | 详情栏（280–400，实配 300） | 已实现（M1 部分） | 含多选批量编辑态 |
