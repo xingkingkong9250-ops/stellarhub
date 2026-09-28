@@ -22,6 +22,7 @@
     <Color x:Key="TextPrimary">#1A1A22</Color>
     <Color x:Key="TextSecondary">#5A5A66</Color>
     <Color x:Key="TextMuted">#6E6E78</Color>
+    <Color x:Key="TextOnAccent">#FFFFFF</Color>
 
     <!-- Accent (violet) -->
     <Color x:Key="Accent">#6B4DFF</Color>
@@ -51,9 +52,15 @@
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimary}" />
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondary}" />
     <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMuted}" />
+    <SolidColorBrush x:Key="TextOnAccentBrush" Color="{StaticResource TextOnAccent}" />
     <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource Accent}" />
     <SolidColorBrush x:Key="AccentDimBrush" Color="{StaticResource AccentDim}" />
     <SolidColorBrush x:Key="AccentBgBrush" Color="{StaticResource AccentBg}" />
+    <!-- U2-A: brand gradient for Logo / AI button hover / C1 progress bar only -->
+    <LinearGradientBrush x:Key="AccentGradientBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Offset="0" Color="{StaticResource Accent}" />
+        <GradientStop Offset="1" Color="{StaticResource AccentDim}" />
+    </LinearGradientBrush>
     <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource Danger}" />
     <SolidColorBrush x:Key="DangerBgBrush" Color="{StaticResource DangerBg}" />
     <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource Warning}" />

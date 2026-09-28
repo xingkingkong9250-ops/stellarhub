@@ -16,6 +16,7 @@ public sealed class StatusBarViewModel : ObservableObject
     private int _thumbnailPending;
     private int _totalCount;
     private int _filteredCount;
+    private bool _isLoading;
 
     public StatusBarViewModel(ThumbnailService thumbnails, AppSettingsService settings)
     {
@@ -29,8 +30,25 @@ public sealed class StatusBarViewModel : ObservableObject
             StatusText = _thumbnails.PendingCount > 0
                 ? $"后台生成缩略图：{_thumbnails.PendingCount}"
                 : "就绪";
+            // U2-A: aggregate loading state from thumbnails + caller-supplied predicate (AI/import).
+            // Predicate keeps this VM free of AiAnalysisService/TopBar dependencies.
+            bool extra = IsBusyPredicate?.Invoke() ?? false;
+            IsLoading = extra || _thumbnails.PendingCount > 0;
         };
         _timer.Start();
+    }
+
+    /// <summary>
+    /// U2-A: Optional predicate supplied by ShellViewModel to surface AI/import
+    /// running state in the C1 progress bar. Returns true when something is busy.
+    /// </summary>
+    public Func<bool>? IsBusyPredicate { get; set; }
+
+    /// <summary>U2-A: true when AI/import/thumbnail work is in flight — drives C1 progress bar.</summary>
+    public bool IsLoading
+    {
+        get => _isLoading;
+        private set => SetProperty(ref _isLoading, value);
     }
 
     public string StatusText

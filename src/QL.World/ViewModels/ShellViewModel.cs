@@ -37,6 +37,8 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         PbrGroupTree = new PbrGroupTreeViewModel(Gallery, services.PbrGrouping);
         Detail = new DetailViewModel(services.ImageQuery, services.Tags, Gallery);
         StatusBar = new StatusBarViewModel(services.Thumbnails, services.Settings);
+        // U2-A: surface AI/import running state on C1 progress bar without coupling StatusBar to those services.
+        StatusBar.IsBusyPredicate = () => TopBar.IsImporting || services.AiAnalysis.IsRunning;
 
         Gallery.Refreshed += OnGalleryRefreshed;
         Gallery.SelectionChanged += OnSelectionChanged;

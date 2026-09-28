@@ -168,13 +168,16 @@
                 BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1">
             <Grid Margin="14,0">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- U2-A: brand gradient Logo block -->
+                    <Border Width="24" Height="24" CornerRadius="6" Margin="0,0,10,0"
+                            Background="{DynamicResource AccentGradientBrush}" />
                     <TextBlock Text="QL World" FontSize="15" FontWeight="Bold"
                                Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                     <TextBlock Text="素材库" Margin="10,2,0,0" FontSize="11"
                                Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
                     <Button Margin="16,0,0,0" Style="{StaticResource AccentButtonStyle}"
                             Content="＋ 导入图片" Command="{Binding TopBar.ImportCommand}" />
-                    <Button Margin="8,0,0,0" Style="{StaticResource SubtleButtonStyle}"
+                    <Button Margin="8,0,0,0" Style="{StaticResource AiButtonStyle}"
                             Content="AI 分析" ToolTip="{Binding TopBar.AiDisabledReason}"
                             Command="{Binding TopBar.AiCommand}" />
                     <Button Margin="8,0,0,0" Style="{StaticResource SubtleButtonStyle}"
@@ -788,29 +791,40 @@
         <!-- ═══════════ C1 状态栏（C1-L 状态 / C1-C 计数 / C1-R 快捷键提示+AI 档位） ═══════════ -->
         <Border Grid.Row="2" Background="{DynamicResource SurfaceVariantBrush}"
                 BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,1,0,0">
-            <Grid Margin="12,0">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="●" FontSize="9" Foreground="{DynamicResource AccentBrush}"
-                               VerticalAlignment="Center" Margin="0,0,6,0" />
-                    <TextBlock Text="{Binding StatusBar.StatusText}" VerticalAlignment="Center"
-                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                    <TextBlock Text="{Binding StatusBar.FilteredCount}" FontSize="12"
-                               Foreground="{DynamicResource TextSecondaryBrush}" />
-                    <TextBlock Text=" / " FontSize="12" Foreground="{DynamicResource TextMutedBrush}" />
-                    <TextBlock Text="{Binding StatusBar.TotalCount}" FontSize="12"
-                               Foreground="{DynamicResource TextSecondaryBrush}" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
-                            VerticalAlignment="Center">
-                    <TextBlock Text="{Binding StatusBar.ShortcutHint}" FontSize="11"
-                               Foreground="{DynamicResource TextMutedBrush}"
-                               VerticalAlignment="Center" Margin="0,0,12,0" />
-                    <TextBlock Text="{Binding StatusBar.AiStatusText}" FontSize="12"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               VerticalAlignment="Center" />
-                </StackPanel>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0" Margin="12,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="●" FontSize="9" Foreground="{DynamicResource AccentBrush}"
+                                   VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <TextBlock Text="{Binding StatusBar.StatusText}" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding StatusBar.FilteredCount}" FontSize="12"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <TextBlock Text=" / " FontSize="12" Foreground="{DynamicResource TextMutedBrush}" />
+                        <TextBlock Text="{Binding StatusBar.TotalCount}" FontSize="12"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="{Binding StatusBar.ShortcutHint}" FontSize="11"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <TextBlock Text="{Binding StatusBar.AiStatusText}" FontSize="12"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+                <!-- U2-A: indeterminate brand-gradient loading bar (import / AI / thumbnail generation) -->
+                <ProgressBar Grid.Row="1" Height="2" IsIndeterminate="True"
+                             Foreground="{DynamicResource AccentGradientBrush}"
+                             Background="Transparent" BorderThickness="0"
+                             Visibility="{Binding StatusBar.IsLoading, Converter={StaticResource BoolVis}}" />
             </Grid>
         </Border>
     </Grid>
