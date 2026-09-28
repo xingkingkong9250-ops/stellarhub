@@ -5,6 +5,37 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-09-28 U1 UI 优化补丁
+
+### U1-A：选中态边框色（§4.A.1）
+
+- 网格卡片：GridCardTemplate 外层 Border 加 Style.Triggers，
+  IsSelected 时 BorderBrush=Accent + BorderThickness=2（1px→2px 外描边）
+- 列表行：ListRowTemplate 外层 Border 加 Style.Triggers，
+  IsSelected 时 BorderThickness=3,0,0,1（左竖条+底线）+ Padding 8→5 抵消
+  layout shift（内容位置不变，避免选中时横向抖动）
+- 底色提示仍由 ListBoxItem 默认 AccentBg 提供（Generic.xaml 未改）
+- 新增 UI 编号 B2-3-SEL（选中态视觉锚点）
+
+### U1-B：§4.D.2 顶栏计数显式化（验证节）
+
+- 经核实 B1 四类树节点 Count 绑定已落地（M1–M4 各阶段逐步实现）：
+  TagTree.CategoryNodes / CollectionTree.CollectionNodes /
+  TagTree.TopTagNodes / PbrGroupTree.GroupNodes
+- ViewModel 通过 SQLite GROUP BY 查询填充 Count/MemberCount
+- 本节不写新代码，仅文档同步：ui_optimization_target.md 标注状态；
+  UI_NUMBERING.md B1-1/B1-2/B1-3/B1-4 行补「含子项计数显示」
+
+### U1-C：底部快捷键提示（§4.E.1）
+
+- StatusBarViewModel 新增 ShortcutHint 属性 + UpdateShortcutHint 方法，
+  按上下文切换（空库/无选中/单选/多选）；仅显示 InputBindings 已绑定的
+  快捷键，不引入新的（F2 重命名未绑定，暂不显示）
+- ShellViewModel 订阅 Gallery.SelectionChanged 事件，选中态变化时
+  更新 ShortcutHint；OnGalleryRefreshed 也同步更新（totalCount 变化）
+- ShellWindow.xaml C1 状态栏拆为 C1-L 状态 / C1-C 计数 / C1-R 快捷键+AI 档位
+- UI_NUMBERING 新增 C1-L/C1-C/C1-R 子编号
+
 ## [1.0.1] — 2026-09-24 补丁
 
 ### 修复

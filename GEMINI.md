@@ -9,7 +9,7 @@ README/AGENTS/PRD 与本文件冲突时，以本文件为准。
 - 技术栈：C# / .NET 10 (`net10.0-windows`) / WPF，纯 MVVM
 - 形态：Windows 10 21H2+ / 11 原生桌面应用；**禁止** WebView2、Electron、任何 HTML UI
 - 产品基线：`PRD/QL_World_产品需求与重写方案.md`（已评审，M0–M4 基线）
-- 里程碑状态：见 `CHANGELOG.md`；当前 **M0–M4 全部完成，v1.0.1 补丁已发布**
+- 里程碑状态：见 `CHANGELOG.md`；当前 **M0–M4 全部完成，U1 UI 优化补丁已发布（v1.1.0）**
 
 ## 2. 解决方案布局
 
