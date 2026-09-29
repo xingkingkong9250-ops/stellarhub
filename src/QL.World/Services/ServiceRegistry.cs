@@ -47,6 +47,12 @@ public sealed class ServiceRegistry
     /// Owns the worker task; dispose at app shutdown.
     /// </summary>
     public DownloadQueueService DownloadQueue { get; }
+    /// <summary>
+    /// M5-H: sliding-window network health tracker. Shared by
+    /// <see cref="GalleryThumbnailProvider"/> (skip remote requests when weak)
+    /// and any future component that wants to gauge NAS latency.
+    /// </summary>
+    public NetworkConditionMonitor NetworkMonitor { get; }
 
     public ServiceRegistry(
         AppSettingsService settings,
@@ -67,7 +73,8 @@ public sealed class ServiceRegistry
         PbrGroupingService pbrGrouping,
         INasConnectorFactory nasFactory,
         ThumbnailCacheService thumbnailCache,
-        DownloadQueueService downloadQueue)
+        DownloadQueueService downloadQueue,
+        NetworkConditionMonitor networkMonitor)
     {
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
         Database = database ?? throw new ArgumentNullException(nameof(database));
@@ -88,5 +95,6 @@ public sealed class ServiceRegistry
         NasFactory = nasFactory ?? throw new ArgumentNullException(nameof(nasFactory));
         ThumbnailCache = thumbnailCache ?? throw new ArgumentNullException(nameof(thumbnailCache));
         DownloadQueue = downloadQueue ?? throw new ArgumentNullException(nameof(downloadQueue));
+        NetworkMonitor = networkMonitor ?? throw new ArgumentNullException(nameof(networkMonitor));
     }
 }

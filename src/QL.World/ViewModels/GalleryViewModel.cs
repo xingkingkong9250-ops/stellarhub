@@ -203,6 +203,10 @@ public sealed class GalleryViewModel : ObservableObject
             HasMoreItems = Items.Count < filtered;
             FilterSummary = BuildSummary(filter);
             Refreshed?.Invoke();
+            // M5-H: prefetch thumbnails for the freshly loaded page so the
+            // next scroll batch is already on disk. Service skips items that
+            // already exist; remote items are skipped on weak networks.
+            Thumbnails.Prefetch(Items);
         }
         finally
         {

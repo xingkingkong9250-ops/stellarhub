@@ -29,7 +29,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         ArgumentNullException.ThrowIfNull(services);
         _services = services;
 
-        ThumbnailProvider = new GalleryThumbnailProvider(services.Thumbnails, services.NasFactory, services.Settings);
+        ThumbnailProvider = new GalleryThumbnailProvider(services.Thumbnails, services.NasFactory, services.Settings, services.NetworkMonitor);
         Gallery = new GalleryViewModel(services.ImageQuery, services.Settings, ThumbnailProvider);
         TopBar = new TopBarViewModel(Gallery, ImportAsync, services.Notifications, services.Ai,
             services.AiAnalysis, services.Colors, services.SemanticSearch, services.Settings);

@@ -156,6 +156,26 @@ public sealed class ThumbnailService : IDisposable
 
     public Task WaitPlaceholderAsync() => _placeholderTask ?? Task.CompletedTask;
 
+    /// <summary>
+    /// M5-H: prefetches thumbnails for items surrounding the visible range.
+    /// Each item is enqueued at normal (low) priority so visible items
+    /// (enqueued via <see cref="Request"/> with highPriority=true) always
+    /// jump ahead. Items whose thumb WebP already exists are silently skipped.
+    /// </summary>
+    public void RequestPrefetch(IEnumerable<(string Hash, IImageSource Source)> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        foreach ((string hash, IImageSource source) in items)
+        {
+            if (string.IsNullOrWhiteSpace(hash))
+                continue;
+            string key = NormalizeHash(hash);
+            if (ThumbnailExists(key, ThumbnailLevel.Thumb))
+                continue;
+            Request(key, source, ThumbnailLevel.Thumb, highPriority: false);
+        }
+    }
+
     private void ConsumeLoop()
     {
         while (!_shutdown.IsCancellationRequested)

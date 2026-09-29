@@ -111,6 +111,9 @@ public partial class App : Application
                 userIdentity, imageQuery, WriteLog);
             _downloadQueue = downloadQueue;
 
+            // M5-H: network health monitor for weak-network detection.
+            var networkMonitor = new NetworkConditionMonitor();
+
             var services = new ServiceRegistry(
                 settings,
                 _database,
@@ -130,7 +133,8 @@ public partial class App : Application
                 pbrGrouping,
                 new WebDavConnectorFactory(),
                 _thumbnailCache,
-                downloadQueue);
+                downloadQueue,
+                networkMonitor);
             _services = services;
 
             SetTheme(settings.Theme);

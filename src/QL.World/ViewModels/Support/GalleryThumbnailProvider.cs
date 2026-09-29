@@ -24,10 +24,12 @@ namespace QL.World.ViewModels.Support;
 public sealed class GalleryThumbnailProvider : IDisposable
 {
     private const int CACHE_LIMIT = 500;
+    private const int PREFETCH_RANGE = 15;
 
     private readonly ThumbnailService _thumbnails;
     private readonly INasConnectorFactory? _nasFactory;
     private readonly AppSettingsService? _settings;
+    private readonly NetworkConditionMonitor? _networkMonitor;
     private readonly object _gate = new();
 
     private readonly Dictionary<string, GalleryItemViewModel> _realized = new();
@@ -57,11 +59,13 @@ public sealed class GalleryThumbnailProvider : IDisposable
     public GalleryThumbnailProvider(
         ThumbnailService thumbnails,
         INasConnectorFactory? nasFactory = null,
-        AppSettingsService? settings = null)
+        AppSettingsService? settings = null,
+        NetworkConditionMonitor? networkMonitor = null)
     {
         _thumbnails = thumbnails;
         _nasFactory = nasFactory;
         _settings = settings;
+        _networkMonitor = networkMonitor;
         _thumbnails.ThumbnailReady += OnThumbnailReady;
     }
 
@@ -86,6 +90,13 @@ public sealed class GalleryThumbnailProvider : IDisposable
         }
         else
         {
+            // M5-H: on weak networks, skip remote thumbnail requests — only
+            // show cached thumbs so the gallery stays responsive over a slow
+            // link. Local items are unaffected.
+            bool isRemote = item.Source == QL.World.Models.ImageSource.Remote;
+            if (isRemote && _networkMonitor is { IsWeakNetwork: true })
+                return;
+
             _thumbnails.Request(item.FileHash, CreateSource(item),
                 ThumbnailLevel.Thumb, highPriority: true);
         }
@@ -106,6 +117,28 @@ public sealed class GalleryThumbnailProvider : IDisposable
         {
             _realized.Clear();
         }
+    }
+
+    /// <summary>
+    /// M5-H: prefetches thumbnails for items surrounding the visible range.
+    /// Called by <see cref="GalleryViewModel"/> after a page loads so the
+    /// next scroll batch is already on disk. Items whose thumb already
+    /// exists are silently skipped (the service also checks). Remote items
+    /// are skipped on weak networks (same gate as <see cref="Attach"/>).
+    /// </summary>
+    public void Prefetch(IEnumerable<GalleryItemViewModel> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        var toEnqueue = new List<(string Hash, IImageSource Source)>();
+        foreach (GalleryItemViewModel item in items)
+        {
+            bool isRemote = item.Source == QL.World.Models.ImageSource.Remote;
+            if (isRemote && _networkMonitor is { IsWeakNetwork: true })
+                continue;
+            toEnqueue.Add((item.FileHash, CreateSource(item)));
+        }
+        if (toEnqueue.Count > 0)
+            _thumbnails.RequestPrefetch(toEnqueue);
     }
 
     /// <summary>
