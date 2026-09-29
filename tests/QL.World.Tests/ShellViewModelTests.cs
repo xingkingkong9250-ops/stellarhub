@@ -61,8 +61,9 @@ public sealed class ShellViewModelTests : IDisposable
     [Fact]
     public void Version_text_uses_three_part_version_from_assembly()
     {
+        // U2-F (§4.E.2): shell footer appends the milestone label after the semantic version.
         Assert.Matches(
-            new Regex(@"^v\d+\.\d+\.\d+$"),
+            new Regex(@"^v\d+\.\d+\.\d+ · .+$"),
             _viewModel.VersionText);
     }
 

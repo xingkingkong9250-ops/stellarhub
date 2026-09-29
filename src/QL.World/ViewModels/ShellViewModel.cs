@@ -132,7 +132,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public event Action? ShowSettingsDialog;
 
     public string Title => $"{AppInfo.ProductName} — {AppInfo.ProductSubtitle}";
-    public string VersionText => $"v{AppInfo.Version}";
+    public string VersionText => $"v{AppInfo.Version} · {AppInfo.MilestoneLabel}";
     public string AiStatusText => "AI：关闭";
 
     public bool UndoVisible
