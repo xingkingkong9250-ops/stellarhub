@@ -56,7 +56,7 @@ public sealed class ShellViewModelTests : IDisposable
     [Fact]
     public void Title_contains_product_name()
     {
-        Assert.Contains("QL World", _viewModel.Title);
+        Assert.Contains("千星汇图", _viewModel.Title);
     }
 
     [Fact]

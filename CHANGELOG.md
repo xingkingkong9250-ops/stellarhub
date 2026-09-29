@@ -5,6 +5,49 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-09-29 U5 品牌升级补丁（QL World → 千星汇图 / StellarHub）
+
+品牌升级为千星汇图（StellarHub），为 M5 NAS 远程库扫清品牌基线。不引入新功能依赖，不动业务逻辑，PRD 核心功能 100% 基线不变。
+
+### U5-A：显示层与程序集品牌
+
+- `AppInfo.ProductName` "QL World" → "千星汇图"；新增 `EnglishName = "StellarHub"`；`MilestoneLabel` "U4 发布基线" → "U5 品牌升级"
+- `QL.World.csproj` `<AssemblyName>` "QL World" → "StellarHub"（exe 产物 `StellarHub.exe`）；新增 `<Product>`、`<AssemblyTitle>`、`<Copyright>`、`<Description>`；`<RootNamespace>QL.World` 保持不变，所有命名空间与 XAML xmlns 不受影响
+- `ShellWindow.xaml` A1 Logo 文字 → 千星汇图；窗口标题已绑 `{Binding Title}` 自动跟随 `AppInfo.ProductName`
+- `SettingsWindow.xaml` 标题 `设置 — QL World` → `设置 — 千星汇图`；A5 关于页产品名同步
+- `LegacyPythonImporter` 错误消息同步品牌名
+- `Theme` 注释与 `App.xaml.cs` 内部日志标签保留 "QL World"（不影响用户感知）
+
+### U5-B：发布脚本与五件套命名
+
+- `build.ps1` staging 与 dist 路径前缀 `QL World_v$Version` → `StellarHub_v$Version`；顶部脚本注释同步
+- `ReleaseArtifacts.cs` 7 处版本目录/五件套文件名常量改为 `StellarHub_v{ver}`；fallback 标题 `BuildMinimalReleaseNotes`/`BuildMinimalUserGuide` → 千星汇图 v{version}
+- `ReleaseContractTests` 五件套断言路径与 zip 名同步；fake staging 中 `QL World.dll/.exe/.runtimeconfig.json` → `StellarHub.*`；UserGuidePath 测试内容用千星汇图品牌名
+- `tools/smoke/UiSmokeA3.ps1` + `UiSmokeU3.ps1` 启动 exe 名 → `StellarHub.exe`
+- `run.ps1` L89 用 `$runtimeConfig.Name` 动态推导 exe 名，自动适配 StellarHub.exe 无需改
+- 生产代码 `DebugUiTestMode.cs` mutex/event 名（`Global\QL_World_SingleInstance` / `Local\QL_World_GracefulShutdown`）保留 —— 用户不可见且改名有升级期单实例保护短暂失效副作用，留待后续单独评估
+- `RELEASE_NOTES.md` v1.0.0 历史发布记录保持原样（不篡改历史）
+
+### U5-C：数据目录迁移
+
+- `AppDataRootResolver` `ProductFolder` "QL_World" → "StellarHub"；新增 `LegacyProductFolder = "QL_World"` 作迁移源；新增 `.migrated` / `.migration-failed` 标记
+- 一次性迁移逻辑（`TryMigrate`）：已 `.migrated` 直接返回新路径；legacy 不存在或无白名单条目视为新装不写标记；有内容则逐项 `File/Directory.Move` 同卷原子；任一失败回滚已移动项 + 写 `.migration-failed` 到 legacy + 返回 legacy 路径，启动不崩；全成功才写 `.migrated`
+- `MigratableEntries` 白名单覆盖 db / `-wal` / `-shm` / `.backup` / config / `.backup` / thumbnails / models / logs；未知 stray 文件留在 legacy 供用户手动处理
+- `run.ps1` L103 错误消息路径 `Qianlan_App\QL_World\` → `Qianlan_App\StellarHub\`
+- DEBUG 下传非空 debugOverride 仍短路优先（测试隔离不变）
+- `DatabaseFileName = "qlworld.db"` / `ConfigFileName = "config.json"` 保持不变（内部文件名用户不可见，改名徒增迁移复杂度）
+- `AppDataRootResolverTests` 由 2 用例升级为 6 用例：Debug 优先级 / 全新安装无标记 / 空 legacy 视为新装 / 首次迁移成功 / 幂等跳过 / 失败 fallback 写失败标记（FileStream FileShare.None 锁源触发 IOException 验证回滚与降级）
+
+### U5-Z：收尾
+
+- `<Version>` 1.4.0 → 1.5.0；`AppInfo.MilestoneLabel = "U5 品牌升级"`（U5-A 已改）
+- `CHANGELOG.md` 顶部新增 [1.5.0] 节
+- `GEMINI.md` 第 1 节项目身份 + 里程碑状态更新（品牌升级说明）
+- `docs/USER_GUIDE.md` 品牌引用同步（标题、首段、12.5 数据目录路径、12.6 进程名、1.2 数据目录路径迁移说明）
+- `README.md` 顶部产品名同步
+- `AGENTS.md` 无 QL World 引用无需改
+- `docs/UI_NUMBERING.md` 无 QL World 引用无需改
+
 ## [1.4.0] — 2026-09-29 U4 主色调收尾（PRD 核心功能 100%）
 
 ### U4-A：B3-4 详情栏主色调色块
