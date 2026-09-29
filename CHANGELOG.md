@@ -5,6 +5,42 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-09-30 U3 UI 优化补丁
+
+### U3-A：§4.B.2 左栏属性筛选折叠组（B1-5）
+
+- 左栏新增「属性筛选」折叠组（默认收起，折叠态持久化），四维单选 chips
+  （各含「全部」，再点已选清除），与 A1/B1 其它筛选 AND 叠加
+- 颜色：9 色族（红/橙/黄/绿/青/蓝/紫/品红/灰）——Schema.v5 新增
+  images.color_family + 索引，由 dominant_colors 首色按 HSV 感知扇区
+  纯计算回填（DbMigrator 同事务），ColorAnalysisService 同窗写入；
+  未分析图片不匹配任何色族
+- 分辨率按长边 MAX(width,height) 分档（<1024 / 1024–2047 / 2048–4095 /
+  ≥4096，NULL 不匹配）；文件大小四档（<1MB/1–5MB/5–20MB/≥20MB）；
+  评分四档（未评分/≥3★/≥4★/5★）
+- 新增 ColorFamily 纯函数、AttributeFilterViewModel、FilterChipStyle、
+  SidebarSectionHeaderStyle；计数条摘要追加四维
+- UI_NUMBERING 新增 B1-5 / B1-5-1~4
+
+### U3-B：§4.C.1 卡片 hover 操作组（B2-3-ACT）
+
+- 网格卡片缩略图底部三按钮浮层：打开原文件 ↗ / 资源管理器定位 ⌖ /
+  复制路径 ⧉；OverlayBrush 底 + hover 浮出、移出即隐（Collapsed 不参与
+  Measure，虚拟化安全）
+- 参数化命令作用于悬停卡片而非当前选中；缺失卡 CanExecute 排除；
+  列表态不加
+- UI_NUMBERING 新增 B2-3-ACT
+
+### U3-C：§4.E.3 B1 四分区折叠+折叠态计数（B1-COL）
+
+- 素材库/收藏夹/热门标签/贴图组标题改为 ToggleButton（▾/▸），
+  折叠态持久化（默认全展开）；折叠时标题显示子项总数「名称 (N)」，
+  计数随树刷新实时更新
+- 修复设置序列化缺陷：WhenWritingDefault 吞掉 false，默认 true 的 bool
+  （CheckIntegrityOnStartup/AutoImportOnWatch/四个折叠态）写 false 后
+  重载回落 true——六属性加 JsonIgnore(Never) 并补 round-trip 回归测试
+- UI_NUMBERING 新增 B1-COL
+
 ## [1.2.0] — 2026-09-30 U2 UI 优化补丁
 
 ### U2-A：品牌视觉

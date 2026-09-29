@@ -178,6 +178,8 @@
 
 **落地提示**：B1 底部追加 `B1-5 属性筛选` 折叠组，每组单选 Chips；折叠态默认收起避免挤占主区。需要先评估与 [Top50 标签 B1-3](file:///c:/AI_Programming/APP/QL_World_dotnet/docs/UI_NUMBERING.md) 的边界。
 
+**状态**：已落地（U3-A）。B1-5 属性筛选折叠组（默认收起、持久化）含颜色/分辨率/文件大小/评分四维单选 chips（各含「全部」，再点已选清除）；颜色走 Schema.v5 images.color_family（dominant_colors 首色 HSV 感知扇区纯计算回填+同窗写入），分辨率按长边分档；与 A1/B1 其它筛选 AND 叠加。UI 编号 B1-5 / B1-5-1~4。
+
 #### 4.B.3 详情栏「相关资产」section（P1）
 
 **目标**：参考千岚·商城右栏底部「相关资产」缩略图行，QL World 在 B3 现有 [B3-8 找相似按钮](file:///c:/AI_Programming/APP/QL_World_dotnet/docs/UI_NUMBERING.md) 基础上，将「找相似」从按钮扩展为内嵌 4–6 张缩略图行（横向滚动）。
@@ -197,6 +199,8 @@
 **理由**：当前 QL World 这些操作在 B3-2 详情栏；高频操作前置到卡片可减少右栏切换。
 
 **落地提示**：在 [GridCardTemplate](file:///c:/AI_Programming/APP/QL_World_dotnet/src/QL.World/Views/ShellWindow.xaml#L31) 外层 Border 上加 hover 触发的浮层 Border（默认 Collapsed），按钮命令复用 B3-2 现有命令；注意虚拟化面板下浮层不要破坏 Measure 性能。
+
+**状态**：已落地（U3-B）。网格卡片缩略图底部三按钮浮层（打开原文件 ↗ / 资源管理器定位 ⌖ / 复制路径 ⧉），OverlayBrush 底 + IsMouseOver 触发显隐（Collapsed 不参与 Measure）；ShellViewModel 参数化命令作用于悬停卡片，缺失卡 CanExecute 排除；列表态不加。UI 编号 B2-3-ACT。
 
 #### 4.C.2 类别 / 状态徽标统一化（P1）
 
@@ -260,6 +264,8 @@
 
 **落地提示**：TreeView 节点 `Header` 模板统一带 `Name (Count)` 渲染；Count 包含所有子孙节点。
 
+**状态**：已落地（U3-C，按 QL World 实际适配）。B1 素材库/收藏夹/热门标签/贴图组四个分区标题改为 ToggleButton（▾/▸）可整区折叠，折叠态持久化（默认全展开）；折叠时标题显示直接子项总数「名称 (N)」（素材库=分类节点数、收藏夹=收藏夹数、Top 标签=标签数、贴图组=组数），计数随树刷新实时更新。QL World 左栏是分区列表而非单棵树，故以「分区折叠+标题计数」实现同等全局感。UI 编号 B1-COL。
+
 ---
 
 ## 5. 不采纳项与边界
@@ -296,3 +302,4 @@
 | 2026-09-24 | 初版，基于两张参考图归纳 | 用户提供的两张截图 |
 | 2026-09-28 | U1 落地状态标注：§4.A.1 / §4.A.3 / §4.D.2 / §4.E.1 均已落地 | U1-Z 收尾 |
 | 2026-09-30 | U2 落地状态标注：§4.A.2 / §4.B.1 / §4.B.3 / §4.C.2 / §4.D.1 / §4.E.2 均已落地 | U2-Z 收尾 |
+| 2026-09-30 | U3 落地状态标注：§4.B.2 / §4.C.1 / §4.E.3 均已落地（P2 项清零） | U3-Z 收尾 |
