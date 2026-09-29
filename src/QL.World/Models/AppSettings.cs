@@ -34,6 +34,9 @@ public sealed class AppSettings
     /// <summary>B2-4 list row thumbnail zoom (80–512).</summary>
     public int GalleryListZoom { get; set; } = 96;
 
+    /// <summary>U3-A (§4.B.2): B1-5 attribute filter section expanded (default collapsed).</summary>
+    public bool SidebarAttributeFilterExpanded { get; set; }
+
     /// <summary>Directories monitored by FileWatcherService (W3/A4).</summary>
     public List<string> WatcherDirectories { get; set; } = [];
 

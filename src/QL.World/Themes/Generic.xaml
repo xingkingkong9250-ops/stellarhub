@@ -177,6 +177,41 @@
         <Setter Property="FontSize" Value="13" />
     </Style>
 
+    <!-- U3-A: B1 collapsible section header (▾ expanded / ▸ collapsed + caption). -->
+    <Style x:Key="SidebarSectionHeaderStyle" TargetType="ToggleButton">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="2,4" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="border" CornerRadius="4"
+                            Background="{TemplateBinding Background}"
+                            Padding="{TemplateBinding Padding}">
+                        <Grid>
+                            <TextBlock x:Name="arrow" Text="▾" FontSize="10" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextMutedBrush}" />
+                            <ContentPresenter Margin="14,0,0,0" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="False">
+                            <Setter TargetName="arrow" Property="Text" Value="▸" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ─── TextBox ─────────────────────────────────────────────── -->
 
     <Style TargetType="TextBox">

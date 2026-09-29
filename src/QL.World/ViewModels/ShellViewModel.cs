@@ -35,6 +35,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         TagTree = new TagTreeViewModel(Gallery, services.ImageQuery, services.Tags);
         CollectionTree = new CollectionTreeViewModel(Gallery, services.Collections);
         PbrGroupTree = new PbrGroupTreeViewModel(Gallery, services.PbrGrouping);
+        AttributeFilter = new AttributeFilterViewModel(Gallery, services.Settings);
         Detail = new DetailViewModel(services.ImageQuery, services.Tags, Gallery, services.SemanticSearch);
         StatusBar = new StatusBarViewModel(services.Thumbnails, services.Settings);
         // U2-A: surface AI/import running state on C1 progress bar without coupling StatusBar to those services.
@@ -99,6 +100,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public TagTreeViewModel TagTree { get; }
     public CollectionTreeViewModel CollectionTree { get; }
     public PbrGroupTreeViewModel PbrGroupTree { get; }
+    public AttributeFilterViewModel AttributeFilter { get; }
     public DetailViewModel Detail { get; }
     public StatusBarViewModel StatusBar { get; }
 
@@ -374,11 +376,17 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         Gallery.Filter.SimilarToImageId = null;
         // U2-B: 清除全部筛选 also resets the 最近入库 dropdown.
         Gallery.Filter.ImportedWithinDays = null;
+        // U3-A: reset the four attribute filter dimensions.
+        Gallery.Filter.ColorFamily = null;
+        Gallery.Filter.ResolutionBucket = null;
+        Gallery.Filter.FileSizeBucket = null;
+        Gallery.Filter.RatingBucket = null;
         TopBar.ClearSearchText();
         TopBar.ClearRecentImport();
         TagTree.ResetSelection();
         CollectionTree.ResetSelection();
         PbrGroupTree.ResetSelection();
+        AttributeFilter.ResetSelection();
         _ = Gallery.RefreshAsync();
     }
 

@@ -1,6 +1,7 @@
 using System.IO;
 using Microsoft.Data.Sqlite;
 using QL.World.Data;
+using QL.World.Helpers;
 
 namespace QL.World.Services.Colors;
 
@@ -65,15 +66,20 @@ public sealed class ColorAnalysisService
         }
 
         // Fill only when still NULL/empty (protects existing values).
+        // U3-A: color_family (hue family of the first color) is written in the
+        // same statement so the B1-5 color filter needs no extra pass.
+        string? family = colors.Count > 0 ? ColorFamily.HexToFamily(colors[0]) : null;
         return _db.Run(conn =>
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = """
                 UPDATE images
-                SET dominant_colors = $json
+                SET dominant_colors = $json,
+                    color_family = $family
                 WHERE id = $id AND (dominant_colors IS NULL OR dominant_colors = '');
                 """;
             cmd.Parameters.AddWithValue("$json", System.Text.Json.JsonSerializer.Serialize(colors));
+            cmd.Parameters.AddNullable("$family", family);
             cmd.Parameters.AddWithValue("$id", imageId);
             return cmd.ExecuteNonQuery() > 0;
         });

@@ -357,4 +357,166 @@ public sealed class ImageQueryServiceTests
         Directory.CreateDirectory(dir);
         return dir;
     }
+
+    // ─── U3-A (§4.B.2): B1-5 attribute filters ─────────────────────────────
+
+    [Fact]
+    public void Color_family_filter_matches_only_that_family()
+    {
+        using var library = new TestLibrary();
+        var query = new ImageQueryService(library.Db);
+        long red = library.InsertImage(filePath: @"X:\red.png");
+        long gray = library.InsertImage(filePath: @"X:\gray.png");
+        long noColor = library.InsertImage(filePath: @"X:\none.png");
+        SetAttributes(library, red, colorFamily: "red");
+        SetAttributes(library, gray, colorFamily: "gray");
+
+        var result = query.QueryGallery(new LibraryFilter { ColorFamily = "red" });
+        Assert.Single(result);
+        Assert.Equal(red, result[0].Id);
+
+        // 未分析颜色（color_family NULL）的图片不匹配任何色族，不报错。
+        Assert.Empty(query.QueryGallery(new LibraryFilter { ColorFamily = "blue" }));
+    }
+
+    [Fact]
+    public void Resolution_bucket_uses_long_edge_and_null_dimensions_match_nothing()
+    {
+        using var library = new TestLibrary();
+        var query = new ImageQueryService(library.Db);
+        long small = library.InsertImage(filePath: @"X:\s.png");      // 800×600
+        long medium = library.InsertImage(filePath: @"X:\m.png");     // 1500×1000
+        long large = library.InsertImage(filePath: @"X:\l.png");      // 3000×2000
+        long huge = library.InsertImage(filePath: @"X:\h.png");       // 5000×100
+        long nullDims = library.InsertImage(filePath: @"X:\n.png");
+        SetAttributes(library, small, width: 800, height: 600);
+        SetAttributes(library, medium, width: 1500, height: 1000);
+        SetAttributes(library, large, width: 3000, height: 2000);
+        SetAttributes(library, huge, width: 5000, height: 100);
+        // InsertImage 默认 10×10；NULL 尺寸必须显式 UPDATE。
+        library.Db.Run(conn =>
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "UPDATE images SET width = NULL, height = NULL WHERE id = $id;";
+            cmd.Parameters.AddWithValue("$id", nullDims);
+            cmd.ExecuteNonQuery();
+        });
+
+        Assert.Equal(small, SingleId(query, ResolutionBuckets.Lt1024));
+        Assert.Equal(medium, SingleId(query, ResolutionBuckets.From1024To2047));
+        Assert.Equal(large, SingleId(query, ResolutionBuckets.From2048To4095));
+        Assert.Equal(huge, SingleId(query, ResolutionBuckets.Ge4096));
+
+        // 边界：长边恰好 1024 落在 1024–2047 档。
+        long edge1024 = library.InsertImage(filePath: @"X:\e1.png");
+        SetAttributes(library, edge1024, width: 1024, height: 10);
+        var bucket2 = query.QueryGallery(
+            new LibraryFilter { ResolutionBucket = ResolutionBuckets.From1024To2047 });
+        Assert.Equal(2, bucket2.Count);
+        Assert.Contains(bucket2, r => r.Id == edge1024);
+
+        static long SingleId(ImageQueryService q, string bucket) =>
+            q.QueryGallery(new LibraryFilter { ResolutionBucket = bucket }).Single().Id;
+    }
+
+    [Fact]
+    public void File_size_bucket_filters_by_byte_ranges()
+    {
+        using var library = new TestLibrary();
+        var query = new ImageQueryService(library.Db);
+        const long mb = 1024L * 1024L;
+        long tiny = library.InsertImage(filePath: @"X:\t.png");
+        long mid = library.InsertImage(filePath: @"X:\m.png");
+        long big = library.InsertImage(filePath: @"X:\b.png");
+        long huge = library.InsertImage(filePath: @"X:\h.png");
+        SetAttributes(library, tiny, fileSize: 512 * 1024);
+        SetAttributes(library, mid, fileSize: 3 * mb);
+        SetAttributes(library, big, fileSize: 10 * mb);
+        SetAttributes(library, huge, fileSize: 25 * mb);
+
+        Assert.Equal(tiny, query.QueryGallery(
+            new LibraryFilter { FileSizeBucket = FileSizeBuckets.Lt1Mb }).Single().Id);
+        Assert.Equal(mid, query.QueryGallery(
+            new LibraryFilter { FileSizeBucket = FileSizeBuckets.From1To5Mb }).Single().Id);
+        Assert.Equal(big, query.QueryGallery(
+            new LibraryFilter { FileSizeBucket = FileSizeBuckets.From5To20Mb }).Single().Id);
+        Assert.Equal(huge, query.QueryGallery(
+            new LibraryFilter { FileSizeBucket = FileSizeBuckets.Ge20Mb }).Single().Id);
+
+        // 边界：恰好 1 MB 落在 1–5 MB 档。
+        long edge = library.InsertImage(filePath: @"X:\e.png");
+        SetAttributes(library, edge, fileSize: mb);
+        var bucket2 = query.QueryGallery(
+            new LibraryFilter { FileSizeBucket = FileSizeBuckets.From1To5Mb });
+        Assert.Equal(2, bucket2.Count);
+        Assert.Contains(bucket2, r => r.Id == edge);
+    }
+
+    [Fact]
+    public void Rating_bucket_filters_and_combines_with_other_filters()
+    {
+        using var library = new TestLibrary();
+        var query = new ImageQueryService(library.Db);
+        long unrated = library.InsertImage(filePath: @"X:\u.png", rating: 0);
+        long three = library.InsertImage(filePath: @"X:\t.png", rating: 3);
+        long four = library.InsertImage(filePath: @"X:\f.png", rating: 4);
+        long five = library.InsertImage(filePath: @"X:\v.png", rating: 5);
+
+        Assert.Equal(unrated, query.QueryGallery(
+            new LibraryFilter { RatingBucket = RatingBuckets.Unrated }).Single().Id);
+        Assert.Equal(3, query.QueryGallery(
+            new LibraryFilter { RatingBucket = RatingBuckets.Ge3 }).Count);
+        Assert.Equal(2, query.QueryGallery(
+            new LibraryFilter { RatingBucket = RatingBuckets.Ge4 }).Count);
+        Assert.Equal(five, query.QueryGallery(
+            new LibraryFilter { RatingBucket = RatingBuckets.Eq5 }).Single().Id);
+
+        // AND 叠加：≥4★ 且 gray 色族。
+        SetAttributes(library, four, colorFamily: "gray");
+        SetAttributes(library, five, colorFamily: "red");
+        var combined = query.QueryGallery(new LibraryFilter
+        {
+            RatingBucket = RatingBuckets.Ge4,
+            ColorFamily = "gray",
+        });
+        Assert.Single(combined);
+        Assert.Equal(four, combined[0].Id);
+    }
+
+    [Fact]
+    public void Unknown_bucket_keys_are_ignored()
+    {
+        using var library = new TestLibrary();
+        var query = new ImageQueryService(library.Db);
+        library.InsertImage();
+
+        Assert.Single(query.QueryGallery(new LibraryFilter { ResolutionBucket = "bogus" }));
+        Assert.Single(query.QueryGallery(new LibraryFilter { FileSizeBucket = "bogus" }));
+        Assert.Single(query.QueryGallery(new LibraryFilter { RatingBucket = "bogus" }));
+    }
+
+    private static void SetAttributes(
+        TestLibrary library, long id,
+        int? width = null, int? height = null,
+        long? fileSize = null, string? colorFamily = null)
+    {
+        library.Db.Run(conn =>
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                UPDATE images
+                SET width = COALESCE($w, width),
+                    height = COALESCE($h, height),
+                    file_size = COALESCE($s, file_size),
+                    color_family = COALESCE($cf, color_family)
+                WHERE id = $id;
+                """;
+            cmd.Parameters.AddWithValue("$w", width is int w ? w : DBNull.Value);
+            cmd.Parameters.AddWithValue("$h", height is int h ? h : DBNull.Value);
+            cmd.Parameters.AddWithValue("$s", fileSize is long s ? s : DBNull.Value);
+            cmd.Parameters.AddWithValue("$cf", colorFamily is not null ? colorFamily : DBNull.Value);
+            cmd.Parameters.AddWithValue("$id", id);
+            cmd.ExecuteNonQuery();
+        });
+    }
 }

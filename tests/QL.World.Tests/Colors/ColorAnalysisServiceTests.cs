@@ -28,6 +28,8 @@ public sealed class ColorAnalysisServiceTests : IDisposable
 
         Assert.True(wrote);
         Assert.Equal("""["#C86432"]""", GetDominantColors(id));
+        // U3-A: color_family written in the same statement ("#C86432" H=20° → orange).
+        Assert.Equal("orange", GetColorFamily(id));
     }
 
     [Fact]
@@ -91,6 +93,16 @@ public sealed class ColorAnalysisServiceTests : IDisposable
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT dominant_colors FROM images WHERE id = $id;";
+            cmd.Parameters.AddWithValue("$id", id);
+            object? result = cmd.ExecuteScalar();
+            return result is string value ? value : null;
+        });
+
+    private string? GetColorFamily(long id) =>
+        _library.Db.Run(conn =>
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT color_family FROM images WHERE id = $id;";
             cmd.Parameters.AddWithValue("$id", id);
             object? result = cmd.ExecuteScalar();
             return result is string value ? value : null;

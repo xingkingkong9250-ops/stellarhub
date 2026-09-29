@@ -27,6 +27,17 @@
         <conv:ZeroToVisibilityConverter x:Key="ZeroVis" />
         <conv:RatingStarBrushConverter x:Key="StarBrush" />
 
+        <!-- U3-A (§4.B.2): B1-5 attribute filter chip — accent when active -->
+        <Style x:Key="FilterChipStyle" TargetType="Button" BasedOn="{StaticResource ChipButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource AccentBgBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource AccentDimBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- B2 grid card -->
         <DataTemplate x:Key="GridCardTemplate">
             <Border Margin="4" Padding="6"
@@ -442,6 +453,84 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+
+                        <!-- U3-A (§4.B.2): B1-5 属性筛选（默认收起，折叠态持久化） -->
+                        <ToggleButton Margin="2,16,0,0"
+                                      Style="{StaticResource SidebarSectionHeaderStyle}"
+                                      AutomationProperties.Name="属性筛选"
+                                      IsChecked="{Binding AttributeFilter.IsExpanded}"
+                                      Content="属性筛选" />
+                        <StackPanel Margin="2,0,0,0"
+                                    Visibility="{Binding AttributeFilter.IsExpanded, Converter={StaticResource BoolVis}}">
+                            <!-- B1-5-1 颜色 -->
+                            <TextBlock Text="颜色" Margin="2,2,0,0" FontSize="11"
+                                       Foreground="{DynamicResource TextMutedBrush}" />
+                            <ItemsControl ItemsSource="{Binding AttributeFilter.ColorOptions}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource FilterChipStyle}"
+                                                Content="{Binding Display}"
+                                                Command="{Binding SelectCommand}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <!-- B1-5-2 分辨率 -->
+                            <TextBlock Text="分辨率（长边）" Margin="2,2,0,0" FontSize="11"
+                                       Foreground="{DynamicResource TextMutedBrush}" />
+                            <ItemsControl ItemsSource="{Binding AttributeFilter.ResolutionOptions}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource FilterChipStyle}"
+                                                Content="{Binding Display}"
+                                                Command="{Binding SelectCommand}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <!-- B1-5-3 文件大小 -->
+                            <TextBlock Text="文件大小" Margin="2,2,0,0" FontSize="11"
+                                       Foreground="{DynamicResource TextMutedBrush}" />
+                            <ItemsControl ItemsSource="{Binding AttributeFilter.FileSizeOptions}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource FilterChipStyle}"
+                                                Content="{Binding Display}"
+                                                Command="{Binding SelectCommand}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <!-- B1-5-4 评分 -->
+                            <TextBlock Text="评分" Margin="2,2,0,0" FontSize="11"
+                                       Foreground="{DynamicResource TextMutedBrush}" />
+                            <ItemsControl ItemsSource="{Binding AttributeFilter.RatingOptions}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource FilterChipStyle}"
+                                                Content="{Binding Display}"
+                                                Command="{Binding SelectCommand}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
             </Border>

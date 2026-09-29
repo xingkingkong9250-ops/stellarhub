@@ -535,6 +535,72 @@ public sealed class ImageQueryService
             parameters.Add(("$pbrGroup", pbrGroupId));
         }
 
+        // U3-A (§4.B.2): B1-5 attribute filters. Unknown bucket keys are ignored.
+        if (!string.IsNullOrEmpty(filter.ColorFamily))
+        {
+            sql.Append(HasWhere(sql) ? "\n  AND " : "\nWHERE ");
+            sql.Append("i.color_family = $colorFamily");
+            parameters.Add(("$colorFamily", filter.ColorFamily));
+        }
+
+        if (!string.IsNullOrEmpty(filter.ResolutionBucket))
+        {
+            // Long edge MAX(width,height); NULL dimensions match no bucket.
+            string? clause = filter.ResolutionBucket switch
+            {
+                ResolutionBuckets.Lt1024 =>
+                    "MAX(i.width, i.height) < 1024",
+                ResolutionBuckets.From1024To2047 =>
+                    "MAX(i.width, i.height) BETWEEN 1024 AND 2047",
+                ResolutionBuckets.From2048To4095 =>
+                    "MAX(i.width, i.height) BETWEEN 2048 AND 4095",
+                ResolutionBuckets.Ge4096 =>
+                    "MAX(i.width, i.height) >= 4096",
+                _ => null,
+            };
+            if (clause is not null)
+            {
+                sql.Append(HasWhere(sql) ? "\n  AND " : "\nWHERE ");
+                sql.Append("(i.width IS NOT NULL AND i.height IS NOT NULL AND ")
+                    .Append(clause).Append(')');
+            }
+        }
+
+        if (!string.IsNullOrEmpty(filter.FileSizeBucket))
+        {
+            const long mb = 1024L * 1024L;
+            string? clause = filter.FileSizeBucket switch
+            {
+                FileSizeBuckets.Lt1Mb => $"i.file_size < {mb}",
+                FileSizeBuckets.From1To5Mb => $"i.file_size BETWEEN {mb} AND {5 * mb - 1}",
+                FileSizeBuckets.From5To20Mb => $"i.file_size BETWEEN {5 * mb} AND {20 * mb - 1}",
+                FileSizeBuckets.Ge20Mb => $"i.file_size >= {20 * mb}",
+                _ => null,
+            };
+            if (clause is not null)
+            {
+                sql.Append(HasWhere(sql) ? "\n  AND " : "\nWHERE ");
+                sql.Append(clause);
+            }
+        }
+
+        if (!string.IsNullOrEmpty(filter.RatingBucket))
+        {
+            string? clause = filter.RatingBucket switch
+            {
+                RatingBuckets.Unrated => "i.rating = 0",
+                RatingBuckets.Ge3 => "i.rating >= 3",
+                RatingBuckets.Ge4 => "i.rating >= 4",
+                RatingBuckets.Eq5 => "i.rating = 5",
+                _ => null,
+            };
+            if (clause is not null)
+            {
+                sql.Append(HasWhere(sql) ? "\n  AND " : "\nWHERE ");
+                sql.Append(clause);
+            }
+        }
+
         if (!string.IsNullOrWhiteSpace(filter.Text))
         {
             sql.Append(HasWhere(sql) ? "\n  AND " : "\nWHERE ");

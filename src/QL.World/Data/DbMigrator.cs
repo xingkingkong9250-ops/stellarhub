@@ -11,7 +11,7 @@ namespace QL.World.Data;
 /// </summary>
 internal static class DbMigrator
 {
-    private const int CURRENT_VERSION = 4;
+    private const int CURRENT_VERSION = 5;
 
     public static void Migrate(SqliteConnection connection)
     {
@@ -31,10 +31,62 @@ internal static class DbMigrator
                 command.CommandText = sql;
                 command.ExecuteNonQuery();
 
+                // U3-A: v5 adds images.color_family — backfill from existing
+                // dominant_colors JSON in the same transaction (pure HSV math).
+                if (target == 5)
+                    BackfillColorFamilies(connection, transaction);
+
                 command.CommandText = $"PRAGMA user_version = {target};";
                 command.ExecuteNonQuery();
             }
             transaction.Commit();
+        }
+    }
+
+    /// <summary>
+    /// Derives color_family from the first dominant color for rows that already
+    /// have dominant_colors. Rows without colors (or with corrupt JSON) keep a
+    /// NULL family — the color filter simply never matches them.
+    /// </summary>
+    private static void BackfillColorFamilies(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        var rows = new List<(long Id, string Json)>();
+        using (var query = connection.CreateCommand())
+        {
+            query.Transaction = transaction;
+            query.CommandText = """
+                SELECT id, dominant_colors FROM images
+                WHERE color_family IS NULL
+                  AND dominant_colors IS NOT NULL AND dominant_colors != '';
+                """;
+            using var reader = query.ExecuteReader();
+            while (reader.Read())
+                rows.Add((reader.GetInt64(0), reader.GetString(1)));
+        }
+
+        foreach ((long id, string json) in rows)
+        {
+            string? family;
+            try
+            {
+                var colors = System.Text.Json.JsonSerializer.Deserialize<List<string>>(json);
+                family = colors is { Count: > 0 }
+                    ? Services.Colors.ColorFamily.HexToFamily(colors[0])
+                    : null;
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                continue; // corrupt JSON must never abort the migration
+            }
+            if (family is null)
+                continue;
+
+            using var update = connection.CreateCommand();
+            update.Transaction = transaction;
+            update.CommandText = "UPDATE images SET color_family = $family WHERE id = $id;";
+            update.Parameters.AddWithValue("$family", family);
+            update.Parameters.AddWithValue("$id", id);
+            update.ExecuteNonQuery();
         }
     }
 

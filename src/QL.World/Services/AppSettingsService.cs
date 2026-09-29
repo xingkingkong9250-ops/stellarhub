@@ -131,6 +131,15 @@ public sealed class AppSettingsService
             next => _settings.GalleryListZoom = next);
     }
 
+    /// <summary>U3-A (§4.B.2): B1-5 attribute filter section expanded.</summary>
+    public bool SidebarAttributeFilterExpanded
+    {
+        get => _settings.SidebarAttributeFilterExpanded;
+        set => SetAndSave(value,
+            () => _settings.SidebarAttributeFilterExpanded,
+            next => _settings.SidebarAttributeFilterExpanded = next);
+    }
+
     public IReadOnlyList<string> WatcherDirectories => _settings.WatcherDirectories;
 
     public void SetWatcherDirectories(IReadOnlyList<string> directories)

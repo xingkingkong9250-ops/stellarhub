@@ -44,7 +44,7 @@ public sealed class DatabaseServiceTests
             command.CommandText = "PRAGMA user_version;";
             return Convert.ToInt32(command.ExecuteScalar());
         });
-        Assert.Equal(4, version);
+        Assert.Equal(5, version);
 
         // Second Initialize must not throw or duplicate anything.
         library.Db.Initialize();
@@ -98,7 +98,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(4, migrated);
+            Assert.Equal(5, migrated);
 
             var (tableCount, imageCount) = db.Run(conn =>
             {
@@ -126,7 +126,98 @@ public sealed class DatabaseServiceTests
             });
             Assert.Equal("'local'", sourceDefault);
 
-            // Re-running Initialize must stay at v4 (idempotent forward-only).
+            // Re-running Initialize must stay at v5 (idempotent forward-only).
+            db.Initialize();
+            Assert.Equal("ok", db.QuickIntegrityCheck());
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            try { Directory.Delete(directory, recursive: true); }
+            catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void Migration_to_v5_backfills_color_family_from_dominant_colors()
+    {
+        string directory = Path.Combine(
+            Path.GetTempPath(), "ql-world-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            // Build a v4 database (v1 schema + migrations 2-4) with analyzed rows.
+            string databasePath = Path.Combine(directory, "qlworld.db");
+            using (var bootstrap = new SqliteConnection($"Data Source={databasePath}"))
+            {
+                bootstrap.Open();
+                foreach (int v in new[] { 1, 2, 3, 4 })
+                {
+                    using var schema = bootstrap.CreateCommand();
+                    schema.CommandText = DbMigrator.LoadSchemaSql(v);
+                    schema.ExecuteNonQuery();
+                }
+                using (var versionCmd = bootstrap.CreateCommand())
+                {
+                    versionCmd.CommandText = "PRAGMA user_version = 4;";
+                    versionCmd.ExecuteNonQuery();
+                }
+                using var seed = bootstrap.CreateCommand();
+                seed.CommandText = """
+                    INSERT INTO images
+                        (file_path, file_name, sortable_name, file_hash, file_size,
+                         width, height, format, rating, notes, primary_category,
+                         dominant_colors, is_missing, created_at, updated_at)
+                    VALUES
+                        ('C:\old\red.png', 'red.png', 'red.png', 'h1', 1,
+                         4, 4, 'png', 0, '', NULL, '["#E04030","#101010"]', 0,
+                         '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'),
+                        ('C:\old\gray.png', 'gray.png', 'gray.png', 'h2', 1,
+                         4, 4, 'png', 0, '', NULL, '["#808080"]', 0,
+                         '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'),
+                        ('C:\old\none.png', 'none.png', 'none.png', 'h3', 1,
+                         4, 4, 'png', 0, '', NULL, NULL, 0,
+                         '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'),
+                        ('C:\old\corrupt.png', 'corrupt.png', 'corrupt.png', 'h4', 1,
+                         4, 4, 'png', 0, '', NULL, 'not-json', 0,
+                         '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+                    """;
+                seed.ExecuteNonQuery();
+            }
+
+            using var db = new DatabaseService(directory);
+            db.Initialize();
+
+            int version = db.Run(conn =>
+            {
+                using var command = conn.CreateCommand();
+                command.CommandText = "PRAGMA user_version;";
+                return Convert.ToInt32(command.ExecuteScalar());
+            });
+            Assert.Equal(5, version);
+
+            var families = db.Run(conn =>
+            {
+                using var command = conn.CreateCommand();
+                command.CommandText = "SELECT file_name, color_family, dominant_colors FROM images ORDER BY file_name;";
+                var rows = new List<(string Name, string? Family, string? Colors)>();
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    rows.Add((reader.GetString(0),
+                        reader.IsDBNull(1) ? null : reader.GetString(1),
+                        reader.IsDBNull(2) ? null : reader.GetString(2)));
+                }
+                return rows;
+            });
+
+            // 首色归族；dominant_colors 原文不动。
+            Assert.Equal(("corrupt.png", null, "not-json"), families[0]);
+            Assert.Equal(("gray.png", "gray", """["#808080"]"""), families[1]);
+            Assert.Equal(("none.png", null, null), families[2]);
+            Assert.Equal(("red.png", "red", """["#E04030","#101010"]"""), families[3]);
+
+            // 幂等：再次 Initialize 不重复回填、不报错。
             db.Initialize();
             Assert.Equal("ok", db.QuickIntegrityCheck());
         }

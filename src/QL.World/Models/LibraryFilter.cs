@@ -37,6 +37,20 @@ public sealed class LibraryFilter
 
     public bool OnlyMissing { get; set; }
 
+    // ─── U3-A (§4.B.2): B1-5 attribute filters; null = 全部 ───────────────
+
+    /// <summary>Color family key (see Services.Colors.ColorFamily), e.g. "red".</summary>
+    public string? ColorFamily { get; set; }
+
+    /// <summary>Resolution bucket key on the long edge (see <see cref="ResolutionBuckets"/>).</summary>
+    public string? ResolutionBucket { get; set; }
+
+    /// <summary>File size bucket key (see <see cref="FileSizeBuckets"/>).</summary>
+    public string? FileSizeBucket { get; set; }
+
+    /// <summary>Rating bucket key (see <see cref="RatingBuckets"/>).</summary>
+    public string? RatingBucket { get; set; }
+
     /// <summary>
     /// Pre-computed top-N image ids from semantic search (text→image or image→image).
     /// When non-empty, the gallery restricts results to these ids (ignoring Text/Tag/Category filters).
@@ -68,6 +82,10 @@ public sealed class LibraryFilter
         Sort = Sort,
         ImportedWithinDays = ImportedWithinDays,
         OnlyMissing = OnlyMissing,
+        ColorFamily = ColorFamily,
+        ResolutionBucket = ResolutionBucket,
+        FileSizeBucket = FileSizeBucket,
+        RatingBucket = RatingBucket,
         SemanticResultIds = SemanticResultIds,
         SimilarToImageId = SimilarToImageId,
         Limit = Limit,
@@ -79,3 +97,30 @@ public sealed class LibraryFilter
 public sealed record CategoryCount(string? Category, int Count);
 
 public sealed record TagCount(string Tag, int Count);
+
+/// <summary>U3-A: resolution bucket keys on the long edge MAX(width,height).</summary>
+public static class ResolutionBuckets
+{
+    public const string Lt1024 = "lt1024";
+    public const string From1024To2047 = "1024-2047";
+    public const string From2048To4095 = "2048-4095";
+    public const string Ge4096 = "ge4096";
+}
+
+/// <summary>U3-A: file size bucket keys (file_size in bytes).</summary>
+public static class FileSizeBuckets
+{
+    public const string Lt1Mb = "lt1mb";
+    public const string From1To5Mb = "1-5mb";
+    public const string From5To20Mb = "5-20mb";
+    public const string Ge20Mb = "ge20mb";
+}
+
+/// <summary>U3-A: rating bucket keys.</summary>
+public static class RatingBuckets
+{
+    public const string Unrated = "unrated";
+    public const string Ge3 = "ge3";
+    public const string Ge4 = "ge4";
+    public const string Eq5 = "eq5";
+}
