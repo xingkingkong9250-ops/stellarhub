@@ -26,6 +26,8 @@ public sealed class GalleryItemViewModel : ObservableObject
         CreatedAt = item.CreatedAt;
         TagsCsv = item.TagsCsv;
         SourceBadge = item.SourceBadge;
+        Source = item.Source;
+        NasConnectionId = item.NasConnectionId;
     }
 
     public long Id { get; }
@@ -43,6 +45,23 @@ public sealed class GalleryItemViewModel : ObservableObject
 
     /// <summary>U2-D (§4.C.2): "本地"/"云端"/"AI" or null — drives B2-3-OL1 source badge.</summary>
     public string? SourceBadge { get; }
+
+    /// <summary>
+    /// M5-E: <see cref="ImageSource.Local"/> or <see cref="ImageSource.Remote"/>.
+    /// <see cref="GalleryThumbnailProvider"/> builds the matching
+    /// <c>IImageSource</c> from this so <c>ThumbnailService</c> can fetch
+    /// the original from a NAS when the local gallery row points at a
+    /// remote <c>file_path</c>.
+    /// </summary>
+    public ImageSource Source { get; }
+
+    /// <summary>
+    /// M5-E: NAS connection id when <see cref="Source"/> is
+    /// <see cref="ImageSource.Remote"/>; <c>null</c> otherwise. Used by
+    /// <see cref="GalleryThumbnailProvider"/> to look up the cached
+    /// <see cref="INasConnector"/>.
+    /// </summary>
+    public int? NasConnectionId { get; }
 
     public int Rating
     {

@@ -621,9 +621,24 @@ public sealed class SettingsViewModel : ObservableObject
     private void RegenerateAllThumbnails()
     {
         var items = _imageQuery.QueryGallery(new LibraryFilter());
+        // M5-E: ThumbnailService.Request now takes IImageSource. Settings
+        // regen builds LocalImageSource for local rows and skips remote rows
+        // (their thumbnails re-generate lazily as the gallery scrolls and
+        // GalleryThumbnailProvider.Attach builds a RemoteImageSource with the
+        // cached connector). Building a per-row connector here would leak.
+        int skipped = 0;
         foreach (GalleryListItem item in items)
-            _thumbnails.Regenerate(item.FileHash, item.FilePath);
-        StatusBarText = $"已重新排队 {items.Count} 张缩略图";
+        {
+            if (item.Source == ImageSource.Remote)
+            {
+                skipped++;
+                continue;
+            }
+            _thumbnails.Regenerate(item.FileHash, new LocalImageSource(item.FilePath));
+        }
+        StatusBarText = skipped > 0
+            ? $"已重新排队 {items.Count - skipped} 张缩略图（跳过 {skipped} 张远程）"
+            : $"已重新排队 {items.Count} 张缩略图";
     }
 
     private void AddWatcherDirectory()

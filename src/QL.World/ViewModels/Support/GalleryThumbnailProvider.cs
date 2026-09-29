@@ -2,7 +2,9 @@ using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using QL.World.Models;
 using QL.World.Services;
+using QL.World.Services.Nas;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace QL.World.ViewModels.Support;
@@ -19,6 +21,8 @@ public sealed class GalleryThumbnailProvider : IDisposable
     private const int CACHE_LIMIT = 500;
 
     private readonly ThumbnailService _thumbnails;
+    private readonly INasConnectorFactory? _nasFactory;
+    private readonly AppSettingsService? _settings;
     private readonly object _gate = new();
 
     private readonly Dictionary<string, GalleryItemViewModel> _realized = new();
@@ -26,11 +30,27 @@ public sealed class GalleryThumbnailProvider : IDisposable
     private readonly LinkedList<string> _lru = new();
     private readonly Dictionary<string, LinkedListNode<string>> _lruNodes = new();
     private readonly HashSet<string> _inFlight = new();
+    private readonly Dictionary<int, INasConnector> _connectors = new();
+    private readonly object _connectorGate = new();
     private bool _disposed;
 
-    public GalleryThumbnailProvider(ThumbnailService thumbnails)
+    /// <summary>
+    /// M5-E: <paramref name="nasFactory"/> + <paramref name="settings"/> let
+    /// the provider build <see cref="RemoteImageSource"/> instances for
+    /// gallery rows whose <see cref="GalleryItemViewModel.Source"/> is
+    /// <see cref="ImageSource.Remote"/>. Connectors are cached per
+    /// <see cref="NasConnectionSpec.Id"/> so the auth handshake + HttpClient
+    /// pool survive across many thumbnails instead of being rebuilt per row.
+    /// Defaults are for tests that only exercise the local path.
+    /// </summary>
+    public GalleryThumbnailProvider(
+        ThumbnailService thumbnails,
+        INasConnectorFactory? nasFactory = null,
+        AppSettingsService? settings = null)
     {
         _thumbnails = thumbnails;
+        _nasFactory = nasFactory;
+        _settings = settings;
         _thumbnails.ThumbnailReady += OnThumbnailReady;
     }
 
@@ -55,7 +75,7 @@ public sealed class GalleryThumbnailProvider : IDisposable
         }
         else
         {
-            _thumbnails.Request(item.FileHash, item.FilePath, highPriority: true);
+            _thumbnails.Request(item.FileHash, CreateSource(item), highPriority: true);
         }
     }
 
@@ -76,11 +96,33 @@ public sealed class GalleryThumbnailProvider : IDisposable
         }
     }
 
+    /// <summary>
+    /// M5-E: force-regenerate the thumbnail for <paramref name="item"/>.
+    /// Called by the B2-3-ACT "重新生成缩略图" context action. Builds the
+    /// same <see cref="IImageSource"/> as <see cref="Attach"/> so remote rows
+    /// reuse the cached <see cref="INasConnector"/> + RemoteImageSource path
+    /// instead of being skipped (which would leave a stale WebP on disk).
+    /// </summary>
+    public void Regenerate(GalleryItemViewModel item)
+    {
+        _thumbnails.Regenerate(item.FileHash, CreateSource(item));
+    }
+
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
         _thumbnails.ThumbnailReady -= OnThumbnailReady;
+        // M5-E: release cached NAS connectors (HttpClient pools) on shutdown.
+        lock (_connectorGate)
+        {
+            foreach (INasConnector c in _connectors.Values)
+            {
+                try { (c as IDisposable)?.Dispose(); }
+                catch { /* best effort */ }
+            }
+            _connectors.Clear();
+        }
     }
 
     private void OnThumbnailReady(string hash)
@@ -94,6 +136,70 @@ public sealed class GalleryThumbnailProvider : IDisposable
                 return;
         }
         StartLoad(item);
+    }
+
+    /// <summary>
+    /// M5-E: builds the <see cref="IImageSource"/> matching this row. Local
+    /// rows wrap <see cref="GalleryItemViewModel.FilePath"/> in a
+    /// <see cref="LocalImageSource"/>; remote rows look up the cached
+    /// <see cref="INasConnector"/> by <see cref="GalleryItemViewModel.NasConnectionId"/>
+    /// and strip the <c>nas://{id}</c> scheme from the stored
+    /// <c>file_path</c> to recover the remote path. Falls back to a local
+    /// source when the connection was deleted from settings (the thumbnail
+    /// will fail to decode and the placeholder is copied — same UX as a
+    /// missing local file).
+    /// </summary>
+    private IImageSource CreateSource(GalleryItemViewModel item)
+    {
+        if (item.Source == QL.World.Models.ImageSource.Remote &&
+            item.NasConnectionId is int connId &&
+            _nasFactory is not null &&
+            GetConnector(connId) is { } connector)
+        {
+            string remotePath = StripNasPrefix(item.FilePath, connId);
+            return new RemoteImageSource(connector, remotePath, item.FilePath);
+        }
+        return new LocalImageSource(item.FilePath);
+    }
+
+    /// <summary>
+    /// Lazily builds + caches a connector for the given connection id. Returns
+    /// null when the id no longer exists in <see cref="AppSettingsService.NasConnections"/>
+    /// (user deleted it after the scan). Cache is keyed by id so a single
+    /// HttpClient/auth handshake serves the whole gallery session.
+    /// </summary>
+    private INasConnector? GetConnector(int connId)
+    {
+        if (_settings is null || _nasFactory is null)
+            return null;
+        lock (_connectorGate)
+        {
+            if (_connectors.TryGetValue(connId, out INasConnector? cached))
+                return cached;
+            NasConnectionSpec? spec = _settings.NasConnections
+                .FirstOrDefault(c => c.Id == connId);
+            if (spec is null)
+                return null;
+            INasConnector connector = _nasFactory.Create(spec, plaintextPassword: null);
+            _connectors[connId] = connector;
+            return connector;
+        }
+    }
+
+    /// <summary>
+    /// Strips the <c>nas://{connId}</c> scheme prefix from a stored canonical
+    /// path to recover the remote path rooted at
+    /// <see cref="NasConnectionSpec.RootPath"/>. Mirrors
+    /// <see cref="RemoteFileSystemAccessor"/>'s private <c>ToRemote</c>.
+    /// Falls back to the raw string when it isn't a canonical nas:// path.
+    /// </summary>
+    private static string StripNasPrefix(string canonical, int connId)
+    {
+        string prefix = $"nas://{connId}";
+        if (!canonical.StartsWith(prefix, StringComparison.Ordinal))
+            return canonical;
+        string rest = canonical[prefix.Length..];
+        return string.IsNullOrEmpty(rest) ? "/" : rest;
     }
 
     private void StartLoad(GalleryItemViewModel item)

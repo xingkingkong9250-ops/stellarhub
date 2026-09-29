@@ -1,5 +1,6 @@
 using System.IO;
 using QL.World.Services;
+using QL.World.Services.Nas;
 using QL.World.Tests.Support;
 
 namespace QL.World.Tests;
@@ -34,7 +35,7 @@ public sealed class ThumbnailServiceTests : IDisposable
             Path.Combine(_directory, "src"), "a.png", 40, 30);
         const string hash = "abcdef1234567890";
 
-        service.Request(hash, source);
+        service.Request(hash, new LocalImageSource(source));
 
         string expected = Path.Combine(
             _directory, "thumbnails", "ab", $"{hash}.webp");
@@ -50,7 +51,7 @@ public sealed class ThumbnailServiceTests : IDisposable
         using var service = new ThumbnailService(_directory, _settings);
         const string hash = "0011223344556677";
 
-        service.Request(hash, Path.Combine(_directory, "gone.png"));
+        service.Request(hash, new LocalImageSource(Path.Combine(_directory, "gone.png")));
 
         string expected = service.GetThumbnailPath(hash);
         Assert.True(WaitFor(() => File.Exists(expected), TimeSpan.FromSeconds(10)));
@@ -64,13 +65,13 @@ public sealed class ThumbnailServiceTests : IDisposable
             Path.Combine(_directory, "src"), "a.png", 20, 20);
         const string hash = "9988776655443322";
 
-        service.Request(hash, source);
+        service.Request(hash, new LocalImageSource(source));
         string expected = service.GetThumbnailPath(hash);
         Assert.True(WaitFor(() => File.Exists(expected), TimeSpan.FromSeconds(10)));
 
         DateTime firstWrite = File.GetLastWriteTimeUtc(expected);
         await Task.Delay(40);
-        service.Regenerate(hash, source);
+        service.Regenerate(hash, new LocalImageSource(source));
 
         Assert.True(WaitFor(
             () => File.Exists(expected) && File.GetLastWriteTimeUtc(expected) > firstWrite,

@@ -1,5 +1,6 @@
 using System.IO;
 using QL.World.Helpers;
+using QL.World.Services.Nas;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Webp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -20,6 +21,7 @@ public sealed class ThumbnailService : IDisposable
     private const int PLACEHOLDER_SIZE = 64;
 
     private readonly string _root;
+    private readonly string _tempRoot;
     private readonly AppSettingsService _settings;
     private readonly IMagickDecoder _magick;
 
@@ -42,6 +44,10 @@ public sealed class ThumbnailService : IDisposable
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _magick = magick ?? new MagickDecoder();
         Directory.CreateDirectory(_root);
+        // M5-E: remote (NAS) thumbnails download the full original into a
+        // per-hash temp file before decoding. %TEMP%\StellarHub\ matches the
+        // U5 brand migration; named by hash so two workers never collide.
+        _tempRoot = Path.Combine(Path.GetTempPath(), "StellarHub");
 
         _workers = Enumerable.Range(0, WORKER_COUNT)
             .Select(_ => Task.Run(ConsumeLoop))
@@ -67,8 +73,12 @@ public sealed class ThumbnailService : IDisposable
     public bool ThumbnailExists(string hash) => File.Exists(GetThumbnailPath(hash));
 
     /// <summary>Enqueues generation unless the WebP already exists.</summary>
-    public void Request(string hash, string sourcePath, bool highPriority = false)
+    /// <param name="source">M5-E: replaces the <c>string sourcePath</c> overload
+    /// so the same worker handles local files (<see cref="LocalImageSource"/>)
+    /// and remote NAS bytes (<see cref="RemoteImageSource"/>).</param>
+    public void Request(string hash, IImageSource source, bool highPriority = false)
     {
+        ArgumentNullException.ThrowIfNull(source);
         string key = NormalizeHash(hash);
         if (ThumbnailExists(key))
             return;
@@ -79,7 +89,7 @@ public sealed class ThumbnailService : IDisposable
                 return;
 
             long order = highPriority ? --_priorityOrder : --_normalOrder;
-            var job = new Job(key, sourcePath, order);
+            var job = new Job(key, source, order);
             _jobs[key] = job;
             _queue.Enqueue(key, order);
         }
@@ -104,8 +114,9 @@ public sealed class ThumbnailService : IDisposable
     }
 
     /// <summary>Forces regeneration even when a WebP already exists.</summary>
-    public void Regenerate(string hash, string sourcePath)
+    public void Regenerate(string hash, IImageSource source)
     {
+        ArgumentNullException.ThrowIfNull(source);
         string key = NormalizeHash(hash);
         try { File.Delete(GetThumbnailPath(key)); }
         catch (IOException) { /* Will be overwritten on save. */ }
@@ -114,7 +125,7 @@ public sealed class ThumbnailService : IDisposable
         {
             _jobs.Remove(key);
         }
-        Request(key, sourcePath, highPriority: true);
+        Request(key, source, highPriority: true);
     }
 
     public Task WaitPlaceholderAsync() => _placeholderTask ?? Task.CompletedTask;
@@ -176,32 +187,68 @@ public sealed class ThumbnailService : IDisposable
         if (File.Exists(output))
             return;
 
-        if (!File.Exists(job.SourcePath))
-        {
-            CopyPlaceholderFor(job.Hash);
-            return;
-        }
-
-        int size = _settings.ThumbnailSize;
-        int quality = _settings.ThumbnailQuality;
-
-        using Image image = LoadDecoded(job.SourcePath);
-        image.Mutate(ctx => ctx.Resize(new ResizeOptions
-        {
-            Size = new Size(size, size),
-            Mode = ResizeMode.Max,
-        }));
-
-        Directory.CreateDirectory(Path.GetDirectoryName(output)!);
-        string temporary = output + $".{Guid.NewGuid():N}.partial";
+        // M5-E: local sources take the fast path (Image.Load(path) + Magick
+        // fallback for tga/exr/hdr/psd). Remote sources stream the full
+        // original into %TEMP%\StellarHub\<hash>.<guid>.tmp via
+        // IImageSource.OpenReadAsync, decode that temp file, save WebP, then
+        // delete the temp in finally (M5 simple path; M6+ adds Range partial
+        // decode so only the bytes a 256px thumb needs cross the wire).
+        string? sourcePath = job.Source.LocalPath;
+        string? tempFile = null;
         try
         {
-            image.Save(temporary, new WebpEncoder { Quality = quality });
-            File.Move(temporary, output, overwrite: true);
+            if (sourcePath is null)
+            {
+                Directory.CreateDirectory(_tempRoot);
+                tempFile = Path.Combine(_tempRoot, $"{job.Hash}.{Guid.NewGuid():N}.tmp");
+                using (Stream src = job.Source.OpenReadAsync(_shutdown.Token).GetAwaiter().GetResult())
+                using (var dst = new FileStream(tempFile, FileMode.Create, FileAccess.Write,
+                               FileShare.None, 81920, useAsync: false))
+                {
+                    src.CopyTo(dst, 81920);
+                }
+                sourcePath = tempFile;
+            }
+
+            if (!File.Exists(sourcePath))
+            {
+                CopyPlaceholderFor(job.Hash);
+                return;
+            }
+
+            int size = _settings.ThumbnailSize;
+            int quality = _settings.ThumbnailQuality;
+
+            using Image image = LoadDecoded(sourcePath);
+            image.Mutate(ctx => ctx.Resize(new ResizeOptions
+            {
+                Size = new Size(size, size),
+                Mode = ResizeMode.Max,
+            }));
+
+            Directory.CreateDirectory(Path.GetDirectoryName(output)!);
+            string temporary = output + $".{Guid.NewGuid():N}.partial";
+            try
+            {
+                image.Save(temporary, new WebpEncoder { Quality = quality });
+                File.Move(temporary, output, overwrite: true);
+            }
+            finally
+            {
+                TryDelete(temporary);
+            }
         }
         finally
         {
-            TryDelete(temporary);
+            if (tempFile is not null)
+            {
+                try { if (File.Exists(tempFile)) File.Delete(tempFile); }
+                catch (IOException ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[Thumbnail] failed to delete remote temp {tempFile}: {ex.Message}");
+                }
+            }
         }
     }
 
@@ -310,15 +357,15 @@ public sealed class ThumbnailService : IDisposable
 
     private sealed class Job
     {
-        public Job(string hash, string sourcePath, long order)
+        public Job(string hash, IImageSource source, long order)
         {
             Hash = hash;
-            SourcePath = sourcePath;
+            Source = source;
             Order = order;
         }
 
         public string Hash { get; }
-        public string SourcePath { get; }
+        public IImageSource Source { get; }
         public long Order { get; set; }
         public bool Running { get; set; }
     }

@@ -60,4 +60,20 @@ public sealed class GalleryListItem
 
     /// <summary>U2-D (§4.C.2): source badge text ("本地"/"云端"/"AI") or null when no AI data.</summary>
     public string? SourceBadge { get; init; }
+
+    /// <summary>
+    /// M5-D (schema v6): where the original bytes live —
+    /// <see cref="ImageSource.Local"/> (default, preserves every pre-M5 row)
+    /// or <see cref="ImageSource.Remote"/> (NAS). Drives which
+    /// <c>IImageSource</c> implementation <c>GalleryThumbnailProvider</c>
+    /// builds for <c>ThumbnailService.Request</c> (M5-E).
+    /// </summary>
+    public ImageSource Source { get; init; } = ImageSource.Local;
+
+    /// <summary>
+    /// M5-D (schema v6): the NAS connection id (matching
+    /// <c>AppSettings.NasConnections[i].Id</c>) when <see cref="Source"/> is
+    /// <see cref="ImageSource.Remote"/>; <c>null</c> for local rows.
+    /// </summary>
+    public int? NasConnectionId { get; init; }
 }

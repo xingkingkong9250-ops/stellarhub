@@ -3,6 +3,7 @@ using ImageMagick;
 using QL.World.Data;
 using QL.World.Models;
 using QL.World.Services;
+using QL.World.Services.Nas;
 using QL.World.Tests.Support;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -100,8 +101,8 @@ public sealed class MagickDecoderTests : IDisposable
         string tga = CreateSample("thumb.tga", MagickFormat.Tga);
         string psd = CreateSample("thumb.psd", MagickFormat.Psd);
 
-        service.Request("tga000000000001", tga);
-        service.Request("psd000000000001", psd);
+        service.Request("tga000000000001", new LocalImageSource(tga));
+        service.Request("psd000000000001", new LocalImageSource(psd));
 
         Assert.True(WaitFor(
             () => File.Exists(service.GetThumbnailPath("tga000000000001")),

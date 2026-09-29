@@ -62,7 +62,9 @@ public sealed class ImageQueryService
                            WHEN EXISTS (SELECT 1 FROM image_tags it2
                                         WHERE it2.image_id = i.id AND it2.source = 'ai') THEN 'AI'
                            ELSE NULL
-                       END AS source_badge
+                       END AS source_badge,
+                       i.source,
+                       i.nas_connection_id
                 FROM images i
                 LEFT JOIN image_embeddings e ON e.image_id = i.id
                 """);
@@ -104,6 +106,10 @@ public sealed class ImageQueryService
                     CreatedAt = DbTime.Parse(reader.GetString(11)),
                     TagsCsv = reader.IsDBNull(12) ? string.Empty : reader.GetString(12),
                     SourceBadge = reader.IsDBNull(13) ? null : reader.GetString(13),
+                    // M5-E: surface source/nas_connection_id so GalleryThumbnailProvider
+                    // can build the right IImageSource (Local vs Remote) per row.
+                    Source = reader.GetString(14) == "remote" ? ImageSource.Remote : ImageSource.Local,
+                    NasConnectionId = reader.IsDBNull(15) ? null : reader.GetInt32(15),
                 });
             }
             return result;

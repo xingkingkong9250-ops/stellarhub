@@ -29,7 +29,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         ArgumentNullException.ThrowIfNull(services);
         _services = services;
 
-        ThumbnailProvider = new GalleryThumbnailProvider(services.Thumbnails);
+        ThumbnailProvider = new GalleryThumbnailProvider(services.Thumbnails, services.NasFactory, services.Settings);
         Gallery = new GalleryViewModel(services.ImageQuery, services.Settings, ThumbnailProvider);
         TopBar = new TopBarViewModel(Gallery, ImportAsync, services.Notifications, services.Ai,
             services.AiAnalysis, services.Colors, services.SemanticSearch, services.Settings);
@@ -475,7 +475,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     private void RegenerateThumbnails()
     {
         foreach (GalleryItemViewModel item in Gallery.SelectedItems)
-            _services.Thumbnails.Regenerate(item.FileHash, item.FilePath);
+            ThumbnailProvider.Regenerate(item);
         StatusBar.PublishMessage("已重新排队生成缩略图");
     }
 
