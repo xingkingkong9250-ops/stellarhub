@@ -5,6 +5,7 @@ using QL.World.Helpers;
 using QL.World.Models;
 using QL.World.Services;
 using QL.World.Services.Ai;
+using QL.World.Services.Nas;
 using QL.World.Services.Pbr;
 
 namespace QL.World.ViewModels;
@@ -12,8 +13,8 @@ namespace QL.World.ViewModels;
 /// <summary>
 /// W3 settings window. A1 general (theme / integrity), A2 thumbnails,
 /// A3 AI (cloud config + local model download), A4 watcher directories,
-/// A5 legacy import & diagnostics. Every change saves immediately through
-/// AppSettingsService.
+/// A5 legacy import & diagnostics, A6 PBR grouping rules, A7 NAS connections.
+/// Every change saves immediately through AppSettingsService.
 /// </summary>
 public sealed class SettingsViewModel : ObservableObject
 {
@@ -25,6 +26,7 @@ public sealed class SettingsViewModel : ObservableObject
     private readonly ModelDownloadService _modelDownload;
     private readonly NotificationService _notifications;
     private readonly string _logsDirectory;
+    private readonly INasConnectorFactory _nasConnectorFactory;
 
     private string _selectedTheme;
     private string? _selectedWatcherDirectory;
@@ -49,7 +51,8 @@ public sealed class SettingsViewModel : ObservableObject
         ModelDownloadService modelDownload,
         NotificationService notifications,
         string logsDirectory,
-        PbrGroupingService pbrGrouping)
+        PbrGroupingService pbrGrouping,
+        INasConnectorFactory nasConnectorFactory)
     {
         _settings = settings;
         _thumbnails = thumbnails;
@@ -59,6 +62,7 @@ public sealed class SettingsViewModel : ObservableObject
         _modelDownload = modelDownload;
         _notifications = notifications;
         _logsDirectory = logsDirectory;
+        _nasConnectorFactory = nasConnectorFactory;
         PbrRules = new PbrRulesViewModel(settings, pbrGrouping);
 
         _selectedTheme = settings.Theme;
@@ -66,6 +70,9 @@ public sealed class SettingsViewModel : ObservableObject
 
         foreach (string directory in settings.WatcherDirectories)
             WatcherDirectories.Add(directory);
+
+        foreach (var c in settings.NasConnections)
+            NasConnections.Add(c);
 
         RegenerateAllThumbnailsCommand = new RelayCommand(
             RegenerateAllThumbnails);
@@ -92,6 +99,15 @@ public sealed class SettingsViewModel : ObservableObject
         DeleteModelCommand = new RelayCommand(
             DeleteModel,
             () => !_isDownloading && _localModelState != LocalModelState.NotDownloaded);
+
+        AddNasConnectionCommand = new RelayCommand(AddNasConnection);
+        DeleteNasConnectionCommand = new RelayCommand(
+            DeleteNasConnection, () => SelectedNasConnection is not null);
+        SaveNasConnectionCommand = new RelayCommand(
+            SaveNasConnection, () => SelectedNasConnection is not null);
+        TestNasConnectionCommand = new AsyncRelayCommand(
+            TestNasConnectionAsync,
+            () => SelectedNasConnection is not null && !IsTestingNasConnection);
 
         RefreshLocalModelState();
         RefreshStatistics();
@@ -472,6 +488,125 @@ public sealed class SettingsViewModel : ObservableObject
     // ─── A6 贴图组规则 ──────────────────────────────────────────────────────
 
     public PbrRulesViewModel PbrRules { get; }
+
+    // ─── A7 NAS 连接 ──────────────────────────────────────────────────────
+
+    public ObservableCollection<NasConnectionSpec> NasConnections { get; } = [];
+
+    public IReadOnlyList<NasConnectionProtocol> NasProtocolOptions { get; } = [NasConnectionProtocol.WebDav];
+
+    private NasConnectionSpec? _selectedNasConnection;
+    public NasConnectionSpec? SelectedNasConnection
+    {
+        get => _selectedNasConnection;
+        set => SetProperty(ref _selectedNasConnection, value);
+    }
+
+    private string _nasStatusText = string.Empty;
+    public string NasStatusText
+    {
+        get => _nasStatusText;
+        private set => SetProperty(ref _nasStatusText, value);
+    }
+
+    private bool _isTestingNasConnection;
+    public bool IsTestingNasConnection
+    {
+        get => _isTestingNasConnection;
+        private set
+        {
+            if (SetProperty(ref _isTestingNasConnection, value))
+                TestNasConnectionCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    public RelayCommand AddNasConnectionCommand { get; }
+    public RelayCommand DeleteNasConnectionCommand { get; }
+    public RelayCommand SaveNasConnectionCommand { get; }
+    public AsyncRelayCommand TestNasConnectionCommand { get; }
+
+    private void AddNasConnection()
+    {
+        var spec = new NasConnectionSpec
+        {
+            Name = "新连接",
+            Protocol = NasConnectionProtocol.WebDav,
+            RootPath = "/",
+            UseTls = true,
+        };
+        _settings.AddNasConnection(spec);
+        RefreshNasConnections();
+        SelectedNasConnection = NasConnections.FirstOrDefault(c => c.Id == spec.Id);
+    }
+
+    private void DeleteNasConnection()
+    {
+        if (SelectedNasConnection is null) return;
+        int id = SelectedNasConnection.Id;
+        _settings.DeleteNasConnection(id);
+        RefreshNasConnections();
+        SelectedNasConnection = NasConnections.FirstOrDefault();
+    }
+
+    private void SaveNasConnection()
+    {
+        if (SelectedNasConnection is null) return;
+        _settings.UpdateNasConnection(SelectedNasConnection);
+        NasStatusText = "已保存连接。";
+        RefreshNasConnections();
+    }
+
+    private async Task TestNasConnectionAsync()
+    {
+        if (SelectedNasConnection is null || IsTestingNasConnection) return;
+        IsTestingNasConnection = true;
+        NasStatusText = "正在测试连接…";
+        INasConnector? connector = null;
+        try
+        {
+            // Persist current edits first so the encrypted password is fresh
+            // (the user may have just typed a new password into the PasswordBox).
+            _settings.UpdateNasConnection(SelectedNasConnection);
+            connector = _nasConnectorFactory.Create(SelectedNasConnection, plaintextPassword: null);
+            bool ok = await connector.TestConnectionAsync(CancellationToken.None);
+            NasStatusText = ok ? "连接成功。" : "连接失败（请检查地址/凭据/网络）。";
+        }
+        catch (NasConnectionException ex)
+        {
+            NasStatusText = $"连接失败：{ex.Kind}（{ex.Message}）";
+        }
+        catch (Exception ex)
+        {
+            NasStatusText = $"连接失败：{ex.Message}";
+        }
+        finally
+        {
+            IsTestingNasConnection = false;
+            (connector as IDisposable)?.Dispose();
+        }
+    }
+
+    /// <summary>Called from the View code-behind on PasswordBox.PasswordChanged.</summary>
+    public void SetNasPasswordInput(int id, string plaintext)
+    {
+        _settings.SetNasPassword(id, plaintext);
+    }
+
+    /// <summary>
+    /// Re-syncs the ObservableCollection from settings (after add/update/delete)
+    /// and re-selects the previously selected id when still present.
+    /// </summary>
+    private void RefreshNasConnections()
+    {
+        int? selectedId = SelectedNasConnection?.Id;
+        NasConnections.Clear();
+        foreach (var c in _settings.NasConnections)
+            NasConnections.Add(c);
+        if (selectedId.HasValue)
+        {
+            SelectedNasConnection = NasConnections.FirstOrDefault(c => c.Id == selectedId.Value);
+        }
+    }
 
     // ─── Events ─────────────────────────────────────────────────────────────
 

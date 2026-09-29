@@ -63,3 +63,10 @@
 | W3/A4 | 监控目录页签 | 已实现（M2） | 目录列表/添加/移除/自动导入开关，即时生效 |
 | W3/A5 | 关于页签 | 已实现（M2） | 版本/统计/旧版 Python 库导入/打开日志文件夹 |
 | W3/A6 | 贴图组规则页签 | 已实现（M4） | 尾缀→角色规则行（模式/角色下拉/启用/删除）+ 添加规则/保存并重建/仅重建/恢复默认 + 状态文本 |
+| W3/A7 | NAS 连接页签 | 已实现（M5） | 连接列表（N1）/ 详情表单 N2-N5 / 测试连接 + 保存（N6）；M5 仅 WebDAV，SMB/SFTP 预留 |
+| W3/A7-N1 | NAS 连接列表 + 新建/删除 | 已实现（M5-C） | ObservableCollection 绑定；新建按钮分配单调递增 id（不复用已删除）；删除按钮清除选中连接（含密码） |
+| W3/A7-N2 | 名称 | 已实现（M5-C） | 唯一显示名；绑定 SelectedNasConnection.Name |
+| W3/A7-N3 | 协议 + 主机 + 端口 | 已实现（M5-C） | 协议下拉（M5 仅 WebDav）；主机文本（IP/域名，不含 scheme）；端口可空=默认 443(TLS)/80 |
+| W3/A7-N4 | 用户名 + 密码 | 已实现（M5-C） | 用户名留空=匿名；PasswordBox 永不回填（安全），DPAPI(CurrentUser) 加密落 config.json |
+| W3/A7-N5 | 根路径 + TLS + 自签 | 已实现（M5-C） | 根路径如 /photos/；UseTls 默认勾选；TrustSelfSigned 默认取消（仅受信任内网勾选） |
+| W3/A7-N6 | 测试连接 + 保存 | 已实现（M5-C） | 测试：INasConnectorFactory.Create + TestConnectionAsync（先 Update 持久化当前编辑→factory 解密密码→PROPFIND root）；保存：UpdateNasConnection（保留 EncryptedPassword/CreatedAt） |

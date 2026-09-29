@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using QL.World.Interop;
 using QL.World.Models;
+using QL.World.Services.Nas;
 using QL.World.Services.Pbr;
 
 namespace QL.World.Services;
@@ -20,6 +21,8 @@ public sealed class AppSettingsService
     private const int MAX_THUMBNAIL_QUALITY = 100;
     private const int MIN_ZOOM = 80;
     private const int MAX_ZOOM = 512;
+    private const int MIN_THUMBNAIL_CACHE_MB = 256;
+    private const int MAX_THUMBNAIL_CACHE_MB = 16384;
 
     private static readonly JsonSerializerOptions JSON_OPTIONS = new()
     {
@@ -88,6 +91,16 @@ public sealed class AppSettingsService
             Math.Clamp(value, MIN_THUMBNAIL_QUALITY, MAX_THUMBNAIL_QUALITY),
             () => _settings.ThumbnailQuality,
             next => _settings.ThumbnailQuality = next);
+    }
+
+    /// <summary>M5-C: thumbnail disk-cache cap in MB; clamped to [256, 16384] on set/load.</summary>
+    public int ThumbnailCacheLimitMb
+    {
+        get => _settings.ThumbnailCacheLimitMb;
+        set => SetAndSave(
+            Math.Clamp(value, MIN_THUMBNAIL_CACHE_MB, MAX_THUMBNAIL_CACHE_MB),
+            () => _settings.ThumbnailCacheLimitMb,
+            next => _settings.ThumbnailCacheLimitMb = next);
     }
 
     public string GalleryViewMode
@@ -312,6 +325,125 @@ public sealed class AppSettingsService
             Changed?.Invoke();
     }
 
+    // ─── NAS connections (M5) ─────────────────────────────────────────────
+
+    /// <summary>Read-only view of persisted NAS connections; mutations go through the dedicated methods below.</summary>
+    public IReadOnlyList<NasConnectionSpec> NasConnections => _settings.NasConnections;
+
+    /// <summary>Bulk-replaces the entire NAS connection list (mirrors SetWatcherDirectories).</summary>
+    public void SetNasConnections(IReadOnlyList<NasConnectionSpec> connections)
+    {
+        _settings.NasConnections = connections.ToList();
+        if (TrySaveNow())
+            Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Adds a connection. Assigns a strictly monotonic id (max existing id + 1,
+    /// or 1 for the first; deleted ids are never reused). Stamps CreatedAt/UpdatedAt
+    /// to now. Returns the assigned id (also written back to <paramref name="spec"/>.Id).
+    /// </summary>
+    public int AddNasConnection(NasConnectionSpec spec)
+    {
+        ArgumentNullException.ThrowIfNull(spec);
+        int nextId = _settings.NasConnections.Count == 0
+            ? 1
+            : _settings.NasConnections.Max(c => c.Id) + 1;
+        spec.Id = nextId;
+        var now = DateTimeOffset.UtcNow;
+        spec.CreatedAt = now;
+        spec.UpdatedAt = now;
+        _settings.NasConnections.Add(spec);
+        if (TrySaveNow())
+            Changed?.Invoke();
+        return nextId;
+    }
+
+    /// <summary>
+    /// Updates an existing connection by id. Copies the editable fields
+    /// (Name/Protocol/Host/Port/RootPath/Username/UseTls/TrustSelfSigned)
+    /// onto the existing instance and stamps UpdatedAt. Preserves
+    /// <see cref="NasConnectionSpec.EncryptedPassword"/> and CreatedAt —
+    /// password is handled separately via <see cref="SetNasPassword"/>.
+    /// Throws <see cref="ArgumentException"/> when the id is unknown.
+    /// </summary>
+    public void UpdateNasConnection(NasConnectionSpec spec)
+    {
+        ArgumentNullException.ThrowIfNull(spec);
+        NasConnectionSpec? existing = _settings.NasConnections.FirstOrDefault(c => c.Id == spec.Id);
+        if (existing is null)
+            throw new ArgumentException($"No NAS connection with id {spec.Id}.", nameof(spec));
+        existing.Name = spec.Name;
+        existing.Protocol = spec.Protocol;
+        existing.Host = spec.Host;
+        existing.Port = spec.Port;
+        existing.RootPath = spec.RootPath;
+        existing.Username = spec.Username;
+        existing.UseTls = spec.UseTls;
+        existing.TrustSelfSigned = spec.TrustSelfSigned;
+        existing.UpdatedAt = DateTimeOffset.UtcNow;
+        if (TrySaveNow())
+            Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Removes the connection with the given id. Because the password lives
+    /// on the spec as EncryptedPassword, removing the spec also removes the
+    /// password. No-op (not an error) when the id is absent.
+    /// </summary>
+    public void DeleteNasConnection(int id)
+    {
+        int removed = _settings.NasConnections.RemoveAll(c => c.Id == id);
+        if (removed == 0) return;
+        if (TrySaveNow())
+            Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Encrypts <paramref name="plaintext"/> via DPAPI (CurrentUser) and
+    /// stores it on the connection with the given id. Null/empty clears the
+    /// stored password. The plaintext never appears in config.json or logs.
+    /// </summary>
+    public void SetNasPassword(int id, string? plaintext)
+    {
+        NasConnectionSpec? spec = _settings.NasConnections.FirstOrDefault(c => c.Id == id);
+        if (spec is null) return;
+        if (string.IsNullOrEmpty(plaintext))
+        {
+            spec.EncryptedPassword = null;
+        }
+        else
+        {
+            string? encrypted = DpApiProtector.Protect(plaintext);
+            if (encrypted is null)
+            {
+                _log($"[SETTINGS] DPAPI protect failed for NAS connection {id}; password not saved.");
+                return;
+            }
+            spec.EncryptedPassword = encrypted;
+        }
+        if (TrySaveNow())
+            Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Decrypts and returns the stored password for the connection. Returns
+    /// null when not set or decryption fails. Callers must never log the result.
+    /// </summary>
+    public string? GetNasPassword(int id)
+    {
+        NasConnectionSpec? spec = _settings.NasConnections.FirstOrDefault(c => c.Id == id);
+        if (spec is null) return null;
+        return DpApiProtector.Unprotect(spec.EncryptedPassword);
+    }
+
+    /// <summary>True when the connection has a stored (encrypted) password.</summary>
+    public bool HasNasPassword(int id)
+    {
+        NasConnectionSpec? spec = _settings.NasConnections.FirstOrDefault(c => c.Id == id);
+        return spec is not null && !string.IsNullOrEmpty(spec.EncryptedPassword);
+    }
+
     private void SetAndSave<T>(T value, Func<T> get, Action<T> set)
     {
         T previous = get();
@@ -413,6 +545,18 @@ public sealed class AppSettingsService
         if (!Uri.TryCreate(_settings.CloudAi.BaseUrl, UriKind.Absolute, out Uri? u) ||
             u!.Scheme != Uri.UriSchemeHttps)
             _settings.CloudAi.BaseUrl = string.Empty;
+
+        // NAS fields
+        _settings.NasConnections ??= [];
+        _settings.ThumbnailCacheLimitMb = Math.Clamp(
+            _settings.ThumbnailCacheLimitMb, MIN_THUMBNAIL_CACHE_MB, MAX_THUMBNAIL_CACHE_MB);
+        // Defensive: ensure every spec has sane CreatedAt/UpdatedAt (older saves
+        // may have default DateTimeOffset values from before the fields existed).
+        foreach (var c in _settings.NasConnections)
+        {
+            if (c.CreatedAt == default) c.CreatedAt = DateTimeOffset.UtcNow;
+            if (c.UpdatedAt == default) c.UpdatedAt = c.CreatedAt;
+        }
     }
 
     private static bool TryLoadFile(

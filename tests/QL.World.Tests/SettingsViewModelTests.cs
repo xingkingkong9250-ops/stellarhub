@@ -15,6 +15,7 @@ public sealed class SettingsViewModelTests : IDisposable
     private readonly SettingsViewModel _viewModel;
     private readonly AppSettingsService _settings;
     private readonly NotificationService _notifications = new();
+    private readonly StubNasConnectorFactory _nasFactory = new();
 
     public SettingsViewModelTests()
     {
@@ -35,7 +36,8 @@ public sealed class SettingsViewModelTests : IDisposable
             new ModelDownloadService(_lib.DirectoryRoot),
             _notifications,
             Path.Combine(_lib.DirectoryRoot, "logs"),
-            new PbrGroupingService(_lib.Db, _settings));
+            new PbrGroupingService(_lib.Db, _settings),
+            _nasFactory);
     }
 
     [Fact]
@@ -59,7 +61,8 @@ public sealed class SettingsViewModelTests : IDisposable
             new ModelDownloadService(_lib.DirectoryRoot),
             _notifications,
             Path.Combine(_lib.DirectoryRoot, "logs"),
-            new PbrGroupingService(_lib.Db, _settings));
+            new PbrGroupingService(_lib.Db, _settings),
+            _nasFactory);
 
         Assert.Equal("图片 2 张，其中缺失 1 张", fresh.StatisticsText);
     }

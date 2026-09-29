@@ -1,3 +1,5 @@
+using QL.World.Services.Nas;
+
 namespace QL.World.Models;
 
 /// <summary>
@@ -83,4 +85,15 @@ public sealed class AppSettings
     /// (PbrRuleSet.Defaults) are active.
     /// </summary>
     public List<PbrRule>? PbrRules { get; set; }
+
+    // ─── NAS (M5) ──────────────────────────────────────────────────────────
+
+    /// <summary>M5-C: persisted NAS connection definitions. Empty for new installs.</summary>
+    public List<NasConnectionSpec> NasConnections { get; set; } = [];
+
+    /// <summary>
+    /// M5-C: local thumbnail cache size cap in MB (used by M5-F LRU cleanup).
+    /// Default 1024. Clamped to [256, 16384] on load.
+    /// </summary>
+    public int ThumbnailCacheLimitMb { get; set; } = 1024;
 }

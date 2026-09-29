@@ -284,6 +284,104 @@
                                Visibility="{Binding PbrRules.StatusText, Converter={StaticResource NullVis}}" />
                 </Grid>
             </TabItem>
+
+            <!-- ═══ A7 NAS 连接 (M5 N1-N6) ═══ -->
+            <TabItem Header="NAS 连接">
+                <Grid Margin="14,12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <!-- N1 连接列表 -->
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="NAS 连接（M5 仅 WebDAV；SMB/SFTP 预留）"
+                                   Style="{StaticResource SectionCaptionStyle}" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Content="＋ 新建" Margin="8,0,0,0"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                Command="{Binding AddNasConnectionCommand}"
+                                AutomationProperties.Name="新建 NAS 连接" />
+                        <Button Grid.Column="2" Content="删除选中" Margin="8,0,0,0"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                Command="{Binding DeleteNasConnectionCommand}"
+                                AutomationProperties.Name="删除 NAS 连接" />
+                    </Grid>
+                    <ListBox Grid.Row="1" Margin="0,6,0,0" MinHeight="80"
+                             ItemsSource="{Binding NasConnections}"
+                             SelectedItem="{Binding SelectedNasConnection}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Name}" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- N2-N5 详情表单（仅在选中时显示） -->
+                    <Border Grid.Row="2" Margin="0,12,0,0" Padding="10,8"
+                            BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1"
+                            Visibility="{Binding SelectedNasConnection, Converter={StaticResource NullVis}}">
+                        <StackPanel>
+                            <!-- N2 名称 -->
+                            <TextBlock Text="名称" Style="{StaticResource SectionCaptionStyle}" />
+                            <TextBox Text="{Binding SelectedNasConnection.Name, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.Name="NAS 连接名称" />
+
+                            <!-- N3 协议 + 地址 + 端口 -->
+                            <TextBlock Text="协议" Margin="0,10,0,2" />
+                            <ComboBox Width="160" HorizontalAlignment="Left"
+                                      ItemsSource="{Binding NasProtocolOptions}"
+                                      SelectedItem="{Binding SelectedNasConnection.Protocol}"
+                                      AutomationProperties.Name="NAS 协议" />
+                            <TextBlock Text="主机（IP 或域名，不含 scheme/port）" Margin="0,10,0,2" />
+                            <TextBox Text="{Binding SelectedNasConnection.Host, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.Name="NAS 主机" />
+                            <TextBlock Text="端口（留空=默认 443/80）" Margin="0,10,0,2" />
+                            <TextBox Text="{Binding SelectedNasConnection.Port, TargetNullValue='', UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.Name="NAS 端口" />
+
+                            <!-- N4 用户名 + 密码 -->
+                            <TextBlock Text="用户名（留空=匿名）" Margin="0,10,0,2" />
+                            <TextBox Text="{Binding SelectedNasConnection.Username, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.Name="NAS 用户名" />
+                            <TextBlock Text="密码（留空=不修改已保存密码）" Margin="0,10,0,2" />
+                            <PasswordBox x:Name="NasPasswordBox"
+                                         PasswordChanged="OnNasPasswordChanged"
+                                         AutomationProperties.Name="NAS 密码" />
+
+                            <!-- N5 根路径 + TLS + 自签 -->
+                            <TextBlock Text="根路径（如 /photos/）" Margin="0,10,0,2" />
+                            <TextBox Text="{Binding SelectedNasConnection.RootPath, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.Name="NAS 根路径" />
+                            <CheckBox Content="使用 HTTPS/TLS（推荐）" Margin="0,10,0,0"
+                                      IsChecked="{Binding SelectedNasConnection.UseTls}"
+                                      AutomationProperties.Name="NAS 启用 TLS" />
+                            <CheckBox Content="信任自签名证书（仅限受信任内网）" Margin="0,4,0,0"
+                                      IsChecked="{Binding SelectedNasConnection.TrustSelfSigned}"
+                                      AutomationProperties.Name="NAS 信任自签" />
+
+                            <!-- N6 测试连接 + 保存 -->
+                            <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                <Button Content="测试连接" Style="{StaticResource SubtleButtonStyle}"
+                                        Command="{Binding TestNasConnectionCommand}"
+                                        AutomationProperties.Name="测试 NAS 连接" />
+                                <Button Content="保存" Margin="8,0,0,0"
+                                        Style="{StaticResource AccentButtonStyle}"
+                                        Command="{Binding SaveNasConnectionCommand}"
+                                        AutomationProperties.Name="保存 NAS 连接" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding NasStatusText}" Margin="0,8,0,0" FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Visibility="{Binding NasStatusText, Converter={StaticResource NullVis}}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
         </TabControl>
 
         <Border Grid.Row="1" Padding="12,8"

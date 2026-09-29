@@ -5,6 +5,7 @@ using QL.World.Helpers;
 using QL.World.Services;
 using QL.World.Services.Ai;
 using QL.World.Services.Colors;
+using QL.World.Services.Nas;
 using QL.World.Services.Pbr;
 using QL.World.ViewModels;
 using QL.World.Views;
@@ -240,7 +241,8 @@ public partial class App : Application
                 new ModelDownloadService(_services.Settings.DataRoot, WriteLog),
                 _services.Notifications,
                 _logDirectory,
-                _services.PbrGrouping);
+                _services.PbrGrouping,
+                new WebDavConnectorFactory());
             settingsViewModel.ThemeChanged += theme =>
             {
                 SetTheme(theme);
