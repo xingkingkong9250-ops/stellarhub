@@ -5,6 +5,20 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-09-29 U4 主色调收尾（PRD 核心功能 100%）
+
+### U4-A：B3-4 详情栏主色调色块
+
+- 详情栏评分行下新增「主色调」行：≤5 个 20×20 圆角色块横向排列，数据来自
+  images.dominant_colors（ColorExtractor K-means，A1-8「分析颜色」批量回填），
+  tooltip 显示对应 #RRGGBB；1px 主题 BorderSubtleBrush 描边保证浅色块可辨
+- DetailViewModel 解析 dominant_colors JSON：null/空/损坏一律空列表，
+  HasDominantColors=false 时整行 BoolVis 隐藏；选中切换随记录刷新；
+  多选批量编辑态随单选面板天然隐藏
+- 新增 HexBrushConverter（#RRGGBB → SolidColorBrush，非法输入 → Transparent）
+- UI_NUMBERING：B3-4 → 已实现（U4-A），PRD 核心功能自此 100% 覆盖；
+  父行 B3/C1 过时「M1 部分」措辞修正
+
 ## [1.3.0] — 2026-09-30 U3 UI 优化补丁
 
 ### U3-A：§4.B.2 左栏属性筛选折叠组（B1-5）
