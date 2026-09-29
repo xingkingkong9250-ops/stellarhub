@@ -48,6 +48,17 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         // U2-C: clicking a related-asset thumbnail in B3-9 dives into its similarity neighborhood.
         Detail.FindSimilarRequested += relatedId => _ = FindSimilarAsync(relatedId);
 
+        // U3-C (§4.E.3): collapsed sidebar headers show child counts — refresh
+        // the (N) suffix whenever a section's items change.
+        TagTree.CategoryNodes.CollectionChanged +=
+            (_, _) => OnPropertyChanged(nameof(LibraryHeaderText));
+        CollectionTree.CollectionNodes.CollectionChanged +=
+            (_, _) => OnPropertyChanged(nameof(CollectionsHeaderText));
+        TagTree.TopTagNodes.CollectionChanged +=
+            (_, _) => OnPropertyChanged(nameof(TopTagsHeaderText));
+        PbrGroupTree.GroupNodes.CollectionChanged +=
+            (_, _) => OnPropertyChanged(nameof(PbrGroupsHeaderText));
+
         _undoTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromSeconds(UNDO_WINDOW_SECONDS),
@@ -144,6 +155,69 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public string Title => $"{AppInfo.ProductName} — {AppInfo.ProductSubtitle}";
     public string VersionText => $"v{AppInfo.Version} · {AppInfo.MilestoneLabel}";
     public string AiStatusText => "AI：关闭";
+
+    // ─── U3-C (§4.E.3): B1-COL collapsible sidebar sections ────────────────
+    // Expanded state persists; collapsed headers show the child count as (N).
+
+    public bool SidebarLibraryExpanded
+    {
+        get => _services.Settings.SidebarLibraryExpanded;
+        set
+        {
+            if (_services.Settings.SidebarLibraryExpanded == value) return;
+            _services.Settings.SidebarLibraryExpanded = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(LibraryHeaderText));
+        }
+    }
+
+    public bool SidebarCollectionsExpanded
+    {
+        get => _services.Settings.SidebarCollectionsExpanded;
+        set
+        {
+            if (_services.Settings.SidebarCollectionsExpanded == value) return;
+            _services.Settings.SidebarCollectionsExpanded = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CollectionsHeaderText));
+        }
+    }
+
+    public bool SidebarTopTagsExpanded
+    {
+        get => _services.Settings.SidebarTopTagsExpanded;
+        set
+        {
+            if (_services.Settings.SidebarTopTagsExpanded == value) return;
+            _services.Settings.SidebarTopTagsExpanded = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(TopTagsHeaderText));
+        }
+    }
+
+    public bool SidebarPbrGroupsExpanded
+    {
+        get => _services.Settings.SidebarPbrGroupsExpanded;
+        set
+        {
+            if (_services.Settings.SidebarPbrGroupsExpanded == value) return;
+            _services.Settings.SidebarPbrGroupsExpanded = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(PbrGroupsHeaderText));
+        }
+    }
+
+    public string LibraryHeaderText =>
+        SidebarLibraryExpanded ? "素材库" : $"素材库 ({TagTree.CategoryNodes.Count})";
+
+    public string CollectionsHeaderText =>
+        SidebarCollectionsExpanded ? "收藏夹" : $"收藏夹 ({CollectionTree.CollectionNodes.Count})";
+
+    public string TopTagsHeaderText =>
+        SidebarTopTagsExpanded ? "热门标签（Top 50）" : $"热门标签（Top 50） ({TagTree.TopTagNodes.Count})";
+
+    public string PbrGroupsHeaderText =>
+        SidebarPbrGroupsExpanded ? "贴图组" : $"贴图组 ({PbrGroupTree.GroupNodes.Count})";
 
     public bool UndoVisible
     {

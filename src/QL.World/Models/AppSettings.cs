@@ -11,6 +11,8 @@ public sealed class AppSettings
     public string Theme { get; set; } = "Dark";
 
     /// <summary>Verify library integrity on startup (W3/A1).</summary>
+    // 默认 true 的 bool 必须 Never 忽略：WhenWritingDefault 会吞掉 false，导致重载回落 true。
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     public bool CheckIntegrityOnStartup { get; set; } = true;
 
     /// <summary>Generated thumbnail edge length in pixels (128–512).</summary>
@@ -37,10 +39,30 @@ public sealed class AppSettings
     /// <summary>U3-A (§4.B.2): B1-5 attribute filter section expanded (default collapsed).</summary>
     public bool SidebarAttributeFilterExpanded { get; set; }
 
+    // ─── U3-C (§4.E.3): B1-COL sidebar section collapse states (default all expanded) ──
+    // 默认 true 的 bool 必须 Never 忽略：WhenWritingDefault 会吞掉 false，导致重载回落 true。
+
+    /// <summary>B1-1 素材库 section expanded.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    public bool SidebarLibraryExpanded { get; set; } = true;
+
+    /// <summary>B1-2 收藏夹 section expanded.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    public bool SidebarCollectionsExpanded { get; set; } = true;
+
+    /// <summary>B1-3 热门标签 Top50 section expanded.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    public bool SidebarTopTagsExpanded { get; set; } = true;
+
+    /// <summary>B1-4 贴图组 section expanded.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    public bool SidebarPbrGroupsExpanded { get; set; } = true;
+
     /// <summary>Directories monitored by FileWatcherService (W3/A4).</summary>
     public List<string> WatcherDirectories { get; set; } = [];
 
     /// <summary>Auto-import new files found by the watcher.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     public bool AutoImportOnWatch { get; set; } = true;
 
     // ─── AI (M3) ────────────────────────────────────────────────────────────

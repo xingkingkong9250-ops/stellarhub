@@ -135,6 +135,48 @@ public sealed class ShellViewModelTests : IDisposable
         SourceBadge = null,
     });
 
+    // ─── U3-C (§4.E.3): B1-COL collapsible sidebar sections ────────────────
+
+    [Fact]
+    public void Collapsed_section_headers_show_child_counts()
+    {
+        // Expanded by default: pure names without counts.
+        Assert.Equal("素材库", _viewModel.LibraryHeaderText);
+        Assert.Equal("收藏夹", _viewModel.CollectionsHeaderText);
+        Assert.Equal("热门标签（Top 50）", _viewModel.TopTagsHeaderText);
+        Assert.Equal("贴图组", _viewModel.PbrGroupsHeaderText);
+
+        _viewModel.SidebarLibraryExpanded = false;
+        _viewModel.SidebarCollectionsExpanded = false;
+        _viewModel.SidebarTopTagsExpanded = false;
+        _viewModel.SidebarPbrGroupsExpanded = false;
+
+        // Collapsed: name + child count. Category tree = 全部 + 10 分类 + 未分类 = 12.
+        Assert.Equal("素材库 (12)", _viewModel.LibraryHeaderText);
+        Assert.Equal("收藏夹 (0)", _viewModel.CollectionsHeaderText);
+        Assert.Equal("热门标签（Top 50） (0)", _viewModel.TopTagsHeaderText);
+        Assert.Equal("贴图组 (0)", _viewModel.PbrGroupsHeaderText);
+
+        // Re-expanding restores the pure name.
+        _viewModel.SidebarLibraryExpanded = true;
+        Assert.Equal("素材库", _viewModel.LibraryHeaderText);
+    }
+
+    [Fact]
+    public void Sidebar_expanded_state_persists_to_settings()
+    {
+        Assert.True(_viewModel.SidebarTopTagsExpanded); // default expanded
+        _viewModel.SidebarTopTagsExpanded = false;
+        _viewModel.SidebarPbrGroupsExpanded = false;
+
+        var reloaded = new AppSettingsService(_directory);
+        reloaded.Load();
+        Assert.False(reloaded.SidebarTopTagsExpanded);
+        Assert.False(reloaded.SidebarPbrGroupsExpanded);
+        Assert.True(reloaded.SidebarLibraryExpanded); // untouched stays default
+        Assert.True(reloaded.SidebarCollectionsExpanded);
+    }
+
     public void Dispose()
     {
         try { _viewModel.Dispose(); }

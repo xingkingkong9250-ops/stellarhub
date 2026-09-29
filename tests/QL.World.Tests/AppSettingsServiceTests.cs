@@ -53,6 +53,31 @@ public sealed class AppSettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public void True_default_booleans_round_trip_false()
+    {
+        // WhenWritingDefault omits false; true-default bools need JsonIgnore(Never)
+        // or a saved false reloads as the initializer's true.
+        var first = new AppSettingsService(_directory);
+        first.Load();
+        first.CheckIntegrityOnStartup = false;
+        first.AutoImportOnWatch = false;
+        first.SidebarLibraryExpanded = false;
+        first.SidebarCollectionsExpanded = false;
+        first.SidebarTopTagsExpanded = false;
+        first.SidebarPbrGroupsExpanded = false;
+        Assert.True(first.LastSaveSucceeded);
+
+        var second = new AppSettingsService(_directory);
+        second.Load();
+        Assert.False(second.CheckIntegrityOnStartup);
+        Assert.False(second.AutoImportOnWatch);
+        Assert.False(second.SidebarLibraryExpanded);
+        Assert.False(second.SidebarCollectionsExpanded);
+        Assert.False(second.SidebarTopTagsExpanded);
+        Assert.False(second.SidebarPbrGroupsExpanded);
+    }
+
+    [Fact]
     public void Out_of_range_values_are_clamped_on_load()
     {
         File.WriteAllText(

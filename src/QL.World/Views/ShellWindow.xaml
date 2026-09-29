@@ -402,8 +402,13 @@
                     BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,1,0">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,12,8,12">
                     <StackPanel>
-                        <TextBlock Text="素材库" Style="{StaticResource SectionCaptionStyle}" />
-                        <ItemsControl ItemsSource="{Binding TagTree.CategoryNodes}">
+                        <!-- U3-C (§4.E.3): B1-COL 分区标题可折叠，折叠态显示子项数 (N) -->
+                        <ToggleButton Style="{StaticResource SidebarSectionHeaderStyle}"
+                                      AutomationProperties.Name="素材库"
+                                      IsChecked="{Binding SidebarLibraryExpanded}"
+                                      Content="{Binding LibraryHeaderText}" />
+                        <ItemsControl ItemsSource="{Binding TagTree.CategoryNodes}"
+                                      Visibility="{Binding SidebarLibraryExpanded, Converter={StaticResource BoolVis}}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <ToggleButton Style="{StaticResource TreeToggleStyle}"
@@ -428,12 +433,16 @@
                                 Visibility="{Binding Gallery.FilterSummary, Converter={StaticResource NullVis}}"
                                 Command="{Binding ClearFiltersCommand}" />
 
-                        <TextBlock Text="收藏夹" Margin="2,16,0,0"
-                                   Style="{StaticResource SectionCaptionStyle}" />
-                        <Button Content="＋ 新建" Style="{StaticResource ChipActiveButtonStyle}"
-                                Margin="0,4,0,0" HorizontalAlignment="Left"
-                                Command="{Binding CreateCollectionCommand}" />
-                        <ItemsControl ItemsSource="{Binding CollectionTree.CollectionNodes}">
+                        <ToggleButton Margin="2,16,0,0"
+                                      Style="{StaticResource SidebarSectionHeaderStyle}"
+                                      AutomationProperties.Name="收藏夹"
+                                      IsChecked="{Binding SidebarCollectionsExpanded}"
+                                      Content="{Binding CollectionsHeaderText}" />
+                        <StackPanel Visibility="{Binding SidebarCollectionsExpanded, Converter={StaticResource BoolVis}}">
+                            <Button Content="＋ 新建" Style="{StaticResource ChipActiveButtonStyle}"
+                                    Margin="0,4,0,0" HorizontalAlignment="Left"
+                                    Command="{Binding CreateCollectionCommand}" />
+                            <ItemsControl ItemsSource="{Binding CollectionTree.CollectionNodes}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <ToggleButton Style="{StaticResource TreeToggleStyle}"
@@ -465,12 +474,17 @@
                                     </ToggleButton>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                            </ItemsControl>
+                        </StackPanel>
 
-                        <TextBlock Text="热门标签（Top 50）" Margin="2,16,0,0"
-                                   Style="{StaticResource SectionCaptionStyle}" />
+                        <ToggleButton Margin="2,16,0,0"
+                                      Style="{StaticResource SidebarSectionHeaderStyle}"
+                                      AutomationProperties.Name="热门标签"
+                                      IsChecked="{Binding SidebarTopTagsExpanded}"
+                                      Content="{Binding TopTagsHeaderText}" />
                         <ItemsControl Margin="2,0,0,0"
-                                      ItemsSource="{Binding TagTree.TopTagNodes}">
+                                      ItemsSource="{Binding TagTree.TopTagNodes}"
+                                      Visibility="{Binding SidebarTopTagsExpanded, Converter={StaticResource BoolVis}}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <WrapPanel />
@@ -492,9 +506,13 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <TextBlock Text="贴图组" Margin="2,16,0,0"
-                                   Style="{StaticResource SectionCaptionStyle}" />
-                        <ItemsControl ItemsSource="{Binding PbrGroupTree.GroupNodes}">
+                        <ToggleButton Margin="2,16,0,0"
+                                      Style="{StaticResource SidebarSectionHeaderStyle}"
+                                      AutomationProperties.Name="贴图组"
+                                      IsChecked="{Binding SidebarPbrGroupsExpanded}"
+                                      Content="{Binding PbrGroupsHeaderText}" />
+                        <ItemsControl ItemsSource="{Binding PbrGroupTree.GroupNodes}"
+                                      Visibility="{Binding SidebarPbrGroupsExpanded, Converter={StaticResource BoolVis}}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <ToggleButton Style="{StaticResource TreeToggleStyle}"

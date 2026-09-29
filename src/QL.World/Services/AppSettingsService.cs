@@ -140,6 +140,40 @@ public sealed class AppSettingsService
             next => _settings.SidebarAttributeFilterExpanded = next);
     }
 
+    // ─── U3-C (§4.E.3): B1-COL sidebar section collapse states ─────────────
+
+    public bool SidebarLibraryExpanded
+    {
+        get => _settings.SidebarLibraryExpanded;
+        set => SetAndSave(value,
+            () => _settings.SidebarLibraryExpanded,
+            next => _settings.SidebarLibraryExpanded = next);
+    }
+
+    public bool SidebarCollectionsExpanded
+    {
+        get => _settings.SidebarCollectionsExpanded;
+        set => SetAndSave(value,
+            () => _settings.SidebarCollectionsExpanded,
+            next => _settings.SidebarCollectionsExpanded = next);
+    }
+
+    public bool SidebarTopTagsExpanded
+    {
+        get => _settings.SidebarTopTagsExpanded;
+        set => SetAndSave(value,
+            () => _settings.SidebarTopTagsExpanded,
+            next => _settings.SidebarTopTagsExpanded = next);
+    }
+
+    public bool SidebarPbrGroupsExpanded
+    {
+        get => _settings.SidebarPbrGroupsExpanded;
+        set => SetAndSave(value,
+            () => _settings.SidebarPbrGroupsExpanded,
+            next => _settings.SidebarPbrGroupsExpanded = next);
+    }
+
     public IReadOnlyList<string> WatcherDirectories => _settings.WatcherDirectories;
 
     public void SetWatcherDirectories(IReadOnlyList<string> directories)
