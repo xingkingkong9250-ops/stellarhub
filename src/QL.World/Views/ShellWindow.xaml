@@ -267,7 +267,7 @@
                     <!-- U2-A: brand gradient Logo block -->
                     <Border Width="24" Height="24" CornerRadius="6" Margin="0,0,10,0"
                             Background="{DynamicResource AccentGradientBrush}" />
-                    <TextBlock Text="QL World" FontSize="15" FontWeight="Bold"
+                    <TextBlock Text="千星汇图" FontSize="15" FontWeight="Bold"
                                Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                     <TextBlock Text="素材库" Margin="10,2,0,0" FontSize="11"
                                Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />

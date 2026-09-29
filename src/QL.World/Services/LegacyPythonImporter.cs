@@ -60,7 +60,7 @@ public sealed class LegacyPythonImporter
 
             if (!TablesExist(legacy))
             {
-                report.ErrorMessage = "该文件不是有效的 QL World Python 旧版库（缺少 images 表）。";
+                report.ErrorMessage = "该文件不是有效的千星汇图 Python 旧版库（缺少 images 表）。";
                 return report;
             }
 

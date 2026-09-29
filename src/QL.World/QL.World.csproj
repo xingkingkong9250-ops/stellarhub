@@ -9,8 +9,12 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- 版本号唯一来源；脚本与界面均从此读取，禁止在别处硬编码 -->
     <Version>1.4.0</Version>
-    <AssemblyName>QL World</AssemblyName>
+    <AssemblyName>StellarHub</AssemblyName>
     <RootNamespace>QL.World</RootNamespace>
+    <Product>千星汇图</Product>
+    <AssemblyTitle>千星汇图 (StellarHub)</AssemblyTitle>
+    <Copyright>Copyright © 2026 StellarHub. 保留所有权利.</Copyright>
+    <Description>面向 3D 美术与概念设计师的全品类图像参考管理工具</Description>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
 

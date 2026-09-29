@@ -8,7 +8,10 @@ namespace QL.World.Helpers;
 /// </summary>
 public static class AppInfo
 {
-    public const string ProductName = "QL World";
+    public const string ProductName = "千星汇图";
+
+    /// <summary>U5: English identifier for exe/assembly/installer copyright.</summary>
+    public const string EnglishName = "StellarHub";
 
     public const string ProductSubtitle = "3D 美术图片素材管理系统";
 
@@ -16,7 +19,7 @@ public static class AppInfo
     /// U2-F (§4.E.2): milestone identifier shown next to the version number on the shell footer.
     /// Settings/About page keeps the pure semantic version (no suffix).
     /// </summary>
-    public const string MilestoneLabel = "U4 发布基线";
+    public const string MilestoneLabel = "U5 品牌升级";
 
     private static readonly Version AssemblyVersion =
         typeof(AppInfo).Assembly.GetName().Version ?? new Version(0, 0, 0);
