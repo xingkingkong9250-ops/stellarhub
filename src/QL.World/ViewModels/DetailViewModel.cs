@@ -18,6 +18,7 @@ public sealed class DetailViewModel : ObservableObject
     private readonly ImageQueryService _query;
     private readonly TagService _tags;
     private readonly GalleryViewModel _gallery;
+    private readonly SemanticSearchService _semanticSearch;
     private readonly DispatcherTimer _notesTimer;
     private readonly DispatcherTimer _saveHintTimer;
 
@@ -35,11 +36,13 @@ public sealed class DetailViewModel : ObservableObject
     public DetailViewModel(
         ImageQueryService query,
         TagService tags,
-        GalleryViewModel gallery)
+        GalleryViewModel gallery,
+        SemanticSearchService semanticSearch)
     {
         _query = query;
         _tags = tags;
         _gallery = gallery;
+        _semanticSearch = semanticSearch;
 
         CategoryOptions = new List<CategoryOption>
         {
@@ -73,6 +76,7 @@ public sealed class DetailViewModel : ObservableObject
         BatchRatingCommand = new RelayCommand(BatchSetRating, _ => IsBatch);
         BatchCategoryCommand = new RelayCommand(BatchSetCategory, _ => IsBatch);
         RelocateFileCommand = new RelayCommand(RelocateFile, () => IsMissing && IsSingle);
+        SelectRelatedCommand = new RelayCommand(SelectRelated);
 
         gallery.SelectionChanged += OnSelectionChanged;
     }
@@ -82,6 +86,14 @@ public sealed class DetailViewModel : ObservableObject
     public List<CategoryOption> CategoryOptions { get; }
 
     public ObservableCollection<DetailTagViewModel> ImageTags { get; } = [];
+
+    /// <summary>U2-C (§4.B.3): B3-9 相关资产缩略图条（top 6），复用 SemanticSearchService 缓存。</summary>
+    public ObservableCollection<GalleryItemViewModel> RelatedAssets { get; } = [];
+
+    public bool HasRelatedAssets => RelatedAssets.Count > 0;
+
+    /// <summary>U2-C: raised when the user clicks a related-asset thumbnail; ShellViewModel runs FindSimilar.</summary>
+    public event Action<long>? FindSimilarRequested;
 
     public bool HasSelection
     {
@@ -200,6 +212,7 @@ public sealed class DetailViewModel : ObservableObject
     public RelayCommand BatchRatingCommand { get; }
     public RelayCommand BatchCategoryCommand { get; }
     public RelayCommand RelocateFileCommand { get; }
+    public RelayCommand SelectRelatedCommand { get; }
 
     private void SetRating(object? parameter)
     {
@@ -353,6 +366,56 @@ public sealed class DetailViewModel : ObservableObject
                 tag.Tag, tag.Source == TagSource.Ai, RemoveTagCommand));
 
         RaiseAllInfoProperties();
+        // U2-C: load related assets after the main record is ready.
+        _ = LoadRelatedAsync(id);
+    }
+
+    /// <summary>
+    /// U2-C (§4.B.3): fetch top-6 semantically similar images and surface them
+    /// in the B3-9 thumbnail strip. Reuses SemanticSearchService's in-memory
+    /// embedding cache; no-op (section hidden) when the source has no embedding.
+    /// </summary>
+    private async Task LoadRelatedAsync(long sourceId)
+    {
+        RelatedAssets.Clear();
+        OnPropertyChanged(nameof(HasRelatedAssets));
+
+        IReadOnlyList<long>? ids = await Task.Run(() => _semanticSearch.SearchByImageId(sourceId));
+        if (ids is null || ids.Count == 0) return;
+
+        foreach (long id in ids.Take(6))
+        {
+            ImageRecord? rec = await Task.Run(() => _query.GetById(id));
+            if (rec is null) continue;
+
+            var item = new GalleryItemViewModel(new GalleryListItem
+            {
+                Id = rec.Id,
+                FileName = rec.FileName,
+                FilePath = rec.FilePath,
+                FileHash = rec.FileHash,
+                FileSize = rec.FileSize,
+                Width = rec.Width,
+                Height = rec.Height,
+                Format = rec.Format,
+                Rating = rec.Rating,
+                PrimaryCategory = rec.PrimaryCategory,
+                IsMissing = rec.IsMissing,
+                CreatedAt = rec.CreatedAt,
+            });
+            RelatedAssets.Add(item);
+            // Reuse the gallery thumbnail pipeline (cache + webp decode).
+            _gallery.Thumbnails.Attach(item);
+        }
+
+        OnPropertyChanged(nameof(HasRelatedAssets));
+    }
+
+    /// <summary>U2-C: clicking a related-asset thumbnail dives into its similarity neighborhood.</summary>
+    private void SelectRelated(object? parameter)
+    {
+        if (parameter is GalleryItemViewModel item)
+            FindSimilarRequested?.Invoke(item.Id);
     }
 
     private void PersistNotes()

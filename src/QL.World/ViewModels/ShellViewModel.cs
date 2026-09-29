@@ -35,7 +35,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         TagTree = new TagTreeViewModel(Gallery, services.ImageQuery, services.Tags);
         CollectionTree = new CollectionTreeViewModel(Gallery, services.Collections);
         PbrGroupTree = new PbrGroupTreeViewModel(Gallery, services.PbrGrouping);
-        Detail = new DetailViewModel(services.ImageQuery, services.Tags, Gallery);
+        Detail = new DetailViewModel(services.ImageQuery, services.Tags, Gallery, services.SemanticSearch);
         StatusBar = new StatusBarViewModel(services.Thumbnails, services.Settings);
         // U2-A: surface AI/import running state on C1 progress bar without coupling StatusBar to those services.
         StatusBar.IsBusyPredicate = () => TopBar.IsImporting || services.AiAnalysis.IsRunning;
@@ -44,6 +44,8 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         Gallery.SelectionChanged += OnSelectionChanged;
         TagTree.ClearFiltersRequested += ClearFilters;
         TopBar.SettingsRequested += () => ShowSettingsDialog?.Invoke();
+        // U2-C: clicking a related-asset thumbnail in B3-9 dives into its similarity neighborhood.
+        Detail.FindSimilarRequested += relatedId => _ = FindSimilarAsync(relatedId);
 
         _undoTimer = new DispatcherTimer
         {
@@ -61,7 +63,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         RemoveCommand = new RelayCommand(_ => RemoveSelected(), _ => HasSelection());
         RegenerateThumbnailsCommand = new RelayCommand(_ => RegenerateThumbnails(), _ => HasSelection());
         FindSimilarCommand = new AsyncRelayCommand(
-            FindSimilarAsync,
+            () => FindSimilarAsync(),
             () => HasSelection() && _services.SemanticSearch.HasAnyEmbeddings());
         SetRatingCommand = new RelayCommand(SetRatings, _ => HasSelection());
         SetCategoryCommand = new RelayCommand(SetCategories, _ => HasSelection());
@@ -385,9 +387,11 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     /// 调 SemanticSearchService.SearchByImageId 获取 top-50 相似图片 id，
     /// 设置 Gallery.Filter 进入语义模式并刷新画廊。
     /// </summary>
-    private async Task FindSimilarAsync()
+    private async Task FindSimilarAsync(long? imageId = null)
     {
-        GalleryItemViewModel? primary = Gallery.PrimarySelected;
+        GalleryItemViewModel? primary = imageId is long id
+            ? Gallery.Items.FirstOrDefault(i => i.Id == id)
+            : Gallery.PrimarySelected;
         if (primary is null) return;
 
         IReadOnlyList<long>? ids = _services.SemanticSearch.SearchByImageId(primary.Id);

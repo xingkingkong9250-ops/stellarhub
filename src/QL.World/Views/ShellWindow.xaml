@@ -720,6 +720,34 @@
                                 <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding Detail.FilePath}" TextWrapping="Wrap" Margin="0,2"
                                            TextOptions.TextFormattingMode="Display" />
                             </Grid>
+
+                            <!-- U2-C (§4.B.3): B3-9 相关资产 — hidden when the source has no embedding -->
+                            <StackPanel Margin="0,16,0,0"
+                                        Visibility="{Binding Detail.HasRelatedAssets, Converter={StaticResource BoolVis}}">
+                                <TextBlock Text="相关资产" Style="{StaticResource SectionCaptionStyle}" />
+                                <ItemsControl Margin="0,6,0,0"
+                                              ItemsSource="{Binding Detail.RelatedAssets}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <VirtualizingStackPanel Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Margin="0,0,6,0" Padding="0" BorderThickness="0"
+                                                    ToolTip="{Binding FileName}"
+                                                    Command="{Binding DataContext.Detail.SelectRelatedCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}">
+                                                <Border CornerRadius="6" ClipToBounds="True"
+                                                        Width="64" Height="64"
+                                                        Background="{DynamicResource SurfaceVariantBrush}">
+                                                    <Image Source="{Binding ThumbnailImage}" Stretch="UniformToFill" />
+                                                </Border>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
 
