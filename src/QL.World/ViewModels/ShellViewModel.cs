@@ -61,6 +61,11 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         OpenCommand = new RelayCommand(_ => OpenSelected(), _ => HasSelection());
         RevealCommand = new RelayCommand(_ => RevealSelected(), _ => HasSelection());
         CopyPathCommand = new RelayCommand(_ => CopySelectedPath(), _ => HasSelection());
+        // U3-B (§4.C.1): hover action bar commands act on the hovered card
+        // (CommandParameter), independent of the current selection.
+        OpenItemCommand = new RelayCommand(OpenItem, CanActOnItem);
+        RevealItemCommand = new RelayCommand(RevealItem, CanActOnItem);
+        CopyItemPathCommand = new RelayCommand(CopyItemPath, CanActOnItem);
         RemoveCommand = new RelayCommand(_ => RemoveSelected(), _ => HasSelection());
         RegenerateThumbnailsCommand = new RelayCommand(_ => RegenerateThumbnails(), _ => HasSelection());
         FindSimilarCommand = new AsyncRelayCommand(
@@ -111,6 +116,9 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public RelayCommand OpenCommand { get; }
     public RelayCommand RevealCommand { get; }
     public RelayCommand CopyPathCommand { get; }
+    public RelayCommand OpenItemCommand { get; }
+    public RelayCommand RevealItemCommand { get; }
+    public RelayCommand CopyItemPathCommand { get; }
     public RelayCommand RemoveCommand { get; }
     public RelayCommand RegenerateThumbnailsCommand { get; }
     public AsyncRelayCommand FindSimilarCommand { get; }
@@ -229,6 +237,29 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     {
         if (Gallery.PrimarySelected is { } primary)
             Clipboard.SetText(primary.FilePath);
+    }
+
+    // ─── U3-B: hover card actions (parameter = the hovered GalleryItemViewModel) ──
+
+    private static bool CanActOnItem(object? parameter) =>
+        parameter is GalleryItemViewModel { IsMissing: false };
+
+    private static void OpenItem(object? parameter)
+    {
+        if (parameter is GalleryItemViewModel { IsMissing: false } item)
+            SystemNavigator.OpenFile(item.FilePath);
+    }
+
+    private static void RevealItem(object? parameter)
+    {
+        if (parameter is GalleryItemViewModel { IsMissing: false } item)
+            SystemNavigator.RevealFile(item.FilePath);
+    }
+
+    private static void CopyItemPath(object? parameter)
+    {
+        if (parameter is GalleryItemViewModel { IsMissing: false } item)
+            Clipboard.SetText(item.FilePath);
     }
 
     private void RemoveSelected()

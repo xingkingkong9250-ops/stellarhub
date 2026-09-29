@@ -38,6 +38,36 @@
             </Style.Triggers>
         </Style>
 
+        <!-- U3-B (§4.C.1): B2-3-ACT hover action button on the thumbnail overlay -->
+        <Style x:Key="CardActionButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource TextOnOverlayBrush}" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="Margin" Value="2,0,0,0" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" CornerRadius="4"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- B2 grid card -->
         <DataTemplate x:Key="GridCardTemplate">
             <Border Margin="4" Padding="6"
@@ -76,6 +106,35 @@
                                     Visibility="{Binding SourceBadge, Converter={StaticResource NullVis}}">
                                 <TextBlock Text="{Binding SourceBadge}" FontSize="10"
                                            Foreground="{DynamicResource TextOnOverlayBrush}" />
+                            </Border>
+                            <!-- U3-B (§4.C.1): B2-3-ACT hover action bar (打开/定位/复制路径)。
+                                 默认 Collapsed 不参与 Measure（虚拟化安全）；作用于悬停卡片而非当前选中。 -->
+                            <Border VerticalAlignment="Bottom" Padding="4,2"
+                                    Background="{DynamicResource OverlayBrush}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Border}}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button Style="{StaticResource CardActionButtonStyle}"
+                                            Content="↗" ToolTip="打开原文件"
+                                            Command="{Binding DataContext.OpenItemCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                            CommandParameter="{Binding}" />
+                                    <Button Style="{StaticResource CardActionButtonStyle}"
+                                            Content="⌖" ToolTip="在资源管理器中定位"
+                                            Command="{Binding DataContext.RevealItemCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                            CommandParameter="{Binding}" />
+                                    <Button Style="{StaticResource CardActionButtonStyle}"
+                                            Content="⧉" ToolTip="复制路径"
+                                            Command="{Binding DataContext.CopyItemPathCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                            CommandParameter="{Binding}" />
+                                </StackPanel>
                             </Border>
                         </Grid>
                     </Border>

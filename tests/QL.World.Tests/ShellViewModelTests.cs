@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.RegularExpressions;
 using QL.World.Data;
+using QL.World.Models;
 using QL.World.Services;
 using QL.World.Services.Ai;
 using QL.World.Services.Colors;
@@ -82,6 +83,57 @@ public sealed class ShellViewModelTests : IDisposable
         Assert.True(
             _viewModel.Gallery.IsGridView || _viewModel.Gallery.IsListView);
     }
+
+    // ─── U3-B (§4.C.1): B2-3-ACT hover action commands ─────────────────────
+
+    [Fact]
+    public void Hover_action_commands_require_a_non_missing_item_parameter()
+    {
+        var present = MakeItem(isMissing: false);
+        var missing = MakeItem(isMissing: true);
+
+        foreach (var command in new[]
+        {
+            _viewModel.OpenItemCommand,
+            _viewModel.RevealItemCommand,
+            _viewModel.CopyItemPathCommand,
+        })
+        {
+            Assert.True(command.CanExecute(present));
+            Assert.False(command.CanExecute(missing));
+            Assert.False(command.CanExecute(null));
+            Assert.False(command.CanExecute("not-an-item"));
+        }
+    }
+
+    [Fact]
+    public void Hover_action_commands_tolerate_null_or_wrong_type_parameters()
+    {
+        // Execute must be a no-op (never throw) for invalid parameters;
+        // side-effecting routes (Navigator/Clipboard) are not covered here.
+        _viewModel.OpenItemCommand.Execute(null);
+        _viewModel.RevealItemCommand.Execute(null);
+        _viewModel.CopyItemPathCommand.Execute(null);
+        _viewModel.OpenItemCommand.Execute(42);
+    }
+
+    private static GalleryItemViewModel MakeItem(bool isMissing) => new(new GalleryListItem
+    {
+        Id = 1,
+        FileName = "a.png",
+        FilePath = @"X:\a.png",
+        FileHash = "h",
+        FileSize = 1,
+        Width = 4,
+        Height = 4,
+        Format = "png",
+        Rating = 0,
+        PrimaryCategory = null,
+        IsMissing = isMissing,
+        CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+        TagsCsv = string.Empty,
+        SourceBadge = null,
+    });
 
     public void Dispose()
     {
