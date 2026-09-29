@@ -38,7 +38,7 @@ public sealed class ThumbnailServiceTests : IDisposable
         service.Request(hash, new LocalImageSource(source));
 
         string expected = Path.Combine(
-            _directory, "thumbnails", "ab", $"{hash}.webp");
+            _directory, "thumbnails", "ab", $"{hash}_thumb.webp");
         Assert.True(WaitFor(() => File.Exists(expected), TimeSpan.FromSeconds(10)));
 
         var info = new FileInfo(expected);

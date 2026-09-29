@@ -45,7 +45,7 @@ public sealed class ThumbnailServiceRemoteTests : IDisposable
         string tempDir = Path.Combine(Path.GetTempPath(), "StellarHub");
 
         string? raised = null;
-        service.ThumbnailReady += h => raised = h;
+        service.ThumbnailReady += (h, level) => raised = h;
 
         // Act: request via RemoteImageSource (LocalPath is null → temp-file
         // download branch in ProcessJob).

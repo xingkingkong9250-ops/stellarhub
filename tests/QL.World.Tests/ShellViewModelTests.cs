@@ -51,7 +51,8 @@ public sealed class ShellViewModelTests : IDisposable
         var services = new ServiceRegistry(
             settings, _database, inspector, import, _thumbnails, imageQuery,
             tags, collections, notifications, watcher, legacyImporter, ai, aiAnalysis,
-            colors, semanticSearch, pbrGrouping, new StubNasConnectorFactory());
+            colors, semanticSearch, pbrGrouping, new StubNasConnectorFactory(),
+            new ThumbnailCacheService(_directory, settings));
         _viewModel = new ShellViewModel(services);
     }
 

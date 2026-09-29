@@ -15,6 +15,11 @@ namespace QL.World.ViewModels.Support;
 /// BitmapSources (LRU), and pushes them into realized gallery items.
 /// Lives in the ViewModel layer because it owns WPF image types;
 /// ThumbnailService itself stays UI-free.
+/// M5-F: handles two tiers — Thumb (256px, gallery grid/list) and Preview
+/// (1024px, detail pane). The Thumb tier is cached in the in-memory LRU;
+/// the Preview tier is decoded on demand and pushed to
+/// <see cref="GalleryItemViewModel.PreviewImage"/> without caching (the
+/// detail pane shows one item at a time).
 /// </summary>
 public sealed class GalleryThumbnailProvider : IDisposable
 {
@@ -30,6 +35,12 @@ public sealed class GalleryThumbnailProvider : IDisposable
     private readonly LinkedList<string> _lru = new();
     private readonly Dictionary<string, LinkedListNode<string>> _lruNodes = new();
     private readonly HashSet<string> _inFlight = new();
+
+    // M5-F: Preview-tier tracking. Separate from _realized because the detail
+    // item may not be in the visible gallery range.
+    private readonly Dictionary<string, GalleryItemViewModel> _previewRequested = new();
+    private readonly HashSet<string> _previewInFlight = new();
+
     private readonly Dictionary<int, INasConnector> _connectors = new();
     private readonly object _connectorGate = new();
     private bool _disposed;
@@ -69,13 +80,14 @@ public sealed class GalleryThumbnailProvider : IDisposable
             }
         }
 
-        if (_thumbnails.ThumbnailExists(item.FileHash))
+        if (_thumbnails.ThumbnailExists(item.FileHash, ThumbnailLevel.Thumb))
         {
             StartLoad(item);
         }
         else
         {
-            _thumbnails.Request(item.FileHash, CreateSource(item), highPriority: true);
+            _thumbnails.Request(item.FileHash, CreateSource(item),
+                ThumbnailLevel.Thumb, highPriority: true);
         }
     }
 
@@ -97,6 +109,43 @@ public sealed class GalleryThumbnailProvider : IDisposable
     }
 
     /// <summary>
+    /// M5-F: requests the Preview-tier (1024px) WebP for the detail pane.
+    /// When the WebP is ready, <see cref="OnThumbnailReady"/> decodes it and
+    /// pushes the <see cref="BitmapSource"/> to <see cref="GalleryItemViewModel.PreviewImage"/>.
+    /// If the Preview WebP already exists on disk, loads it immediately.
+    /// </summary>
+    public void RequestPreview(GalleryItemViewModel item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        lock (_gate)
+        {
+            _previewRequested[item.FileHash] = item;
+        }
+
+        if (_thumbnails.ThumbnailExists(item.FileHash, ThumbnailLevel.Preview))
+        {
+            StartPreviewLoad(item);
+        }
+        else
+        {
+            _thumbnails.Request(item.FileHash, CreateSource(item),
+                ThumbnailLevel.Preview, highPriority: true);
+        }
+    }
+
+    /// <summary>
+    /// M5-F: clears the preview request so a stale callback doesn't update
+    /// an item that's no longer in the detail pane.
+    /// </summary>
+    public void ClearPreviewRequest(string hash)
+    {
+        lock (_gate)
+        {
+            _previewRequested.Remove(hash);
+        }
+    }
+
+    /// <summary>
     /// M5-E: force-regenerate the thumbnail for <paramref name="item"/>.
     /// Called by the B2-3-ACT "重新生成缩略图" context action. Builds the
     /// same <see cref="IImageSource"/> as <see cref="Attach"/> so remote rows
@@ -105,7 +154,7 @@ public sealed class GalleryThumbnailProvider : IDisposable
     /// </summary>
     public void Regenerate(GalleryItemViewModel item)
     {
-        _thumbnails.Regenerate(item.FileHash, CreateSource(item));
+        _thumbnails.Regenerate(item.FileHash, CreateSource(item), ThumbnailLevel.Thumb);
     }
 
     public void Dispose()
@@ -125,17 +174,33 @@ public sealed class GalleryThumbnailProvider : IDisposable
         }
     }
 
-    private void OnThumbnailReady(string hash)
+    /// <summary>
+    /// M5-F: routes the ThumbnailReady callback by level. Thumb → load into
+    /// the gallery grid/list; Preview → load into the detail pane.
+    /// </summary>
+    private void OnThumbnailReady(string hash, ThumbnailLevel level)
     {
         if (_disposed) return;
 
         GalleryItemViewModel? item;
         lock (_gate)
         {
-            if (!_realized.TryGetValue(hash, out item))
-                return;
+            if (level == ThumbnailLevel.Thumb)
+            {
+                if (!_realized.TryGetValue(hash, out item))
+                    return;
+            }
+            else
+            {
+                if (!_previewRequested.TryGetValue(hash, out item))
+                    return;
+            }
         }
-        StartLoad(item);
+
+        if (level == ThumbnailLevel.Preview)
+            StartPreviewLoad(item);
+        else
+            StartLoad(item);
     }
 
     /// <summary>
@@ -204,7 +269,7 @@ public sealed class GalleryThumbnailProvider : IDisposable
 
     private void StartLoad(GalleryItemViewModel item)
     {
-        string path = _thumbnails.GetThumbnailPath(item.FileHash);
+        string path = _thumbnails.GetThumbnailPath(item.FileHash, ThumbnailLevel.Thumb);
 
         lock (_gate)
         {
@@ -237,6 +302,54 @@ public sealed class GalleryThumbnailProvider : IDisposable
                 lock (_gate)
                 {
                     _inFlight.Remove(item.FileHash);
+                }
+            }
+        });
+    }
+
+    /// <summary>
+    /// M5-F: decodes the Preview-tier WebP (1024px) and pushes the frozen
+    /// BitmapSource to <see cref="GalleryItemViewModel.PreviewImage"/>.
+    /// Not cached in the in-memory LRU — the detail pane shows one item at
+    /// a time and the on-disk WebP is the cache.
+    /// </summary>
+    private void StartPreviewLoad(GalleryItemViewModel item)
+    {
+        string path = _thumbnails.GetThumbnailPath(item.FileHash, ThumbnailLevel.Preview);
+
+        lock (_gate)
+        {
+            if (_previewInFlight.Contains(item.FileHash)) return;
+            _previewInFlight.Add(item.FileHash);
+        }
+
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                if (!File.Exists(path)) return;
+                BitmapSource? bitmap = DecodeWebp(path);
+                if (bitmap is null) return;
+
+                lock (_gate)
+                {
+                    if (_previewRequested.TryGetValue(item.FileHash,
+                        out GalleryItemViewModel? live))
+                    {
+                        live.PreviewImage = bitmap;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[ThumbnailUI] preview decode failed for {item.FileHash}: {ex.Message}");
+            }
+            finally
+            {
+                lock (_gate)
+                {
+                    _previewInFlight.Remove(item.FileHash);
                 }
             }
         });

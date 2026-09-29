@@ -8,6 +8,7 @@ namespace QL.World.ViewModels;
 public sealed class GalleryItemViewModel : ObservableObject
 {
     private BitmapSource? _thumbnailImage;
+    private BitmapSource? _previewImage;
     private int _rating;
 
     public GalleryItemViewModel(GalleryListItem item)
@@ -73,6 +74,18 @@ public sealed class GalleryItemViewModel : ObservableObject
     {
         get => _thumbnailImage;
         set => SetProperty(ref _thumbnailImage, value);
+    }
+
+    /// <summary>
+    /// M5-F: 1024px preview-tier WebP decoded to a frozen BitmapSource.
+    /// Set by <see cref="Support.GalleryThumbnailProvider"/> when the Preview
+    /// level WebP arrives. Bound by <see cref="Views.Controls.ProgressiveImage"/>
+    /// as the middle layer (fades in over the 256px thumb).
+    /// </summary>
+    public BitmapSource? PreviewImage
+    {
+        get => _previewImage;
+        set => SetProperty(ref _previewImage, value);
     }
 
     public string DimensionsText =>

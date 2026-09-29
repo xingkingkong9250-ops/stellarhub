@@ -338,6 +338,14 @@ public sealed class DetailViewModel : ObservableObject
     private void OnSelectionChanged()
     {
         _notesTimer.Stop();
+        // M5-F: clear the previous detail item's preview request so a stale
+        // ThumbnailReady callback doesn't overwrite the new item's PreviewImage.
+        if (Primary is not null)
+        {
+            Primary.PreviewImage = null;
+            _gallery.Thumbnails.ClearPreviewRequest(Primary.FileHash);
+        }
+
         List<GalleryItemViewModel> selection = _gallery.SelectedItems.ToList();
         SelectedCount = selection.Count;
         HasSelection = selection.Count > 0;
@@ -345,7 +353,13 @@ public sealed class DetailViewModel : ObservableObject
         Primary = selection.FirstOrDefault();
 
         if (IsSingle && Primary is not null)
+        {
+            // M5-F: request the 1024px preview tier for the detail pane.
+            // The ProgressiveImage control cross-fades thumb → preview when
+            // the PreviewImage property is set by GalleryThumbnailProvider.
+            _gallery.Thumbnails.RequestPreview(Primary);
             _ = ReloadSingleAsync(Primary.Id);
+        }
         else
         {
             Record = null;

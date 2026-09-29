@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:support="clr-namespace:QL.World.Views.Support"
         xmlns:conv="clr-namespace:QL.World.Views.Converters"
+        xmlns:controls="clr-namespace:QL.World.Views.Controls"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         mc:Ignorable="d"
         d:Width="1400" d:Height="850"
@@ -780,8 +781,11 @@
                                     Background="{DynamicResource SurfaceVariantBrush}"
                                     MouseLeftButtonUp="Preview_MouseLeftButtonUp">
                                 <Grid>
-                                    <Image Source="{Binding Detail.Preview.ThumbnailImage}"
-                                           Stretch="Uniform" Margin="6" />
+                                    <!-- M5-F: progressive image — thumb (placeholder) → preview (1024px) → original -->
+                                    <controls:ProgressiveImage
+                                        PlaceholderSource="{Binding Detail.Preview.ThumbnailImage}"
+                                        PreviewSource="{Binding Detail.Preview.PreviewImage}"
+                                        Stretch="Uniform" Margin="6" />
                                     <Border VerticalAlignment="Top" HorizontalAlignment="Left"
                                             Margin="8" Padding="0" CornerRadius="4"
                                             Background="{DynamicResource WarningBgBrush}"

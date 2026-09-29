@@ -27,6 +27,7 @@ public partial class App : Application
     private ServiceRegistry? _services;
     private DatabaseService? _database;
     private ThumbnailService? _thumbnails;
+    private ThumbnailCacheService? _thumbnailCache;
     private FileWatcherService? _watcher;
     private Mutex? _singleInstanceMutex;
     private EventWaitHandle? _gracefulShutdownEvent;
@@ -85,6 +86,8 @@ public partial class App : Application
             var pbrGrouping = new PbrGroupingService(_database, settings, WriteLog);
             var importService = new ImportService(_database, inspector, pbrGrouping);
             _thumbnails = new ThumbnailService(dataRoot, settings);
+            _thumbnailCache = new ThumbnailCacheService(dataRoot, settings);
+            _thumbnailCache.Start();
             var imageQuery = new ImageQueryService(_database);
             var tagService = new TagService(_database);
             var collectionService = new CollectionService(_database);
@@ -117,7 +120,8 @@ public partial class App : Application
                 colorAnalysis,
                 semanticSearch,
                 pbrGrouping,
-                new WebDavConnectorFactory());
+                new WebDavConnectorFactory(),
+                _thumbnailCache);
             _services = services;
 
             SetTheme(settings.Theme);
@@ -161,6 +165,15 @@ public partial class App : Application
         catch (Exception ex)
         {
             WriteLog($"[EXIT] Thumbnail service cleanup failed: {ex}");
+        }
+
+        try
+        {
+            _thumbnailCache?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"[EXIT] Thumbnail cache cleanup failed: {ex}");
         }
 
         try

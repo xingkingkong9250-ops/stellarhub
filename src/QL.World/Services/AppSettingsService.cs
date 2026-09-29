@@ -21,8 +21,8 @@ public sealed class AppSettingsService
     private const int MAX_THUMBNAIL_QUALITY = 100;
     private const int MIN_ZOOM = 80;
     private const int MAX_ZOOM = 512;
-    private const int MIN_THUMBNAIL_CACHE_MB = 256;
-    private const int MAX_THUMBNAIL_CACHE_MB = 16384;
+    private const int MIN_THUMBNAIL_CACHE_MB = 128;
+    private const int MAX_THUMBNAIL_CACHE_MB = 8192;
 
     private static readonly JsonSerializerOptions JSON_OPTIONS = new()
     {
@@ -93,7 +93,7 @@ public sealed class AppSettingsService
             next => _settings.ThumbnailQuality = next);
     }
 
-    /// <summary>M5-C: thumbnail disk-cache cap in MB; clamped to [256, 16384] on set/load.</summary>
+    /// <summary>M5-C: thumbnail disk-cache cap in MB; clamped to [128, 8192] on set/load.</summary>
     public int ThumbnailCacheLimitMb
     {
         get => _settings.ThumbnailCacheLimitMb;

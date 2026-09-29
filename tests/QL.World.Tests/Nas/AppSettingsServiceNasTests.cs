@@ -196,21 +196,21 @@ public sealed class AppSettingsServiceNasTests : IDisposable
         settings.Load();
         Assert.Equal(1024, settings.ThumbnailCacheLimitMb);
 
-        // Below range clamps to 256.
+        // Below range clamps to 128.
         File.WriteAllText(
             Path.Combine(_directory, "config.json"),
             "{\"thumbnailCacheLimitMb\":5}");
         var low = new AppSettingsService(_directory);
         low.Load();
-        Assert.Equal(256, low.ThumbnailCacheLimitMb);
+        Assert.Equal(128, low.ThumbnailCacheLimitMb);
 
-        // Above range clamps to 16384.
+        // Above range clamps to 8192.
         File.WriteAllText(
             Path.Combine(_directory, "config.json"),
             "{\"thumbnailCacheLimitMb\":99999}");
         var high = new AppSettingsService(_directory);
         high.Load();
-        Assert.Equal(16384, high.ThumbnailCacheLimitMb);
+        Assert.Equal(8192, high.ThumbnailCacheLimitMb);
     }
 
     [Fact]

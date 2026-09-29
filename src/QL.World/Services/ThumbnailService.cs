@@ -11,7 +11,9 @@ namespace QL.World.Services;
 /// <summary>
 /// Generates WebP thumbnails on bounded-concurrency background workers.
 /// Visible items can be promoted with <see cref="Prioritize"/>.
-/// Output layout: thumbnails\&lt;hash2&gt;\&lt;hash&gt;.webp.
+/// M5-F output layout: thumbnails\&lt;hash2&gt;\&lt;hash&gt;_thumb.webp (256px)
+/// and &lt;hash&gt;_preview.webp (1024px). Legacy &lt;hash&gt;.webp files are
+/// migrated to _thumb on startup.
 /// This service has no UI dependency — consumers get file paths via
 /// <see cref="ThumbnailReady"/> and load bitmaps themselves.
 /// </summary>
@@ -19,6 +21,7 @@ public sealed class ThumbnailService : IDisposable
 {
     private const int WORKER_COUNT = 2;
     private const int PLACEHOLDER_SIZE = 64;
+    private const int PREVIEW_SIZE = 1024;
 
     private readonly string _root;
     private readonly string _tempRoot;
@@ -49,6 +52,9 @@ public sealed class ThumbnailService : IDisposable
         // U5 brand migration; named by hash so two workers never collide.
         _tempRoot = Path.Combine(Path.GetTempPath(), "StellarHub");
 
+        // M5-F: migrate legacy <hash>.webp → <hash>_thumb.webp (idempotent).
+        MigrateLegacyThumbnails();
+
         _workers = Enumerable.Range(0, WORKER_COUNT)
             .Select(_ => Task.Run(ConsumeLoop))
             .ToArray();
@@ -56,76 +62,96 @@ public sealed class ThumbnailService : IDisposable
         _placeholderTask = Task.Run(EnsurePlaceholderOnDisk);
     }
 
-    /// <summary>Raised (on a worker thread) when a thumbnail becomes available.</summary>
-    public event Action<string>? ThumbnailReady;
+    /// <summary>
+    /// M5-F: Raised (on a worker thread) when a thumbnail becomes available.
+    /// The <see cref="ThumbnailLevel"/> tells the consumer which tier was
+    /// generated so it can update the matching layer in ProgressiveImage.
+    /// </summary>
+    public event Action<string, ThumbnailLevel>? ThumbnailReady;
 
     public int PendingCount
     {
         get { lock (_queueGate) return _queue.Count; }
     }
 
-    public string GetThumbnailPath(string hash)
+    /// <summary>
+    /// M5-F: Returns the on-disk path for the given hash + level.
+    /// Layout: thumbnails\&lt;hash2&gt;\&lt;hash&gt;_&lt;level&gt;.webp.
+    /// </summary>
+    public string GetThumbnailPath(string hash, ThumbnailLevel level = ThumbnailLevel.Thumb)
     {
         string key = NormalizeHash(hash);
-        return Path.Combine(_root, key[..2], $"{key}.webp");
+        return Path.Combine(_root, key[..2], $"{key}_{LevelSuffix(level)}.webp");
     }
 
-    public bool ThumbnailExists(string hash) => File.Exists(GetThumbnailPath(hash));
+    public bool ThumbnailExists(string hash, ThumbnailLevel level = ThumbnailLevel.Thumb) =>
+        File.Exists(GetThumbnailPath(hash, level));
 
-    /// <summary>Enqueues generation unless the WebP already exists.</summary>
+    /// <summary>
+    /// Enqueues generation unless the WebP already exists.
+    /// M5-F: <paramref name="level"/> selects the target tier (Thumb=256px,
+    /// Preview=1024px). The same hash can have independent Thumb and Preview
+    /// jobs in flight simultaneously.
+    /// </summary>
     /// <param name="source">M5-E: replaces the <c>string sourcePath</c> overload
     /// so the same worker handles local files (<see cref="LocalImageSource"/>)
     /// and remote NAS bytes (<see cref="RemoteImageSource"/>).</param>
-    public void Request(string hash, IImageSource source, bool highPriority = false)
+    public void Request(string hash, IImageSource source,
+        ThumbnailLevel level = ThumbnailLevel.Thumb,
+        bool highPriority = false)
     {
         ArgumentNullException.ThrowIfNull(source);
         string key = NormalizeHash(hash);
-        if (ThumbnailExists(key))
+        if (ThumbnailExists(key, level))
             return;
 
+        string composite = CompositeKey(key, level);
         lock (_queueGate)
         {
-            if (_jobs.ContainsKey(key))
+            if (_jobs.ContainsKey(composite))
                 return;
 
             long order = highPriority ? --_priorityOrder : --_normalOrder;
-            var job = new Job(key, source, order);
-            _jobs[key] = job;
-            _queue.Enqueue(key, order);
+            var job = new Job(key, source, level, order);
+            _jobs[composite] = job;
+            _queue.Enqueue(composite, order);
         }
         _signal.Set();
     }
 
     /// <summary>Promotes a queued job ahead of normal (previously enqueued) jobs.</summary>
-    public void Prioritize(string hash)
+    public void Prioritize(string hash, ThumbnailLevel level = ThumbnailLevel.Thumb)
     {
         string key = NormalizeHash(hash);
+        string composite = CompositeKey(key, level);
         lock (_queueGate)
         {
-            if (!_jobs.TryGetValue(key, out Job? job) || job.Running)
+            if (!_jobs.TryGetValue(composite, out Job? job) || job.Running)
                 return;
 
             job.Order = --_priorityOrder;
             // Re-enqueue with the new priority; stale dequeues are guarded
             // by comparing the stored order.
-            _queue.Enqueue(key, job.Order);
+            _queue.Enqueue(composite, job.Order);
         }
         _signal.Set();
     }
 
     /// <summary>Forces regeneration even when a WebP already exists.</summary>
-    public void Regenerate(string hash, IImageSource source)
+    public void Regenerate(string hash, IImageSource source,
+        ThumbnailLevel level = ThumbnailLevel.Thumb)
     {
         ArgumentNullException.ThrowIfNull(source);
         string key = NormalizeHash(hash);
-        try { File.Delete(GetThumbnailPath(key)); }
+        try { File.Delete(GetThumbnailPath(key, level)); }
         catch (IOException) { /* Will be overwritten on save. */ }
 
+        string composite = CompositeKey(key, level);
         lock (_queueGate)
         {
-            _jobs.Remove(key);
+            _jobs.Remove(composite);
         }
-        Request(key, source, highPriority: true);
+        Request(key, source, level, highPriority: true);
     }
 
     public Task WaitPlaceholderAsync() => _placeholderTask ?? Task.CompletedTask;
@@ -134,7 +160,7 @@ public sealed class ThumbnailService : IDisposable
     {
         while (!_shutdown.IsCancellationRequested)
         {
-            string? key = null;
+            string? composite = null;
             Job? job = null;
 
             lock (_queueGate)
@@ -147,7 +173,7 @@ public sealed class ThumbnailService : IDisposable
                     if (_jobs.TryGetValue(candidate, out Job? queued) &&
                         !queued.Running && queued.Order == order)
                     {
-                        key = candidate;
+                        composite = candidate;
                         job = queued;
                         job.Running = true;
                         break;
@@ -155,7 +181,7 @@ public sealed class ThumbnailService : IDisposable
                 }
             }
 
-            if (key is null || job is null)
+            if (composite is null || job is null)
             {
                 try { _signal.WaitOne(500, exitContext: false); }
                 catch (ObjectDisposedException) { return; }
@@ -169,21 +195,21 @@ public sealed class ThumbnailService : IDisposable
             catch (Exception ex) when (ex is not (ObjectDisposedException))
             {
                 System.Diagnostics.Debug.WriteLine(
-                    $"[Thumbnail] {job.Hash} failed: {ex.Message}");
-                CopyPlaceholderFor(job.Hash);
+                    $"[Thumbnail] {job.Hash} {job.Level} failed: {ex.Message}");
+                CopyPlaceholderFor(job.Hash, job.Level);
             }
 
             lock (_queueGate)
             {
-                _jobs.Remove(key);
+                _jobs.Remove(composite);
             }
-            ThumbnailReady?.Invoke(key);
+            ThumbnailReady?.Invoke(job.Hash, job.Level);
         }
     }
 
     private void ProcessJob(Job job)
     {
-        string output = GetThumbnailPath(job.Hash);
+        string output = GetThumbnailPath(job.Hash, job.Level);
         if (File.Exists(output))
             return;
 
@@ -212,11 +238,16 @@ public sealed class ThumbnailService : IDisposable
 
             if (!File.Exists(sourcePath))
             {
-                CopyPlaceholderFor(job.Hash);
+                CopyPlaceholderFor(job.Hash, job.Level);
                 return;
             }
 
-            int size = _settings.ThumbnailSize;
+            // M5-F: target size depends on level. Thumb follows the user's
+            // ThumbnailSize setting (128–512, default 256); Preview is fixed
+            // at 1024 for the detail pane.
+            int size = job.Level == ThumbnailLevel.Preview
+                ? PREVIEW_SIZE
+                : _settings.ThumbnailSize;
             int quality = _settings.ThumbnailQuality;
 
             using Image image = LoadDecoded(sourcePath);
@@ -307,12 +338,12 @@ public sealed class ThumbnailService : IDisposable
         return path;
     }
 
-    private void CopyPlaceholderFor(string hash)
+    private void CopyPlaceholderFor(string hash, ThumbnailLevel level)
     {
         try
         {
             string placeholder = EnsurePlaceholderOnDisk();
-            string output = GetThumbnailPath(hash);
+            string output = GetThumbnailPath(hash, level);
             if (File.Exists(output))
                 return;
             Directory.CreateDirectory(Path.GetDirectoryName(output)!);
@@ -323,6 +354,55 @@ public sealed class ThumbnailService : IDisposable
             // Placeholder is best effort; UI falls back to its own empty state.
         }
     }
+
+    /// <summary>
+    /// M5-F: renames legacy &lt;hash&gt;.webp to &lt;hash&gt;_thumb.webp.
+    /// Skips files that already have a _thumb/_preview suffix or are the
+    /// placeholder. Idempotent: safe to call on every startup.
+    /// </summary>
+    private void MigrateLegacyThumbnails()
+    {
+        try
+        {
+            foreach (string dir in Directory.EnumerateDirectories(_root))
+            {
+                foreach (string file in Directory.EnumerateFiles(dir, "*.webp"))
+                {
+                    string name = Path.GetFileNameWithoutExtension(file);
+                    // Already migrated or special file.
+                    if (name.EndsWith("_thumb", StringComparison.Ordinal) ||
+                        name.EndsWith("_preview", StringComparison.Ordinal) ||
+                        name == "placeholder")
+                        continue;
+
+                    string target = Path.Combine(
+                        Path.GetDirectoryName(file)!,
+                        $"{name}_thumb.webp");
+                    if (File.Exists(target))
+                    {
+                        // Target already exists (e.g. previous partial migration);
+                        // remove the legacy file to avoid confusion.
+                        TryDelete(file);
+                        continue;
+                    }
+                    try { File.Move(file, target); }
+                    catch (IOException) { /* Best effort; next startup retries. */ }
+                }
+            }
+        }
+        catch (DirectoryNotFoundException) { /* No thumbnails yet — fine. */ }
+        catch (IOException) { /* Best effort; non-fatal. */ }
+    }
+
+    private static string LevelSuffix(ThumbnailLevel level) => level switch
+    {
+        ThumbnailLevel.Thumb => "thumb",
+        ThumbnailLevel.Preview => "preview",
+        _ => "thumb",
+    };
+
+    private static string CompositeKey(string hash, ThumbnailLevel level) =>
+        $"{hash}:{(int)level}";
 
     private static string NormalizeHash(string hash)
     {
@@ -357,15 +437,17 @@ public sealed class ThumbnailService : IDisposable
 
     private sealed class Job
     {
-        public Job(string hash, IImageSource source, long order)
+        public Job(string hash, IImageSource source, ThumbnailLevel level, long order)
         {
             Hash = hash;
             Source = source;
+            Level = level;
             Order = order;
         }
 
         public string Hash { get; }
         public IImageSource Source { get; }
+        public ThumbnailLevel Level { get; }
         public long Order { get; set; }
         public bool Running { get; set; }
     }

@@ -36,6 +36,11 @@ public sealed class ServiceRegistry
     /// (Test Connection button) and <see cref="RemoteLibraryScanner"/> (scan).
     /// </summary>
     public INasConnectorFactory NasFactory { get; }
+    /// <summary>
+    /// M5-F: background LRU cleaner that trims the thumbnails disk cache
+    /// when it exceeds <see cref="AppSettingsService.ThumbnailCacheLimitMb"/>.
+    /// </summary>
+    public ThumbnailCacheService ThumbnailCache { get; }
 
     public ServiceRegistry(
         AppSettingsService settings,
@@ -54,7 +59,8 @@ public sealed class ServiceRegistry
         ColorAnalysisService colors,
         SemanticSearchService semanticSearch,
         PbrGroupingService pbrGrouping,
-        INasConnectorFactory nasFactory)
+        INasConnectorFactory nasFactory,
+        ThumbnailCacheService thumbnailCache)
     {
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
         Database = database ?? throw new ArgumentNullException(nameof(database));
@@ -73,5 +79,6 @@ public sealed class ServiceRegistry
         SemanticSearch = semanticSearch ?? throw new ArgumentNullException(nameof(semanticSearch));
         PbrGrouping = pbrGrouping ?? throw new ArgumentNullException(nameof(pbrGrouping));
         NasFactory = nasFactory ?? throw new ArgumentNullException(nameof(nasFactory));
+        ThumbnailCache = thumbnailCache ?? throw new ArgumentNullException(nameof(thumbnailCache));
     }
 }
