@@ -27,7 +27,7 @@ public sealed class ReleaseContractTests
 
         Assert.True(Directory.Exists(result.DistDir));
         Assert.Equal(
-            Path.Combine(fixture.DistRoot, $"QL World_v{TestVersion}"),
+            Path.Combine(fixture.DistRoot, $"StellarHub_v{TestVersion}"),
             result.DistDir);
 
         // 5 个角色齐全
@@ -38,16 +38,16 @@ public sealed class ReleaseContractTests
         Assert.True(result.FilePathByRole.ContainsKey(ReleaseArtifacts.UserGuideRole));
         Assert.True(result.FilePathByRole.ContainsKey(ReleaseArtifacts.ManifestRole));
 
-        // 文件命名规范：QL World_v{x.y.z}[role].ext
-        Assert.Equal($"QL World_v{TestVersion}.zip",
+        // 文件命名规范：StellarHub_v{x.y.z}[role].ext
+        Assert.Equal($"StellarHub_v{TestVersion}.zip",
             Path.GetFileName(result.FilePathByRole[ReleaseArtifacts.AppRole]));
-        Assert.Equal($"QL World_v{TestVersion}_source.zip",
+        Assert.Equal($"StellarHub_v{TestVersion}_source.zip",
             Path.GetFileName(result.FilePathByRole[ReleaseArtifacts.SourceRole]));
-        Assert.Equal($"QL World_v{TestVersion}_更新公告.txt",
+        Assert.Equal($"StellarHub_v{TestVersion}_更新公告.txt",
             Path.GetFileName(result.FilePathByRole[ReleaseArtifacts.ReleaseNotesRole]));
-        Assert.Equal($"QL World_v{TestVersion}_使用说明.txt",
+        Assert.Equal($"StellarHub_v{TestVersion}_使用说明.txt",
             Path.GetFileName(result.FilePathByRole[ReleaseArtifacts.UserGuideRole]));
-        Assert.Equal($"QL World_v{TestVersion}_manifest.json",
+        Assert.Equal($"StellarHub_v{TestVersion}_manifest.json",
             Path.GetFileName(result.FilePathByRole[ReleaseArtifacts.ManifestRole]));
 
         // 所有文件都实际存在
@@ -206,8 +206,8 @@ public sealed class ReleaseContractTests
         Assert.Contains("run.bat", entryNames);
         Assert.Contains("run-hidden.vbs", entryNames);
         Assert.Contains("run.ps1", entryNames);
-        Assert.Contains("QL World.dll", entryNames);
-        Assert.Contains("QL World.exe", entryNames);
+        Assert.Contains("StellarHub.dll", entryNames);
+        Assert.Contains("StellarHub.exe", entryNames);
 
         // 内容字节一致：run.bat 字节相等
         var runBatEntry = archive.GetEntry("run.bat")!;
@@ -261,7 +261,7 @@ public sealed class ReleaseContractTests
         Assert.Contains(badPath, ex.Message);
 
         // 失败后：版本子目录永不存在，DistRoot 下无 .tmp-* 残留
-        string versionDir = Path.Combine(fixture.DistRoot, $"QL World_v{TestVersion}");
+        string versionDir = Path.Combine(fixture.DistRoot, $"StellarHub_v{TestVersion}");
         Assert.False(Directory.Exists(versionDir));
 
         if (Directory.Exists(fixture.DistRoot))
@@ -308,7 +308,7 @@ public sealed class ReleaseContractTests
 
     /// <summary>
     /// 测试夹具：管理一个临时根目录、一个 fake staging（含 run.bat / run.ps1 /
-    /// run-hidden.vbs / QL World.dll / QL World.exe）、一个 fake DistRoot、一个
+    /// run-hidden.vbs / StellarHub.dll / StellarHub.exe）、一个 fake DistRoot、一个
     /// FakeGitInfoProvider、可选的注入路径。Dispose 时统一清理。
     /// </summary>
     private sealed class ReleaseFixture : IDisposable
@@ -324,7 +324,7 @@ public sealed class ReleaseContractTests
             Directory.CreateDirectory(_ownTemp);
             OwnTemp = _ownTemp;
 
-            StagingDir = Path.Combine(_ownTemp, "staging", $"QL World_v{TestVersion}");
+            StagingDir = Path.Combine(_ownTemp, "staging", $"StellarHub_v{TestVersion}");
             Directory.CreateDirectory(StagingDir);
             BuildFakeStaging(StagingDir);
 
@@ -335,7 +335,7 @@ public sealed class ReleaseContractTests
                 $"# v{{x.y.z}} 更新公告\n\n## 亮点\n- 测试占位\n");
             UserGuidePath = Path.Combine(_ownTemp, "USER_GUIDE.md");
             File.WriteAllText(UserGuidePath,
-                $"# QL World v{{x.y.z}} 用户指南\n\n## 安装\n- 解压即可运行\n");
+                $"# 千星汇图 v{{x.y.z}} 用户指南\n\n## 安装\n- 解压即可运行\n");
 
             // 默认预制 source.zip：避免测试依赖真实 git 仓库（测试 ProjectRoot 在 temp 下
             // 不是 git 工作区，git archive 会失败）。测试可显式传 sourceArchivePath 覆盖。
@@ -383,19 +383,19 @@ public sealed class ReleaseContractTests
         {
             // 模拟一个最小可发布 staging（self-contained win-x64 输出）
             File.WriteAllText(Path.Combine(dir, "run.bat"),
-                "@echo off\nstart \"\" \"QL World.exe\"\n");
+                "@echo off\nstart \"\" \"StellarHub.exe\"\n");
             File.WriteAllText(Path.Combine(dir, "run-hidden.vbs"),
                 "Set WshShell = CreateObject(\"WScript.Shell\")\n" +
                 $"WshShell.Run \"run.bat\", 0, False\n");
             File.WriteAllText(Path.Combine(dir, "run.ps1"),
-                "$ErrorActionPreference = 'Stop'\nStart-Process -FilePath 'QL World.exe'\n");
+                "$ErrorActionPreference = 'Stop'\nStart-Process -FilePath 'StellarHub.exe'\n");
 
             // 假 dll/exe（非真实 PE，只占字节）
-            File.WriteAllBytes(Path.Combine(dir, "QL World.dll"),
+            File.WriteAllBytes(Path.Combine(dir, "StellarHub.dll"),
                 new byte[1024]);
-            File.WriteAllBytes(Path.Combine(dir, "QL World.exe"),
+            File.WriteAllBytes(Path.Combine(dir, "StellarHub.exe"),
                 new byte[2048]);
-            File.WriteAllBytes(Path.Combine(dir, "QL World.runtimeconfig.json"),
+            File.WriteAllBytes(Path.Combine(dir, "StellarHub.runtimeconfig.json"),
                 Encoding.UTF8.GetBytes("{}"));
             File.WriteAllBytes(Path.Combine(dir, "apphost.dll"),
                 new byte[512]);

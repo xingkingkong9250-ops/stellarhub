@@ -1,4 +1,4 @@
-﻿# QL World build/release script.
+# StellarHub build/release script.
 # Prepare runs the full local gate (Release build with zero warnings,
 # all tests, self-contained staging publish).
 # Finalize implements the five-piece release into dist/ and prints
@@ -27,13 +27,13 @@ Import-Module (Join-Path $projectRoot 'tools\release\ReleaseContract.psm1')
 <#
     Prepare gate: restore + Release zero-warning build + all tests +
     self-contained win-x64 ReadyToRun publish into
-    artifacts\staging\QL World_v{version}\.
+    artifacts\staging\StellarHub_v{version}\.
     Shared by Prepare and Finalize (M4-F refactor, no logic duplication).
 #>
 function Invoke-PrepareGate {
     param([Parameter(Mandatory = $true)][string]$Version)
 
-    $staging = Join-Path $projectRoot "artifacts\staging\QL World_v$Version"
+    $staging = Join-Path $projectRoot "artifacts\staging\StellarHub_v$Version"
 
     # Native command stdout MUST be captured and re-emitted via Write-Host:
     # un-captured stdout enters the function output pipeline and pollutes
@@ -134,7 +134,7 @@ switch ($Mode) {
         # command is printed, not executed.
         Write-Host ''
         Write-Host '[QLWorld] Finalize complete.'
-        Write-Host "[QLWorld] Release dist dir: $distRoot\QL World_v$version"
+        Write-Host "[QLWorld] Release dist dir: $distRoot\StellarHub_v$version"
         Write-Host "[QLWorld] Manifest sha256: $manifestSha"
         Write-Host ''
         Write-Host '[QLWorld] Run the following to tag (manual step, not executed by this script):'

@@ -24,7 +24,7 @@ public sealed record ReleaseInput(
 );
 
 /// <summary>
-/// 产出结果：DistDir = dist\QL World_v{ver}\；FilePathByRole 包含 5 个角色
+/// 产出结果：DistDir = dist\StellarHub_v{ver}\；FilePathByRole 包含 5 个角色
 /// （app/source/releaseNotes/userGuide/manifest）到绝对路径的映射；ManifestSha256
 /// 是 manifest.json 文件自身的 SHA-256（用于 annotated tag message）。
 /// </summary>
@@ -68,7 +68,7 @@ public static class ReleaseArtifacts
     private const string UserGuideRoleName = "userGuide";
 
     /// <summary>
-    /// 便利入口：从 staging 目录直接产出五件套到 distRoot\QL World_v{version}\。
+    /// 便利入口：从 staging 目录直接产出五件套到 distRoot\StellarHub_v{version}\。
     /// build.ps1 用此方法签名；测试一般直接构造 ReleaseInput 调 Produce 以注入更多参数。
     /// </summary>
     public static ReleaseResult ProduceFromStaging(
@@ -82,7 +82,7 @@ public static class ReleaseArtifacts
     }
 
     /// <summary>
-    /// 主入口：产五件套到 DistRoot\QL World_v{version}\；该版本子目录已存在则抛
+    /// 主入口：产五件套到 DistRoot\StellarHub_v{version}\；该版本子目录已存在则抛
     /// InvalidOperationException（历史版本永不覆盖）。所有文件先写到 DistRoot 下的
     /// .tmp-{version}-{guid} 兄弟目录，全部成功后 Directory.Move 到最终位置（原子落地）。
     /// 任一失败清理临时目录后重抛。
@@ -106,7 +106,7 @@ public static class ReleaseArtifacts
             throw new ArgumentException(
                 $"Version must be major.minor.patch (found: '{input.Version}').", nameof(input));
 
-        string versionDirName = $"QL World_v{input.Version}";
+        string versionDirName = $"StellarHub_v{input.Version}";
         string versionDir = Path.GetFullPath(Path.Combine(input.DistRoot, versionDirName));
         string distRootFull = Path.GetFullPath(input.DistRoot);
 
@@ -130,14 +130,14 @@ public static class ReleaseArtifacts
 
             // ── 件 1: app.zip ── staging 全部内容打包（递归，含 run.bat / run-hidden.vbs
             //    / run.ps1 等启动脚本；ZipFile.CreateFromDirectory 默认不收集空目录）。
-            string appFileName = $"QL World_v{input.Version}.zip";
+            string appFileName = $"StellarHub_v{input.Version}.zip";
             string appPath = Path.Combine(tmpDir, appFileName);
             WriteAppZip(input.StagingDir, appPath, log);
             fileArtifacts.Add((AppRoleName, appFileName, appPath));
 
             // ── 件 2: source.zip ── git archive --format=zip HEAD；
             //    测试通过 ReleaseInput.SourceArchivePath 注入预制 zip 直接复制。
-            string sourceFileName = $"QL World_v{input.Version}_source.zip";
+            string sourceFileName = $"StellarHub_v{input.Version}_source.zip";
             string sourcePath = Path.Combine(tmpDir, sourceFileName);
             if (!string.IsNullOrEmpty(input.SourceArchivePath))
             {
@@ -158,7 +158,7 @@ public static class ReleaseArtifacts
             // ── 件 3: 更新公告.txt ── 模板来自 docs/release/RELEASE_NOTES.md；
             //    ReleaseNotesPath 注入时必须存在（严格），null 时回退默认路径，
             //    默认路径仍不存在则生成最小化占位模板。
-            string releaseNotesFileName = $"QL World_v{input.Version}_更新公告.txt";
+            string releaseNotesFileName = $"StellarHub_v{input.Version}_更新公告.txt";
             string releaseNotesPath = Path.Combine(tmpDir, releaseNotesFileName);
             WriteReleaseNotes(releaseNotesPath, input.Version, input.ReleaseNotesPath,
                 input.ProjectRoot, log);
@@ -168,7 +168,7 @@ public static class ReleaseArtifacts
             //    这里只 Read 不 Write）；UserGuidePath 注入时必须存在（严格），
             //    null 时回退默认路径，默认路径仍不存在则生成最小占位文本
             //    （标题 + 一行 "详见 docs/USER_GUIDE.md"）。
-            string userGuideFileName = $"QL World_v{input.Version}_使用说明.txt";
+            string userGuideFileName = $"StellarHub_v{input.Version}_使用说明.txt";
             string userGuidePath = Path.Combine(tmpDir, userGuideFileName);
             WriteUserGuide(userGuidePath, input.Version, input.UserGuidePath,
                 input.ProjectRoot, log);
@@ -212,7 +212,7 @@ public static class ReleaseArtifacts
             byte[] bytesWithField = JsonSerializer.SerializeToUtf8Bytes(
                 manifest, ManifestJsonOptions);
 
-            string manifestFileName = $"QL World_v{input.Version}_manifest.json";
+            string manifestFileName = $"StellarHub_v{input.Version}_manifest.json";
             string manifestPath = Path.Combine(tmpDir, manifestFileName);
             string manifestTmpPath = manifestPath + ".tmp";
             File.WriteAllBytes(manifestTmpPath, bytesWithField);
@@ -342,7 +342,7 @@ public static class ReleaseArtifacts
     private static string BuildMinimalReleaseNotes(string version)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"QL World v{version} 更新公告");
+        sb.AppendLine($"千星汇图 v{version} 更新公告");
         sb.AppendLine();
         sb.AppendLine($"发布日期: {DateTime.UtcNow:yyyy-MM-dd}");
         sb.AppendLine();
@@ -368,7 +368,7 @@ public static class ReleaseArtifacts
     private static string BuildMinimalUserGuide(string version)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"QL World v{version} 使用说明");
+        sb.AppendLine($"千星汇图 v{version} 使用说明");
         sb.AppendLine();
         sb.AppendLine("详见 docs/USER_GUIDE.md");
         sb.AppendLine();

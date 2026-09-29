@@ -1,4 +1,4 @@
-﻿﻿# QL World M3 UIA 冒烟测试 — W3/A3 三档切换 + AI 按钮置灰 + 本地区块/颜色按钮存在性
+﻿# QL World M3 UIA 冒烟测试 — W3/A3 三档切换 + AI 按钮置灰 + 本地区块/颜色按钮存在性
 # 用法: powershell -ExecutionPolicy Bypass -File tools\smoke\UiSmokeA3.ps1
 # 前置: .NET 10 SDK；脚本自建 Debug 构建并用隔离数据根，不影响真实数据。
 # 退出码: 0 = 全部通过；非 0 = 存在失败步骤。
@@ -14,7 +14,7 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath))
 $sourceProject = Join-Path $projectRoot 'src\QL.World'
 $outputDirectory = Join-Path $sourceProject 'bin\Debug\net10.0-windows'
-$applicationExe = Join-Path $outputDirectory 'QL World.exe'
+$applicationExe = Join-Path $outputDirectory 'StellarHub.exe'
 $dataRoot = Join-Path $env:TEMP ("QL_World_UiSmoke_" + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $shutdownEventName = 'Local\QL_World_UiTest_GracefulShutdown'
 
