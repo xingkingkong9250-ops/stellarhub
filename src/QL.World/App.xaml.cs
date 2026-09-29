@@ -29,6 +29,7 @@ public partial class App : Application
     private ThumbnailService? _thumbnails;
     private ThumbnailCacheService? _thumbnailCache;
     private FileWatcherService? _watcher;
+    private DownloadQueueService? _downloadQueue;
     private Mutex? _singleInstanceMutex;
     private EventWaitHandle? _gracefulShutdownEvent;
     private RegisteredWaitHandle? _gracefulShutdownRegistration;
@@ -103,6 +104,13 @@ public partial class App : Application
             _watcher = watcher;
             watcher.Start();
 
+            // M5-G: persistent download queue (NAS→local with resume + retry).
+            var userIdentity = new UserIdentityService();
+            var downloadQueue = new DownloadQueueService(
+                _database, new WebDavConnectorFactory(), settings,
+                userIdentity, imageQuery, WriteLog);
+            _downloadQueue = downloadQueue;
+
             var services = new ServiceRegistry(
                 settings,
                 _database,
@@ -121,7 +129,8 @@ public partial class App : Application
                 semanticSearch,
                 pbrGrouping,
                 new WebDavConnectorFactory(),
-                _thumbnailCache);
+                _thumbnailCache,
+                downloadQueue);
             _services = services;
 
             SetTheme(settings.Theme);
@@ -130,6 +139,7 @@ public partial class App : Application
             _shellViewModel.ShowImportDialog += ShowImportDialog;
             _shellViewModel.RequestInputDialog += ShowInputDialog;
             _shellViewModel.ShowSettingsDialog += ShowSettingsDialog;
+            _shellViewModel.ShowDownloadQueueDialog += ShowDownloadQueueDialog;
             _shellWindow = new ShellWindow(_shellViewModel);
 
             MainWindow = _shellWindow;
@@ -183,6 +193,15 @@ public partial class App : Application
         catch (Exception ex)
         {
             WriteLog($"[EXIT] Watcher cleanup failed: {ex}");
+        }
+
+        try
+        {
+            _downloadQueue?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"[EXIT] Download queue cleanup failed: {ex}");
         }
 
         try
@@ -272,6 +291,23 @@ public partial class App : Application
         catch (Exception ex)
         {
             WriteLog($"[SETTINGS] Dialog failed: {ex}");
+        }
+    }
+
+    private void ShowDownloadQueueDialog()
+    {
+        if (_shellWindow is null || _services is null) return;
+        try
+        {
+            var dialog = new DownloadQueueWindow(_services)
+            {
+                Owner = _shellWindow,
+            };
+            dialog.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"[DOWNLOAD] Dialog failed: {ex}");
         }
     }
 

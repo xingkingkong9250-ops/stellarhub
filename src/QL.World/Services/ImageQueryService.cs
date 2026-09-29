@@ -658,6 +658,12 @@ public sealed class ImageQueryService
         IsMissing = reader.GetInt32(reader.GetOrdinal("is_missing")) != 0,
         CreatedAt = DbTime.Parse(reader.GetString(reader.GetOrdinal("created_at"))),
         UpdatedAt = DbTime.Parse(reader.GetString(reader.GetOrdinal("updated_at"))),
+        // M5-G: surface source/nas_connection_id on GetById so the download
+        // queue can route Local (File.Copy) vs Remote (INasConnector).
+        Source = reader.GetString(reader.GetOrdinal("source")) == "remote"
+            ? ImageSource.Remote : ImageSource.Local,
+        NasConnectionId = reader.IsDBNull(reader.GetOrdinal("nas_connection_id"))
+            ? null : reader.GetInt32(reader.GetOrdinal("nas_connection_id")),
     };
 }
 

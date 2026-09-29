@@ -42,6 +42,12 @@ public sealed class ServiceRegistry
     /// </summary>
     public ThumbnailCacheService ThumbnailCache { get; }
 
+    /// <summary>
+    /// M5-G: persistent download queue (NAS→local with resume + retry).
+    /// Owns the worker task; dispose at app shutdown.
+    /// </summary>
+    public DownloadQueueService DownloadQueue { get; }
+
     public ServiceRegistry(
         AppSettingsService settings,
         DatabaseService database,
@@ -60,7 +66,8 @@ public sealed class ServiceRegistry
         SemanticSearchService semanticSearch,
         PbrGroupingService pbrGrouping,
         INasConnectorFactory nasFactory,
-        ThumbnailCacheService thumbnailCache)
+        ThumbnailCacheService thumbnailCache,
+        DownloadQueueService downloadQueue)
     {
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
         Database = database ?? throw new ArgumentNullException(nameof(database));
@@ -80,5 +87,6 @@ public sealed class ServiceRegistry
         PbrGrouping = pbrGrouping ?? throw new ArgumentNullException(nameof(pbrGrouping));
         NasFactory = nasFactory ?? throw new ArgumentNullException(nameof(nasFactory));
         ThumbnailCache = thumbnailCache ?? throw new ArgumentNullException(nameof(thumbnailCache));
+        DownloadQueue = downloadQueue ?? throw new ArgumentNullException(nameof(downloadQueue));
     }
 }

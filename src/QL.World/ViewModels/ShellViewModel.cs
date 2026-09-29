@@ -70,6 +70,8 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         ScanNasLibraryCommand = new AsyncRelayCommand(ScanNasLibraryAsync, () => !TopBar.IsImporting);
         FocusSearchCommand = new RelayCommand(() => TopBar.RequestFocusSearch());
         ClearFiltersCommand = new RelayCommand(ClearFilters);
+        // M5-G: opens the persistent download queue window.
+        ShowDownloadQueueCommand = new RelayCommand(() => ShowDownloadQueueDialog?.Invoke());
 
         OpenCommand = new RelayCommand(_ => OpenSelected(), _ => HasSelection());
         RevealCommand = new RelayCommand(_ => RevealSelected(), _ => HasSelection());
@@ -124,6 +126,8 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
     public RelayCommand FocusSearchCommand { get; }
     public RelayCommand ClearFiltersCommand { get; }
+    /// <summary>M5-G: opens the persistent download queue window.</summary>
+    public RelayCommand ShowDownloadQueueCommand { get; }
     public AsyncRelayCommand RefreshCommand { get; }
     /// <summary>
     /// N7: scan a NAS library. Opens a connection picker (or skips straight
@@ -160,6 +164,9 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>App wires this to show the W3 settings window.</summary>
     public event Action? ShowSettingsDialog;
+
+    /// <summary>App wires this to show the M5-G download queue window.</summary>
+    public event Action? ShowDownloadQueueDialog;
 
     public string Title => $"{AppInfo.ProductName} — {AppInfo.ProductSubtitle}";
     public string VersionText => $"v{AppInfo.Version} · {AppInfo.MilestoneLabel}";

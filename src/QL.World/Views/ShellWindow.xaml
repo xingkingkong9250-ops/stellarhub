@@ -285,6 +285,11 @@
                     <Button Margin="8,0,0,0" Style="{StaticResource SubtleButtonStyle}"
                             Content="分析颜色" ToolTip="为缺失主色调的图片批量回填 dominant_colors"
                             Command="{Binding TopBar.ColorCommand}" />
+                    <!-- M5-G: open the persistent download queue window. -->
+                    <Button Margin="8,0,0,0" Style="{StaticResource SubtleButtonStyle}"
+                            Content="📥 下载队列" ToolTip="打开下载队列（NAS→本地，支持续传/重试）"
+                            AutomationProperties.Name="下载队列"
+                            Command="{Binding ShowDownloadQueueCommand}" />
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"

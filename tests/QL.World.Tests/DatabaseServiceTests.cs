@@ -30,6 +30,8 @@ public sealed class DatabaseServiceTests
             Assert.Contains("meta", tables);
             Assert.Contains("pbr_groups", tables);
             Assert.Contains("pbr_group_images", tables);
+            // M5-G: persistent download queue table.
+            Assert.Contains("download_queue", tables);
         });
     }
 
@@ -44,7 +46,7 @@ public sealed class DatabaseServiceTests
             command.CommandText = "PRAGMA user_version;";
             return Convert.ToInt32(command.ExecuteScalar());
         });
-        Assert.Equal(6, version);
+        Assert.Equal(7, version);
 
         // Second Initialize must not throw or duplicate anything.
         library.Db.Initialize();
@@ -98,7 +100,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(6, migrated);
+            Assert.Equal(7, migrated);
 
             var (tableCount, imageCount) = db.Run(conn =>
             {
@@ -194,7 +196,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(6, version);
+            Assert.Equal(7, version);
 
             var families = db.Run(conn =>
             {
@@ -308,7 +310,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(6, version);
+            Assert.Equal(7, version);
 
             // source column exists with DEFAULT 'local' and backfilled the v5 row.
             string sourceDefault = db.Run(conn =>
@@ -350,7 +352,7 @@ public sealed class DatabaseServiceTests
             });
             Assert.Equal(2, indexCount);
 
-            // Idempotent re-init stays at v6.
+            // Idempotent re-init stays at v7.
             db.Initialize();
             Assert.Equal("ok", db.QuickIntegrityCheck());
         }

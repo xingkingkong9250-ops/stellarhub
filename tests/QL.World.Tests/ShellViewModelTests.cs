@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.RegularExpressions;
 using QL.World.Data;
+using QL.World.Helpers;
 using QL.World.Models;
 using QL.World.Services;
 using QL.World.Services.Ai;
@@ -17,6 +18,7 @@ public sealed class ShellViewModelTests : IDisposable
     private readonly string _directory;
     private readonly DatabaseService _database;
     private readonly ThumbnailService _thumbnails;
+    private readonly DownloadQueueService _downloadQueue;
     private readonly ShellViewModel _viewModel;
 
     public ShellViewModelTests()
@@ -48,11 +50,16 @@ public sealed class ShellViewModelTests : IDisposable
         var colors = new ColorAnalysisService(_database);
         var semanticSearch = new SemanticSearchService(_database, ai);
         var pbrGrouping = new PbrGroupingService(_database, settings);
+        // M5-G: download queue service needs IUserIdentity + ImageQueryService.
+        var userIdentity = new UserIdentityService();
+        var downloadQueue = new DownloadQueueService(
+            _database, new StubNasConnectorFactory(), settings, userIdentity, imageQuery);
+        _downloadQueue = downloadQueue;
         var services = new ServiceRegistry(
             settings, _database, inspector, import, _thumbnails, imageQuery,
             tags, collections, notifications, watcher, legacyImporter, ai, aiAnalysis,
             colors, semanticSearch, pbrGrouping, new StubNasConnectorFactory(),
-            new ThumbnailCacheService(_directory, settings));
+            new ThumbnailCacheService(_directory, settings), downloadQueue);
         _viewModel = new ShellViewModel(services);
     }
 
@@ -187,6 +194,9 @@ public sealed class ShellViewModelTests : IDisposable
 
         try { _thumbnails.Dispose(); }
         catch (IOException) { /* Best effort. */ }
+
+        try { _downloadQueue.Dispose(); }
+        catch (Exception) { /* Best effort. */ }
 
         _database.Dispose();
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();

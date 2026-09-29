@@ -26,6 +26,20 @@ public sealed class ImageRecord
     public bool IsMissing { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>
+    /// M5-D (schema v6): where the original bytes live — Local (default) or
+    /// Remote (NAS). Read by <see cref="QL.World.Services.DownloadQueueService"/>
+    /// (M5-G) to decide between File.Copy and INasConnector download.
+    /// </summary>
+    public ImageSource Source { get; set; } = ImageSource.Local;
+
+    /// <summary>
+    /// M5-D (schema v6): the NAS connection id when <see cref="Source"/> is
+    /// Remote; null for local rows. Read by the download queue (M5-G) to
+    /// build the right INasConnector.
+    /// </summary>
+    public int? NasConnectionId { get; set; }
 }
 
 /// <summary>One row of the image_tags table.</summary>
