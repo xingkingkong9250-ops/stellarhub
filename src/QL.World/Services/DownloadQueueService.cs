@@ -449,25 +449,40 @@ public sealed class DownloadQueueService : IDisposable
     {
         const FileOptions opts = FileOptions.Asynchronous | FileOptions.SequentialScan;
         long offset = startOffset;
-        using var fs = new FileStream(partPath, FileMode.Append, FileAccess.Write,
-            FileShare.None, bufferSize: 81920, options: opts);
-        while (fileSize == 0 || offset < fileSize)
+        try
         {
-            ct.ThrowIfCancellationRequested();
-            long remaining = fileSize - offset;
-            int chunk = (int)Math.Min(CHUNK_SIZE, remaining > 0 ? remaining : CHUNK_SIZE);
-            byte[] bytes = await connector.DownloadRangeAsync(remotePath, offset, chunk, ct);
-            if (bytes.Length == 0)
-                break;
-            await fs.WriteAsync(bytes, 0, bytes.Length, ct);
-            offset += bytes.Length;
-            if (fileSize > 0)
-                UpdateProgress(queueId, (double)offset / fileSize);
-            // Server returned fewer bytes than requested → EOF.
-            if (bytes.Length < chunk)
-                break;
+            using var fs = new FileStream(partPath, FileMode.Append, FileAccess.Write,
+                FileShare.None, bufferSize: 81920, options: opts);
+            while (fileSize == 0 || offset < fileSize)
+            {
+                ct.ThrowIfCancellationRequested();
+                long remaining = fileSize - offset;
+                int chunk = (int)Math.Min(CHUNK_SIZE, remaining > 0 ? remaining : CHUNK_SIZE);
+                byte[] bytes = await connector.DownloadRangeAsync(remotePath, offset, chunk, ct);
+                if (bytes.Length == 0)
+                    break;
+                await fs.WriteAsync(bytes, 0, bytes.Length, ct);
+                offset += bytes.Length;
+                if (fileSize > 0)
+                    UpdateProgress(queueId, (double)offset / fileSize);
+                // Server returned fewer bytes than requested → EOF.
+                if (bytes.Length < chunk)
+                    break;
+            }
+            await fs.FlushAsync(ct);
         }
-        await fs.FlushAsync(ct);
+        catch (OperationCanceledException)
+        {
+            // M5-Z (Release-only test failure): the worker holds an exclusive
+            // FileShare.None lock on .part during the loop; user-triggered
+            // CancelAsync.TryDeleteFile silently fails because the file is
+            // locked. By the time we get here the using-block has disposed
+            // the FileStream (releasing the lock), so we can delete the .part
+            // ourselves before re-throwing — otherwise the test sees a stale
+            // .part file race-conditionally.
+            TryDeleteFile(partPath);
+            throw;
+        }
     }
 
     // ─── DB mutations ───────────────────────────────────────────────────────

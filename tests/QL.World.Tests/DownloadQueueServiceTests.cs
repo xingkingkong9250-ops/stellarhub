@@ -143,7 +143,27 @@ public sealed class DownloadQueueServiceTests : IDisposable
             new[] { "cancelled" }, TimeSpan.FromSeconds(3));
 
         Assert.Equal("cancelled", item.Status);
-        Assert.False(File.Exists(part), ".part must be deleted on cancel");
+        // M5-Z race fix: CancelAsync updates status synchronously and invokes
+        // Changed, but the worker may still be inside DownloadAppendAsync's
+        // await Task.Delay (stub) or its using-FFileStream scope. The worker's
+        // catch (OperationCanceledException) deletes .part AFTER its FileStream
+        // is disposed (releasing the FileShare.None lock). Poll up to 3 s for
+        // the worker to release — without this, Release builds race-fail
+        // because the synchronous assertion runs before the worker exits its
+        // await. OnCancelled also runs on the worker's catch path as defense.
+        Assert.True(WaitForCondition(() => !File.Exists(part), TimeSpan.FromSeconds(3)),
+            ".part must be deleted on cancel (within 3s)");
+    }
+
+    private static bool WaitForCondition(Func<bool> condition, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (condition()) return true;
+            Thread.Sleep(50);
+        }
+        return condition();
     }
 
     [Fact]

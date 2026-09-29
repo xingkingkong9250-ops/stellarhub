@@ -71,3 +71,12 @@
 | W3/A7-N5 | 根路径 + TLS + 自签 | 已实现（M5-C） | 根路径如 /photos/；UseTls 默认勾选；TrustSelfSigned 默认取消（仅受信任内网勾选） |
 | W3/A7-N6 | 测试连接 + 保存 | 已实现（M5-C） | 测试：INasConnectorFactory.Create + TestConnectionAsync（先 Update 持久化当前编辑→factory 解密密码→PROPFIND root）；保存：UpdateNasConnection（保留 EncryptedPassword/CreatedAt） |
 | W1-N7 | 扫描 NAS 库 | 已实现（M5-D） | 工具栏「📡 扫描 NAS」按钮；0 连接→提示并打开 W3/A7；1 连接→直扫；>1 连接→代码内建选择器（ComboBox + 扫描/取消）；ScanNasLibraryCommand→RemoteLibraryScanner→ImportService(Source=Remote)→source='remote' + nas_connection_id 落库；进度上 C1 状态栏 |
+| W1-N8 | 下载队列入口 | 已实现（M5-G） | 工具栏「📥 下载队列」按钮；ShowDownloadQueueCommand 打开 W4；无远程图片时按钮仍可点（窗口显示空队列引导） |
+| W1/B2-3-DL | 图卡右键「下载到本地...」 | 已实现（M5-G） | 远程项（Source=Remote）右键菜单条目；本地项隐藏；弹出 System.Windows.Forms.FolderBrowserDialog 选目录→加入下载队列 |
+| W4 | 下载队列窗口 | 已实现（M5-G） | 640×480，最小 520×360，可最小化不阻塞主窗；ResizeMode=CanResize；按 D1-D4 四横区布局 |
+| W4/D1 | 队列表头 | 已实现（M5-G） | 列：文件名 / 来源 / 大小 / 进度 / 状态 / 操作；可见列与排序固定，不支持列定制 |
+| W4/D2 | 队列行 | 已实现（M5-G） | ObservableCollection<DownloadQueueRowViewModel>；每行 ProgressBar（Mode=OneWay，U3 教训）+ 状态图标 + 操作按钮（重试/取消/打开目录） |
+| W4/D3 | 状态聚合条 | 已实现（M5-G） | 底部状态文本：N 个进行中 / M 已完成 / K 失败；总进度环 |
+| W4/D4 | 工具栏 | 已实现（M5-G） | 全部重试 / 全部取消 / 清空已完成 / 打开根目录 |
+| W3/A7-PRE | ProgressiveImage 三层渐显 | 已实现（M5-F/H） | 详情栏 B3-1 大图预览替换为 ProgressiveImage 控件：PlaceholderLayer（256px thumb，已缓存）→ PreviewLayer（1024px preview，加载完成淡入替代）→ FinalLayer（原图，按需淡入替代）；每层 DoubleAnimation 200ms QuadraticEase；上层淡入完成才折叠下层避免闪烁 |
+| W3/A7-WEAK | 弱网优先策略 | 已实现（M5-H） | NetworkConditionMonitor.IsWeakNetwork=true 时：画廊 Attach 与 Prefetch 跳过远程项请求（仅显示已缓存 thumb）；本地项不受影响；恢复后自动恢复请求。无 UI 控件，行为层实现 |

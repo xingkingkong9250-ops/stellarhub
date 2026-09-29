@@ -9,7 +9,8 @@ README/AGENTS/PRD 与本文件冲突时，以本文件为准。
 - 技术栈：C# / .NET 10 (`net10.0-windows`) / WPF，纯 MVVM
 - 形态：Windows 10 21H2+ / 11 原生桌面应用；**禁止** WebView2、Electron、任何 HTML UI
 - 产品基线：`PRD/QL_World_产品需求与重写方案.md`（已评审，M0–M4 基线）
-- 里程碑状态：见 `CHANGELOG.md`；当前 **M0–M4 全部完成，U4 主色调收尾已发布（v1.4.0），U5 品牌升级补丁已发布（v1.5.0）——PRD 核心功能 100% 覆盖基线不变**
+- 里程碑状态：见 `CHANGELOG.md`；当前 **M0–M4 全部完成，U1–U5 收尾补丁已发布（v1.5.0），M5 NAS 远程库已发布（v1.6.0）——PRD 核心功能 100% 覆盖基线不变**
+- M5 NAS 远程库（2026-09-30）：WebDAV 协议接入群晖/威联通等 NAS；零新增第三方依赖（仅 BCL HttpClient + System.Xml）。平台抽象层（INasConnector / IFileSystemAccessor / IUserIdentity）+ WebDAV 连接器（XNamespace D="DAV:" 兼容群晖/威联通，ServerCertificateCustomValidationCallback 适配自签证书）+ 远程库扫描（schema v6 source/nas_connection_id）+ IImageSource 抽象（本地/远程同源）+ 三级缩略图（Thumb 256px / Preview 1024px / Original 按需）+ LRU 缓存上限（ThumbnailCacheService 后台 Timer 清理）+ 下载队列（schema v7，2 并发 worker，.part 断点续传 + 416 重启 + 3 次指数退避重试）+ 弱网检测（NetworkConditionMonitor 10 样本滑动窗口，失败率 >50% 或延迟 >3000ms 跳过远程请求）+ 邻近图片预加载（RequestPrefetch 低优先级批量入队）+ ProgressiveImage 三层 Image 渐显控件（PlaceholderLayer→PreviewLayer→FinalLayer，200ms QuadraticEase 淡入，上层完成才折叠下层避免闪烁）。为 M6 多用户/macOS/SMB/SFTP 留路
 - U5 品牌升级（2026-09-29）：窗口标题/Logo/关于页=千星汇图；exe=StellarHub.exe；程序集 Product/Copyright/Description 改为千星汇图/StellarHub；五件套命名 QL World_v{ver}→StellarHub_v{ver}；数据目录 %APPDATA%\Qianlan_App\QL_World\→StellarHub\（原子迁移+.migrated 标记+失败 fallback 旧路径）。内部 mutex/event 名与 db 文件名 qlworld.db 保留以减少升级期副作用
 
 ## 2. 解决方案布局
@@ -52,11 +53,11 @@ build.bat / build.ps1
 
 ## 4. 数据与状态
 
-- 数据根目录：`%APPDATA%\Qianlan_App\QL_World\`
-  - `qlworld.db`（SQLite，单长连接，WAL，`PRAGMA user_version` 顺序迁移）
-  - `thumbnails\<hash前2位>\<hash>.webp`
+- 数据根目录：`%APPDATA%\Qianlan_App\StellarHub\`（U5 由 `QL_World\` 迁移；首次启动原子迁移 + `.migrated`/`.migration-failed` 标记 + 失败 fallback 旧路径）
+  - `qlworld.db`（SQLite，单长连接，WAL，`PRAGMA user_version` 顺序迁移；M5 升至 v7：v6 加 source/nas_connection_id，v7 加 download_queue 表）
+  - `thumbnails\<hash前2位>\<hash>_thumb.webp` / `<hash>_preview.webp`（M5-F 多级；旧 `<hash>.webp` 启动迁移为 `_thumb.webp`）
   - `models\`（M3 本地 AI 模型）
-  - `config.json` + `config.json.backup`
+  - `config.json` + `config.json.backup`（含 NasConnections 列表，密码 DPAPI 加密）
   - `logs\error.log`（1MB 自动截断保留后半）
 - 小文本状态（配置/导出元数据）必须经 `AtomicTextFile`：
   同目录临时文件 → 原子替换 → 保留上一完整副本为 `.backup`；
@@ -94,11 +95,11 @@ Release 构建必须完全忽略这些变量。
   Release 编译（**0 警告**）→ `dotnet test` 全绿 → Self-Contained win-x64 + ReadyToRun 发布到 `artifacts/staging/`
 - 正式发布（M4 落地）：两阶段 Prepare/Finalize；
   Finalize 只读 Git 不做推送，产出五件套到 `dist/`，历史版本永不覆盖：
-  1. `QL World_v{x.y.z}.zip`（自包含应用包）
-  2. `QL World_v{x.y.z}_source.zip`
-  3. `QL World_v{x.y.z}_更新公告.txt`
-  4. `QL World_v{x.y.z}_使用说明.txt`
-  5. `QL World_v{x.y.z}_manifest.json`（最后原子落地；annotated Tag message 含
+  1. `StellarHub_v{x.y.z}.zip`（自包含应用包）
+  2. `StellarHub_v{x.y.z}_source.zip`
+  3. `StellarHub_v{x.y.z}_更新公告.txt`
+  4. `StellarHub_v{x.y.z}_使用说明.txt`
+  5. `StellarHub_v{x.y.z}_manifest.json`（最后原子落地；annotated Tag message 含
      `release-manifest-sha256: <64hex>`）
 - 目标机免装运行时；不自动推远端，不自动打 Tag 除非显式要求
 

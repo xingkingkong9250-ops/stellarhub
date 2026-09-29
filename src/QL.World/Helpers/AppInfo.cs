@@ -19,7 +19,7 @@ public static class AppInfo
     /// U2-F (§4.E.2): milestone identifier shown next to the version number on the shell footer.
     /// Settings/About page keeps the pure semantic version (no suffix).
     /// </summary>
-    public const string MilestoneLabel = "U5 品牌升级";
+    public const string MilestoneLabel = "M5 NAS 远程库";
 
     private static readonly Version AssemblyVersion =
         typeof(AppInfo).Assembly.GetName().Version ?? new Version(0, 0, 0);

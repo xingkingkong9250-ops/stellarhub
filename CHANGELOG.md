@@ -5,6 +5,87 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-09-30 M5 NAS 远程库（WebDAV + 三级缩略图 + 下载队列 + 弱网优化）
+
+引入 NAS 远程库支持：WebDAV 协议接入群晖/威联通等 NAS 设备，远程图片可浏览/缩略图预览/下载到本地。零新增第三方依赖（仅用 BCL HttpClient + System.Xml）。平台抽象层（INasConnector / IFileSystemAccessor / IUserIdentity）为 M6 多用户/macOS 留路。
+
+### M5-A：平台抽象层
+
+- `Services/Nas/INasConnector.cs` 抽象：`TestConnectionAsync` / `ListAsync(path)` / `OpenReadAsync(path)` / `DownloadFileAsync(path, localPath, range)` / `UploadFileAsync` / `DeleteAsync`
+- `INasConnectorFactory` 工厂接口（按 NasConnectionSpec 构建连接器）；`INasConnector` 与 `INasConnectorFactory` 都注入 DI（手写 ServiceRegistry）
+- `RemoteFileSystemAccessor` 实现 IFileSystemAccessor（走 INasConnector.ListAsync/DownloadFileAsync）
+- `IUserIdentity` + `UserIdentityService`：当前用户标识（M5 仅 stub，M6 接权限校验）
+
+### M5-B：WebDAV 连接器
+
+- `WebDavConnector : INasConnector`：基于 HttpClient，PROPFIND（Depth=1）列目录、GET 下载、PUT 上传、DELETE 删除
+- `XNamespace D = "DAV:"` 解析 propstat（不硬编码前缀，兼容群晖/威联通命名差异）
+- `ServerCertificateCustomValidationCallback` 适配自签名证书（.NET 5+ 强制要求，移除 legacy ServerCertificateValidationCallback）
+- `WebDavConnectorFactory : INasConnectorFactory`：按 spec 构建 HttpClient（Basic Auth + 超时 + 证书回调）
+- `DisposableWebDavConnector` 包装类：工厂托管 HttpClient 生命周期，dispose 时统一释放
+
+### M5-C：NAS 连接配置 UI + 设置持久化
+
+- `Models/NasConnectionSpec`：Id（单调递增整数，删除不复用，Max+1 分配）、Name、Host、Port、Username、EncryptedPassword（DPAPI CurrentUser 加密）、RootPath、UseTls
+- `AppSettingsService.NasConnections` 列表持久化到 config.json；密码 SetNasPassword 用 ProtectedData.Protect(CurrentUser)，不回填 PasswordBox
+- `UpdateNasConnection` 保留 EncryptedPassword 与 CreatedAt；密码仅经 SetNasPassword 修改
+- `SettingsViewModel` 测试连接命令：调用 `INasConnectorFactory.Create(spec, plaintextPassword).TestConnectionAsync()` → 显示成功/失败
+- `SettingsWindow.xaml` N 页签：连接列表 + 新增/编辑/删除/测试连接按钮；PasswordBox 切换 selection 时自动清空（防误改）
+
+### M5-D：远程库扫描 + schema v6 迁移
+
+- `Data/Schema.v6.sql`：images 表新增 `source TEXT NOT NULL DEFAULT 'local'` + `nas_connection_id INTEGER NULL` + 索引 `idx_images_source`
+- `DbMigrator` CURRENT_VERSION 5→6；现有 v5 数据库补列时旧行 source='local'（DEFAULT 兜底）
+- `ImageRecord` 模型新增 Source/NasConnectionId 字段；`ImageQueryService.ReadImage` 读取新列
+- `RemoteLibraryScanner`：选 NAS 连接 → PROPFIND 递归列出图片（按扩展名过滤）→ 计算文件 hash（流式 Md5Hasher.ComputeStreamAsync，不读全字节 OOM）→ 写入 images 表（source='remote'，file_path=`nas://{connId}/{remotePath}`）
+- `GalleryListItem.SourceBadge` 三态徽标：cloud（云端）> local（本地）> ai tag（AI 标签）> null
+
+### M5-E：远程缩略图
+
+- `IImageSource` 抽象：`OpenStreamAsync()` 返回图片字节流；`LocalImageSource`（包装 File.OpenRead）/ `RemoteImageSource`（走 INasConnector.OpenReadAsync 下载到 `%TEMP%\StellarHub\` → 解码 → 删除临时文件）
+- `ThumbnailService.Request(hash, source, level, highPriority)` 重构：本地与远程走同一 IImageSource 接口
+- 临时文件下载失败 try/finally 删除，不阻塞缩略图生成
+- `GalleryThumbnailProvider` 缓存 INasConnector 按 NasConnectionId（一次 auth handshake 服务整个画廊 session）
+
+### M5-F：三级缩略图（thumb/preview/original）+ LRU 缓存上限
+
+- `Services/ThumbnailLevel.cs` enum：Thumb=0（256px）/ Preview=1（1024px）
+- `ThumbnailService` 多级支持：`GetThumbnailPath(hash, level)` 目录布局 `<hash>_thumb.webp` / `<hash>_preview.webp`；`Request` / `Regenerate` 接受 level 参数；`ThumbnailReady` 事件签名 `Action<string, ThumbnailLevel>`
+- `_jobs` 字典按复合 key `$"{hash}:{(int)level}"` 索引（同 hash 可并行 thumb 与 preview 两个 job）
+- `MigrateLegacyThumbnails()`：启动迁移旧 `<hash>.webp` → `<hash>_thumb.webp`（幂等，跳过已带 _thumb/_preview 后缀的文件与 placeholder）
+- `ThumbnailCacheService`：后台 Timer（5s 延迟 + 1h 周期）扫描 thumbnails/**/*.webp，按 LastAccessTime 排序删除最旧文件至 `ThumbnailCacheLimitMb` 阈值内；跳过 placeholder.webp、.partial、.tmp
+- `AppSettingsService.ThumbnailCacheLimitMb` 钳制范围 256-16384 → 128-8192（M5-F 调整以适配多级缓存）
+- `Views/Controls/ProgressiveImage.xaml(.cs)`：三层 Image 渐显控件（PlaceholderLayer 256px → PreviewLayer 1024px → FinalLayer 原图），DoubleAnimation 200ms QuadraticEase 淡入；上层淡入完成后才折叠下层避免闪烁
+- `GalleryItemViewModel.PreviewImage` 属性（1024px 预览）；`DetailViewModel.OnSelectionChanged` 切换时清理前一项 PreviewImage + ClearPreviewRequest，新选项 RequestPreview
+
+### M5-G：下载队列 + 断点续传 + 失败重试
+
+- `Data/Schema.v7.sql`：download_queue 表（id/image_id/source/nas_connection_id/remote_path/local_path/total_bytes/downloaded_bytes/status/error_message/retry_count/created_at/started_at/updated_at）+ 索引 `idx_download_queue_status`
+- `DbMigrator` CURRENT_VERSION 6→7
+- `Models/DownloadQueueItem` 行模型 + 路由字段（Source/NasConnectionId）
+- `DownloadQueueService`：2 并发 worker（SemaphoreSlim），`.part` 续传（Range header 4MB 分块），416 → 删 .part 重启；3 次指数退避重试；Cancel 删除 .part
+- `DownloadQueueViewModel` + `DownloadQueueWindow`：D1-D4 布局（队列/进度条/状态/操作），ProgressBar 绑只读计算属性必须 Mode=OneWay（U3 教训）
+- ShellWindow 工具栏「📥 下载队列」按钮 + `ShellViewModel.ShowDownloadQueueCommand`
+
+### M5-H：弱网检测 + 预加载邻近图片 + 三级淡入
+
+- `Services/NetworkConditionMonitor.cs`：10 样本滑动窗口，失败率 >50% 或平均延迟 >3000ms → IsWeakNetwork=true；Changed 事件仅在状态翻转时触发；MIN_SAMPLES=3 启动守卫避免单次握手失败锁死画廊
+- `ThumbnailService.RequestPrefetch`：低优先级批量入队，已存在缩略图跳过，空/whitespace hash 静默丢弃
+- `GalleryThumbnailProvider`：构造接受 NetworkConditionMonitor；Attach/Prefetch 在弱网下跳过远程请求（本地项不受影响）；新增 Prefetch 方法
+- `GalleryViewModel.RefreshAsync` 在 Refreshed?.Invoke() 后调用 Thumbnails.Prefetch(Items) 预取当前页周边缩略图
+
+### M5-Z：收尾
+
+- `QL.World.csproj` `<Version>` 1.5.0 → 1.6.0（UTF-8 BOM 保留）
+- `AppInfo.MilestoneLabel` "U5 品牌升级" → "M5 NAS 远程库"
+- `CHANGELOG.md` 顶部新增 [1.6.0] 节
+- `GEMINI.md` 里程碑状态更新
+- `docs/UI_NUMBERING.md` 补齐 N + D 系列编号
+- `docs/USER_GUIDE.md` 新增 NAS / 远程库扫描 / 下载队列章节
+- `README.md` + `AGENTS.md` 顶部功能描述同步
+- 门禁：build.ps1 -Mode Prepare（0 警告 + 全测试绿 + R2R publish 成功）
+- staging 体积对比：v1.5.0 190.46MB → v1.6.0 190.78MB（+0.32MB，零新依赖，仅 C# 代码 + schema v6/v7.sql embedded resource + R2R 代码量增量）
+
 ## [1.5.0] — 2026-09-29 U5 品牌升级补丁（QL World → 千星汇图 / StellarHub）
 
 品牌升级为千星汇图（StellarHub），为 M5 NAS 远程库扫清品牌基线。不引入新功能依赖，不动业务逻辑，PRD 核心功能 100% 基线不变。
