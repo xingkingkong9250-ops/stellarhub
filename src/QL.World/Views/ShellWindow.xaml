@@ -78,6 +78,11 @@
                                        Text="{Binding Rating, StringFormat='★{0}'}"
                                        Visibility="{Binding Rating, Converter={StaticResource ZeroVis}, ConverterParameter=Invert}" />
                         </Grid>
+                        <!-- U2-E (§4.D.1): tag summary row (first 2 + +N); hidden when no tags -->
+                        <TextBlock Text="{Binding TagsSummary}" FontSize="11" Margin="0,2,0,0"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Visibility="{Binding TagsSummary, Converter={StaticResource NullVis}}" />
                     </StackPanel>
                     <Border Grid.RowSpan="2" Background="{DynamicResource OverlayBrush}"
                             Visibility="{Binding IsMissing, Converter={StaticResource BoolVis}}">

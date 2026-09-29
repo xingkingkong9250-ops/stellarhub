@@ -59,6 +59,23 @@ public sealed class GalleryItemViewModel : ObservableObject
     public string DimensionsText =>
         Width is int w && Height is int h ? $"{w} × {h}" : "—";
 
+    /// <summary>
+    /// U2-E (§4.D.1): first 2 tags joined by 「, 」 plus 「+N」 when there are more.
+    /// Empty string when there are no tags (XAML hides the row via ZeroVis).
+    /// </summary>
+    public string TagsSummary
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(TagsCsv)) return string.Empty;
+            string[] tags = TagsCsv.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            if (tags.Length == 0) return string.Empty;
+            int take = Math.Min(2, tags.Length);
+            string first = string.Join(", ", tags.Take(take));
+            return tags.Length > 2 ? $"{first} +{tags.Length - 2}" : first;
+        }
+    }
+
     public string FileSizeText => FileSize switch
     {
         >= 1024L * 1024 * 1024 => $"{FileSize / (1024.0 * 1024 * 1024):0.##} GB",
