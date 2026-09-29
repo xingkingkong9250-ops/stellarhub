@@ -273,6 +273,11 @@
                                Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
                     <Button Margin="16,0,0,0" Style="{StaticResource AccentButtonStyle}"
                             Content="＋ 导入图片" Command="{Binding TopBar.ImportCommand}" />
+                    <!-- M5-D N7: scan a NAS library (remote import). -->
+                    <Button Margin="8,0,0,0" Style="{StaticResource SubtleButtonStyle}"
+                            Content="📡 扫描 NAS" ToolTip="扫描已配置的 NAS 连接目录，索引为远程图片"
+                            AutomationProperties.Name="扫描NAS"
+                            Command="{Binding ScanNasLibraryCommand}" />
                     <Button Margin="8,0,0,0" Style="{StaticResource AiButtonStyle}"
                             Content="AI 分析" ToolTip="{Binding TopBar.AiDisabledReason}"
                             Command="{Binding TopBar.AiCommand}" />

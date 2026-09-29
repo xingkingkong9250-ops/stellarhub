@@ -10,6 +10,21 @@ public sealed class ImportOptions
 
     public bool SkipHidden { get; init; } = true;
 
+    /// <summary>
+    /// Local file system (default) or NAS via <see cref="ImageSource.Remote"/>.
+    /// Drives which <see cref="QL.World.Services.Nas.IFileSystemAccessor"/>
+    /// the importer resolves, and the value written to <c>images.source</c>.
+    /// </summary>
+    public ImageSource Source { get; init; } = ImageSource.Local;
+
+    /// <summary>
+    /// When <see cref="Source"/> is <see cref="ImageSource.Remote"/>, the id of
+    /// the NAS connection (in <see cref="AppSettingsService.NasConnections"/>)
+    /// the bytes live behind. Null for local rows. Written to
+    /// <c>images.nas_connection_id</c>.
+    /// </summary>
+    public int? NasConnectionId { get; init; }
+
     /// <summary>Lower-cased allow-list including the dot (".jpg").</summary>
     public IReadOnlySet<string> EnabledExtensions { get; init; } =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase);

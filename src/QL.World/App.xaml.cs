@@ -116,7 +116,8 @@ public partial class App : Application
                 aiAnalysis,
                 colorAnalysis,
                 semanticSearch,
-                pbrGrouping);
+                pbrGrouping,
+                new WebDavConnectorFactory());
             _services = services;
 
             SetTheme(settings.Theme);
@@ -242,7 +243,7 @@ public partial class App : Application
                 _services.Notifications,
                 _logDirectory,
                 _services.PbrGrouping,
-                new WebDavConnectorFactory());
+                _services.NasFactory);
             settingsViewModel.ThemeChanged += theme =>
             {
                 SetTheme(theme);

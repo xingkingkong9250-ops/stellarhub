@@ -4,6 +4,7 @@ using System.Windows.Threading;
 using QL.World.Helpers;
 using QL.World.Models;
 using QL.World.Services;
+using QL.World.Services.Nas;
 using QL.World.ViewModels.Support;
 
 namespace QL.World.ViewModels;
@@ -66,6 +67,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         _undoTimer.Tick += (_, _) => HideUndoBar();
 
         RefreshCommand = new AsyncRelayCommand(() => Gallery.RefreshAsync());
+        ScanNasLibraryCommand = new AsyncRelayCommand(ScanNasLibraryAsync, () => !TopBar.IsImporting);
         FocusSearchCommand = new RelayCommand(() => TopBar.RequestFocusSearch());
         ClearFiltersCommand = new RelayCommand(ClearFilters);
 
@@ -123,6 +125,13 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public RelayCommand FocusSearchCommand { get; }
     public RelayCommand ClearFiltersCommand { get; }
     public AsyncRelayCommand RefreshCommand { get; }
+    /// <summary>
+    /// N7: scan a NAS library. Opens a connection picker (or skips straight
+    /// to the scan when only one connection is configured), runs
+    /// <see cref="RemoteLibraryScanner"/> with progress on the status bar,
+    /// then refreshes the gallery so the new remote rows appear.
+    /// </summary>
+    public AsyncRelayCommand ScanNasLibraryCommand { get; }
 
     public RelayCommand OpenCommand { get; }
     public RelayCommand RevealCommand { get; }
@@ -277,6 +286,112 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
                 System.Diagnostics.Debug.WriteLine($"[color] backfill failed: {ex.Message}");
             }
         });
+    }
+
+    // ─── NAS library scan (N7) ────────────────────────────────────────────
+
+    private async Task ScanNasLibraryAsync()
+    {
+        IReadOnlyList<NasConnectionSpec> connections = _services.Settings.NasConnections;
+        if (connections.Count == 0)
+        {
+            StatusBar.PublishMessage("请先在设置 → NAS 中配置一个连接。");
+            ShowSettingsDialog?.Invoke();
+            return;
+        }
+
+        NasConnectionSpec? picked = connections.Count == 1
+            ? connections[0]
+            : await PickNasConnectionAsync(connections);
+        if (picked is null)
+            return;
+
+        TopBar.IsImporting = true;
+        ScanNasLibraryCommand.RaiseCanExecuteChanged();
+        try
+        {
+            var scanner = new RemoteLibraryScanner(_services.Import, _services.NasFactory, _services.Settings);
+            var progress = new Progress<ImportProgress>(p =>
+                StatusBar.PublishMessage(
+                    $"扫描 NAS {picked.Name}：{p.Processed}/{p.ScannedTotal}（新增 {p.Added}）{Path.GetFileName(p.CurrentFile)}"));
+            StatusBar.PublishMessage($"正在扫描 NAS 库 {picked.Name}…");
+
+            ImportReport report = await scanner.ScanAsync(picked.Id, progress, CancellationToken.None);
+            await Gallery.RefreshAsync();
+
+            if (report.Cancelled)
+                StatusBar.PublishMessage($"已取消扫描 NAS {picked.Name}：扫描 {report.ScannedTotal}，导入 {report.AddedCount}。");
+            else
+                StatusBar.PublishMessage($"扫描 NAS {picked.Name} 完成：扫描 {report.ScannedTotal}，导入 {report.AddedCount}，跳过 {report.SkippedCount}。");
+            RunColorBackfill();
+        }
+        catch (NasConnectionException ex)
+        {
+            StatusBar.PublishMessage($"扫描 NAS 失败（{ex.Kind}）：{ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            StatusBar.PublishMessage($"扫描 NAS 失败：{ex.Message}");
+        }
+        finally
+        {
+            TopBar.IsImporting = false;
+            ScanNasLibraryCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    /// <summary>
+    /// Minimal connection picker built in code (no new XAML) for the
+    /// &gt;1-connection case. Returns null when the user cancels.
+    /// </summary>
+    private static async Task<NasConnectionSpec?> PickNasConnectionAsync(
+        IReadOnlyList<NasConnectionSpec> connections)
+    {
+        var dialog = new Window
+        {
+            Title = "选择要扫描的 NAS 连接",
+            Width = 360,
+            Height = 160,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            ResizeMode = ResizeMode.CanMinimize,
+        };
+
+        var combo = new System.Windows.Controls.ComboBox
+        {
+            Margin = new Thickness(16, 16, 16, 8),
+            ItemsSource = connections.ToList(),
+            DisplayMemberPath = "Name",
+            SelectedIndex = 0,
+        };
+        var ok = new System.Windows.Controls.Button
+        {
+            Content = "扫描",
+            Margin = new Thickness(16, 0, 8, 16),
+            Padding = new Thickness(16, 4, 16, 4),
+            IsDefault = true,
+        };
+        var cancel = new System.Windows.Controls.Button
+        {
+            Content = "取消",
+            Margin = new Thickness(8, 0, 16, 16),
+            Padding = new Thickness(16, 4, 16, 4),
+            IsCancel = true,
+        };
+        ok.Click += (_, _) => dialog.DialogResult = true;
+
+        var buttons = new System.Windows.Controls.StackPanel
+        {
+            Orientation = System.Windows.Controls.Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Children = { ok, cancel },
+        };
+        dialog.Content = new System.Windows.Controls.StackPanel
+        {
+            Children = { combo, buttons },
+        };
+
+        bool? result = await Application.Current.Dispatcher.InvokeAsync(() => dialog.ShowDialog());
+        return result == true ? (NasConnectionSpec?)combo.SelectedItem : null;
     }
 
     private string GetSuggestedImportFolder()

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -35,6 +35,7 @@
     <EmbeddedResource Include="Data\Schema.v3.sql" />
     <EmbeddedResource Include="Data\Schema.v4.sql" />
     <EmbeddedResource Include="Data\Schema.v5.sql" />
+    <EmbeddedResource Include="Data\Schema.v6.sql" />
     <EmbeddedResource Include="Assets\Ml\text-embeddings-clip-vit-b32.json" />
     <EmbeddedResource Include="Assets\Ml\vocab.json" />
     <EmbeddedResource Include="Assets\Ml\merges.txt" />

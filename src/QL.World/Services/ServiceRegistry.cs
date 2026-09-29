@@ -1,6 +1,7 @@
 using QL.World.Data;
 using QL.World.Services.Ai;
 using QL.World.Services.Colors;
+using QL.World.Services.Nas;
 using QL.World.Services.Pbr;
 
 namespace QL.World.Services;
@@ -29,6 +30,12 @@ public sealed class ServiceRegistry
     public ColorAnalysisService Colors { get; }
     public SemanticSearchService SemanticSearch { get; }
     public PbrGroupingService PbrGrouping { get; }
+    /// <summary>
+    /// M5-D: builds <see cref="INasConnector"/> instances from persisted
+    /// <see cref="NasConnectionSpec"/>s. Shared by <see cref="SettingsViewModel"/>
+    /// (Test Connection button) and <see cref="RemoteLibraryScanner"/> (scan).
+    /// </summary>
+    public INasConnectorFactory NasFactory { get; }
 
     public ServiceRegistry(
         AppSettingsService settings,
@@ -46,7 +53,8 @@ public sealed class ServiceRegistry
         AiAnalysisService aiAnalysis,
         ColorAnalysisService colors,
         SemanticSearchService semanticSearch,
-        PbrGroupingService pbrGrouping)
+        PbrGroupingService pbrGrouping,
+        INasConnectorFactory nasFactory)
     {
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
         Database = database ?? throw new ArgumentNullException(nameof(database));
@@ -64,5 +72,6 @@ public sealed class ServiceRegistry
         Colors = colors ?? throw new ArgumentNullException(nameof(colors));
         SemanticSearch = semanticSearch ?? throw new ArgumentNullException(nameof(semanticSearch));
         PbrGrouping = pbrGrouping ?? throw new ArgumentNullException(nameof(pbrGrouping));
+        NasFactory = nasFactory ?? throw new ArgumentNullException(nameof(nasFactory));
     }
 }

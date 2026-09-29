@@ -16,4 +16,18 @@ public static class Md5Hasher
             bufferSize: STREAM_BUFFER_SIZE, FileOptions.SequentialScan);
         return Convert.ToHexString(md5.ComputeHash(stream)).ToLowerInvariant();
     }
+
+    /// <summary>
+    /// Hashes an already-open <see cref="Stream"/> (remote originals fetched
+    /// through <see cref="Nas.RemoteFileSystemAccessor.OpenRead"/> never
+    /// materialize as a full <c>byte[]</c> — the import pipeline streams
+    /// the network read straight into MD5 to bound memory regardless of file
+    /// size). The caller owns and disposes the stream.
+    /// </summary>
+    public static string ComputeStream(Stream stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        using var md5 = MD5.Create();
+        return Convert.ToHexString(md5.ComputeHash(stream)).ToLowerInvariant();
+    }
 }

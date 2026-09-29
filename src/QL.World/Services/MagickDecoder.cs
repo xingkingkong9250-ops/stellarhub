@@ -16,6 +16,13 @@ public interface IMagickDecoder
     bool TryReadMetadata(string path, out int width, out int height, out string? format);
 
     /// <summary>
+    /// Header-only probe over an already-open <see cref="Stream"/>. Used for
+    /// remote originals (M5-D <see cref="Nas.RemoteFileSystemAccessor"/>) so
+    /// the import metadata step never writes a temp file just to read a header.
+    /// </summary>
+    bool TryReadMetadata(Stream stream, out int width, out int height, out string? format);
+
+    /// <summary>
     /// Decodes the composite frame (PSD layers flattened) into an ImageSharp
     /// image. On success <paramref name="image"/> is non-null and owned by the
     /// caller. Returns false when the file cannot be decoded.
@@ -47,6 +54,28 @@ internal sealed class MagickDecoder : IMagickDecoder
         }
         catch (Exception ex) when (ex is IOException
             or UnauthorizedAccessException or MagickException)
+        {
+            return false;
+        }
+    }
+
+    public bool TryReadMetadata(Stream stream, out int width, out int height, out string? format)
+    {
+        width = 0;
+        height = 0;
+        format = null;
+
+        try
+        {
+            // Leave the stream open; the caller owns it (RemoteFileSystemAccessor
+            // disposes the network stream after this returns).
+            var info = new MagickImageInfo(stream);
+            width = checked((int)info.Width);
+            height = checked((int)info.Height);
+            format = info.Format.ToString().ToLowerInvariant();
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or MagickException)
         {
             return false;
         }

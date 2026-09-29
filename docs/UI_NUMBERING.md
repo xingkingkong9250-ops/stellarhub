@@ -70,3 +70,4 @@
 | W3/A7-N4 | 用户名 + 密码 | 已实现（M5-C） | 用户名留空=匿名；PasswordBox 永不回填（安全），DPAPI(CurrentUser) 加密落 config.json |
 | W3/A7-N5 | 根路径 + TLS + 自签 | 已实现（M5-C） | 根路径如 /photos/；UseTls 默认勾选；TrustSelfSigned 默认取消（仅受信任内网勾选） |
 | W3/A7-N6 | 测试连接 + 保存 | 已实现（M5-C） | 测试：INasConnectorFactory.Create + TestConnectionAsync（先 Update 持久化当前编辑→factory 解密密码→PROPFIND root）；保存：UpdateNasConnection（保留 EncryptedPassword/CreatedAt） |
+| W1-N7 | 扫描 NAS 库 | 已实现（M5-D） | 工具栏「📡 扫描 NAS」按钮；0 连接→提示并打开 W3/A7；1 连接→直扫；>1 连接→代码内建选择器（ComboBox + 扫描/取消）；ScanNasLibraryCommand→RemoteLibraryScanner→ImportService(Source=Remote)→source='remote' + nas_connection_id 落库；进度上 C1 状态栏 |

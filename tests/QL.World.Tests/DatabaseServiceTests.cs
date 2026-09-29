@@ -44,7 +44,7 @@ public sealed class DatabaseServiceTests
             command.CommandText = "PRAGMA user_version;";
             return Convert.ToInt32(command.ExecuteScalar());
         });
-        Assert.Equal(5, version);
+        Assert.Equal(6, version);
 
         // Second Initialize must not throw or duplicate anything.
         library.Db.Initialize();
@@ -98,7 +98,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(5, migrated);
+            Assert.Equal(6, migrated);
 
             var (tableCount, imageCount) = db.Run(conn =>
             {
@@ -194,7 +194,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(5, version);
+            Assert.Equal(6, version);
 
             var families = db.Run(conn =>
             {
@@ -259,5 +259,106 @@ public sealed class DatabaseServiceTests
             command.CommandText = "SELECT COUNT(*) FROM image_tags;";
             Assert.Equal(0, Convert.ToInt32(command.ExecuteScalar()));
         });
+    }
+
+    [Fact]
+    public void Migration_to_v6_adds_source_and_nas_connection_id_columns()
+    {
+        // Build a v5 library (run all schemas 1..5) with one local row and
+        // assert the v6 migration backfills source='local' default + adds
+        // the nullable nas_connection_id column + both indexes.
+        string directory = Path.Combine(
+            Path.GetTempPath(), "ql-world-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string databasePath = Path.Combine(directory, "qlworld.db");
+            using (var bootstrap = new SqliteConnection($"Data Source={databasePath}"))
+            {
+                bootstrap.Open();
+                foreach (int v in new[] { 1, 2, 3, 4, 5 })
+                {
+                    using var schema = bootstrap.CreateCommand();
+                    schema.CommandText = DbMigrator.LoadSchemaSql(v);
+                    schema.ExecuteNonQuery();
+                }
+                using var versionCmd = bootstrap.CreateCommand();
+                versionCmd.CommandText = "PRAGMA user_version = 5;";
+                versionCmd.ExecuteNonQuery();
+
+                using var seed = bootstrap.CreateCommand();
+                seed.CommandText = """
+                    INSERT INTO images
+                        (file_path, file_name, sortable_name, file_hash, file_size,
+                         width, height, format, rating, notes, primary_category,
+                         dominant_colors, is_missing, created_at, updated_at)
+                    VALUES ('C:\old\img.png', 'img.png', 'img.png', 'h1', 1,
+                            4, 4, 'png', 0, '', NULL, NULL, 0,
+                            '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+                    """;
+                seed.ExecuteNonQuery();
+            }
+
+            using var db = new DatabaseService(directory);
+            db.Initialize();
+
+            int version = db.Run(conn =>
+            {
+                using var command = conn.CreateCommand();
+                command.CommandText = "PRAGMA user_version;";
+                return Convert.ToInt32(command.ExecuteScalar());
+            });
+            Assert.Equal(6, version);
+
+            // source column exists with DEFAULT 'local' and backfilled the v5 row.
+            string sourceDefault = db.Run(conn =>
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "SELECT dflt_value FROM pragma_table_info('images') WHERE name = 'source';";
+                return cmd.ExecuteScalar()?.ToString() ?? string.Empty;
+            });
+            Assert.Equal("'local'", sourceDefault);
+
+            var (source, nasId) = db.Run(conn =>
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "SELECT source, nas_connection_id FROM images WHERE file_hash = 'h1';";
+                using var reader = cmd.ExecuteReader();
+                reader.Read();
+                return (reader.GetString(0), reader.IsDBNull(1) ? (int?)null : reader.GetInt32(1));
+            });
+            Assert.Equal("local", source);
+            Assert.Null(nasId);
+
+            // nas_connection_id is nullable with no FK; both indexes present.
+            string nasDefault = db.Run(conn =>
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "SELECT dflt_value FROM pragma_table_info('images') WHERE name = 'nas_connection_id';";
+                return cmd.ExecuteScalar()?.ToString() ?? string.Empty;
+            });
+            Assert.Equal(string.Empty, nasDefault); // NULL default → empty dflt_value
+
+            int indexCount = db.Run(conn =>
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = """
+                    SELECT COUNT(*) FROM sqlite_master
+                    WHERE type = 'index' AND name IN ('idx_images_source', 'idx_images_nas_connection');
+                    """;
+                return Convert.ToInt32(cmd.ExecuteScalar());
+            });
+            Assert.Equal(2, indexCount);
+
+            // Idempotent re-init stays at v6.
+            db.Initialize();
+            Assert.Equal("ok", db.QuickIntegrityCheck());
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            try { Directory.Delete(directory, recursive: true); }
+            catch (IOException) { }
+        }
     }
 }

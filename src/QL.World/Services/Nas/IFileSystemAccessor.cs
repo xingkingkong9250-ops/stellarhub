@@ -37,11 +37,20 @@ public interface IFileSystemAccessor
     Stream OpenRead(string path);
 
     /// <summary>
-    /// Recursively enumerates files whose extension (lowercased, no dot)
-    /// is in <paramref name="extensions"/>. Directories are descended into
-    /// but not returned. Order is implementation-defined.
+    /// Enumerates files whose extension (lowercased, with dot) is in
+    /// <paramref name="extensions"/>. When <paramref name="recurseSubdirectories"/>
+    /// is true, directories are descended into (remote drivers always recurse
+    /// one level per <see cref="INasConnector.ListFilesAsync"/> call, so the
+    /// flag is honored by walking those levels). <paramref name="skipHidden"/>
+    /// is honored by the local driver (maps to <see cref="System.IO.EnumerationOptions.AttributesToSkip"/>);
+    /// remote drivers ignore it (WebDAV has no hidden attribute). Directories
+    /// are not returned. Order is implementation-defined.
     /// </summary>
-    IEnumerable<string> EnumerateFiles(string rootPath, IReadOnlySet<string> extensions);
+    IEnumerable<string> EnumerateFiles(
+        string rootPath,
+        IReadOnlySet<string> extensions,
+        bool recurseSubdirectories,
+        bool skipHidden);
 
     /// <summary>File size in bytes; <c>-1</c> when unknown.</summary>
     long GetFileSize(string path);

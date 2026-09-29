@@ -6,6 +6,8 @@ using QL.World.Services;
 using QL.World.Services.Ai;
 using QL.World.Services.Colors;
 using QL.World.Services.Pbr;
+using QL.World.Services.Nas;
+using QL.World.Tests.Support;
 using QL.World.ViewModels;
 
 namespace QL.World.Tests;
@@ -49,7 +51,7 @@ public sealed class ShellViewModelTests : IDisposable
         var services = new ServiceRegistry(
             settings, _database, inspector, import, _thumbnails, imageQuery,
             tags, collections, notifications, watcher, legacyImporter, ai, aiAnalysis,
-            colors, semanticSearch, pbrGrouping);
+            colors, semanticSearch, pbrGrouping, new StubNasConnectorFactory());
         _viewModel = new ShellViewModel(services);
     }
 
