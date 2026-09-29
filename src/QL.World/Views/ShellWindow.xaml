@@ -55,8 +55,18 @@
                             Width="{Binding DataContext.GridZoom, RelativeSource={RelativeSource AncestorType=ListBox}}"
                             Height="{Binding DataContext.GridZoom, RelativeSource={RelativeSource AncestorType=ListBox}}"
                             Background="{DynamicResource SurfaceBrush}">
-                        <Image Source="{Binding ThumbnailImage}" Stretch="UniformToFill"
-                               RenderOptions.BitmapScalingMode="HighQuality" />
+                        <Grid>
+                            <Image Source="{Binding ThumbnailImage}" Stretch="UniformToFill"
+                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                            <!-- U2-D (§4.C.2): B2-3-OL1 source badge (本地/云端/AI) -->
+                            <Border HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                    Margin="0,0,4,4" Padding="4,1" CornerRadius="3"
+                                    Background="{DynamicResource OverlayBrush}"
+                                    Visibility="{Binding SourceBadge, Converter={StaticResource NullVis}}">
+                                <TextBlock Text="{Binding SourceBadge}" FontSize="10"
+                                           Foreground="{DynamicResource TextOnOverlayBrush}" />
+                            </Border>
+                        </Grid>
                     </Border>
                     <StackPanel Grid.Row="1" Margin="2,6,2,0">
                         <TextBlock Text="{Binding FileName}" FontSize="12" TextTrimming="CharacterEllipsis" />
@@ -110,7 +120,17 @@
                             Margin="0,0,10,0" CornerRadius="4" ClipToBounds="True"
                             Background="{DynamicResource SurfaceVariantBrush}"
                             VerticalAlignment="Center">
-                        <Image Source="{Binding ThumbnailImage}" Stretch="UniformToFill" />
+                        <Grid>
+                            <Image Source="{Binding ThumbnailImage}" Stretch="UniformToFill" />
+                            <!-- U2-D (§4.C.2): B2-3-OL1 source badge (本地/云端/AI) -->
+                            <Border HorizontalAlignment="Right" VerticalAlignment="Top"
+                                    Margin="0,3,3,0" Padding="3,0" CornerRadius="2"
+                                    Background="{DynamicResource OverlayBrush}"
+                                    Visibility="{Binding SourceBadge, Converter={StaticResource NullVis}}">
+                                <TextBlock Text="{Binding SourceBadge}" FontSize="9"
+                                           Foreground="{DynamicResource TextOnOverlayBrush}" />
+                            </Border>
+                        </Grid>
                     </Border>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                         <TextBlock Text="{Binding FileName}" TextTrimming="CharacterEllipsis" />

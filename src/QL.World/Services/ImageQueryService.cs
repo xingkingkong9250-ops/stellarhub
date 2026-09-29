@@ -55,8 +55,16 @@ public sealed class ImageQueryService
                            SELECT tag FROM image_tags
                            WHERE image_id = i.id
                            ORDER BY CASE source WHEN 'manual' THEN 0 ELSE 1 END, tag
-                       )) AS tags_csv
+                       )) AS tags_csv,
+                       CASE
+                           WHEN e.source = 'cloud' THEN '云端'
+                           WHEN e.source = 'local' THEN '本地'
+                           WHEN EXISTS (SELECT 1 FROM image_tags it2
+                                        WHERE it2.image_id = i.id AND it2.source = 'ai') THEN 'AI'
+                           ELSE NULL
+                       END AS source_badge
                 FROM images i
+                LEFT JOIN image_embeddings e ON e.image_id = i.id
                 """);
 
             var parameters = new List<(string Name, object? Value)>();
@@ -95,6 +103,7 @@ public sealed class ImageQueryService
                     IsMissing = reader.GetInt32(10) != 0,
                     CreatedAt = DbTime.Parse(reader.GetString(11)),
                     TagsCsv = reader.IsDBNull(12) ? string.Empty : reader.GetString(12),
+                    SourceBadge = reader.IsDBNull(13) ? null : reader.GetString(13),
                 });
             }
             return result;

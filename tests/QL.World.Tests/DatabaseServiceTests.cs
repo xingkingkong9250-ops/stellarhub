@@ -44,7 +44,7 @@ public sealed class DatabaseServiceTests
             command.CommandText = "PRAGMA user_version;";
             return Convert.ToInt32(command.ExecuteScalar());
         });
-        Assert.Equal(3, version);
+        Assert.Equal(4, version);
 
         // Second Initialize must not throw or duplicate anything.
         library.Db.Initialize();
@@ -98,7 +98,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(3, migrated);
+            Assert.Equal(4, migrated);
 
             var (tableCount, imageCount) = db.Run(conn =>
             {
@@ -116,7 +116,17 @@ public sealed class DatabaseServiceTests
             Assert.Equal(2, tableCount);
             Assert.Equal(1, imageCount); // v1 data survived the migration
 
-            // Re-running Initialize must stay at v3 (idempotent forward-only).
+            // U2-D: v4 migration adds image_embeddings.source with DEFAULT 'local'.
+            string sourceDefault = db.Run(conn =>
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "SELECT dflt_value FROM pragma_table_info('image_embeddings') WHERE name = 'source';";
+                object? val = cmd.ExecuteScalar();
+                return val?.ToString() ?? string.Empty;
+            });
+            Assert.Equal("'local'", sourceDefault);
+
+            // Re-running Initialize must stay at v4 (idempotent forward-only).
             db.Initialize();
             Assert.Equal("ok", db.QuickIntegrityCheck());
         }

@@ -195,6 +195,13 @@ public sealed class AiAnalysisService
     /// <summary>Raised after PersistResult writes an embedding row. SemanticSearchService subscribes to invalidate its cache.</summary>
     public event Action? EmbeddingsUpdated;
 
+    /// <summary>
+    /// U2-D (§4.C.2): map IAiService.Mode to the image_embeddings.source value
+    /// ("local" / "cloud"). "Disabled" never reaches here (IsAvailable=false);
+    /// any other value falls back to "local".
+    /// </summary>
+    private string EmbeddingSource => _ai.Mode == "Cloud" ? "cloud" : "local";
+
     private void PersistEmbedding(long imageId, AiAnalysisResult result)
     {
         // Embedding (self-describing BLOB). Always write a row on success —
@@ -204,8 +211,8 @@ public sealed class AiAnalysisService
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = """
-                INSERT OR REPLACE INTO image_embeddings (image_id, model_id, dim, embedding, created_at)
-                VALUES ($id, $model, $dim, $blob, $now);
+                INSERT OR REPLACE INTO image_embeddings (image_id, model_id, dim, embedding, created_at, source)
+                VALUES ($id, $model, $dim, $blob, $now, $source);
                 """;
             float[]? emb = result.Embedding;
             cmd.Parameters.AddWithValue("$id", imageId);
@@ -213,6 +220,7 @@ public sealed class AiAnalysisService
             cmd.Parameters.AddWithValue("$dim", emb?.Length ?? 0);
             cmd.Parameters.AddWithValue("$blob", emb is { Length: > 0 } ? FloatsToBytes(emb) : []);
             cmd.Parameters.AddWithValue("$now", DbTime.Now());
+            cmd.Parameters.AddWithValue("$source", EmbeddingSource);
             cmd.ExecuteNonQuery();
         });
     }

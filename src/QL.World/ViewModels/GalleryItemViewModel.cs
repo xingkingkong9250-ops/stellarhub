@@ -25,6 +25,7 @@ public sealed class GalleryItemViewModel : ObservableObject
         IsMissing = item.IsMissing;
         CreatedAt = item.CreatedAt;
         TagsCsv = item.TagsCsv;
+        SourceBadge = item.SourceBadge;
     }
 
     public long Id { get; }
@@ -39,6 +40,9 @@ public sealed class GalleryItemViewModel : ObservableObject
     public bool IsMissing { get; }
     public DateTime CreatedAt { get; }
     public string TagsCsv { get; private set; }
+
+    /// <summary>U2-D (§4.C.2): "本地"/"云端"/"AI" or null — drives B2-3-OL1 source badge.</summary>
+    public string? SourceBadge { get; }
 
     public int Rating
     {

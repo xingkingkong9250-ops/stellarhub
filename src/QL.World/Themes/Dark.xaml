@@ -38,6 +38,8 @@
     <!-- Translucent cover laid over gallery thumbnails (file-missing badge);
          must adapt per theme instead of a hardcoded dark overlay. -->
     <Color x:Key="Overlay">#CC17171C</Color>
+    <!-- U2-D: text color for badges rendered on top of OverlayBrush (≥ 4.5:1). -->
+    <Color x:Key="TextOnOverlay">#E6E6EC</Color>
 
     <!-- Brushes -->
     <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource Background}" />
@@ -64,5 +66,6 @@
     <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource Warning}" />
     <SolidColorBrush x:Key="WarningBgBrush" Color="{StaticResource WarningBg}" />
     <SolidColorBrush x:Key="OverlayBrush" Color="{StaticResource Overlay}" />
+    <SolidColorBrush x:Key="TextOnOverlayBrush" Color="{StaticResource TextOnOverlay}" />
 
 </ResourceDictionary>

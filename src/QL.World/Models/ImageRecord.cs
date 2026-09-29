@@ -57,4 +57,7 @@ public sealed class GalleryListItem
 
     /// <summary>Tags concatenated with 「,」 ordered by manual-first then name.</summary>
     public string TagsCsv { get; init; } = string.Empty;
+
+    /// <summary>U2-D (§4.C.2): source badge text ("本地"/"云端"/"AI") or null when no AI data.</summary>
+    public string? SourceBadge { get; init; }
 }

@@ -303,6 +303,53 @@ public sealed class ImageQueryServiceTests
         Assert.Equal(0, query.CountFiltered(new LibraryFilter { SearchMode = SearchMode.Semantic }));
     }
 
+    [Fact]
+    public void Source_badge_reflects_embedding_source_then_ai_tag_fallback()
+    {
+        using var library = new TestLibrary();
+        var query = new ImageQueryService(library.Db);
+        var tags = new TagService(library.Db);
+
+        long local = library.InsertImage(filePath: @"X:\local.png");
+        long cloud = library.InsertImage(filePath: @"X:\cloud.png");
+        long aiTagOnly = library.InsertImage(filePath: @"X:\aitag.png");
+        long none = library.InsertImage(filePath: @"X:\none.png");
+
+        // embeddings with dim>0 (real vectors); dim=0 marker rows shouldn't badge as "本地".
+        InsertEmbedding(library, local, source: "local", dim: 4);
+        InsertEmbedding(library, cloud, source: "cloud", dim: 4);
+        // aiTagOnly: no embedding, but has an AI-sourced tag → "AI".
+        tags.AddTags([aiTagOnly], ["sky"], TagSource.Ai);
+        // none: no embedding, no AI tag → null.
+
+        var byId = query.QueryGallery(new LibraryFilter())
+            .ToDictionary(r => r.Id, r => r.SourceBadge);
+
+        Assert.Equal("本地", byId[local]);
+        Assert.Equal("云端", byId[cloud]);
+        Assert.Equal("AI", byId[aiTagOnly]);
+        Assert.Null(byId[none]);
+    }
+
+    private static void InsertEmbedding(TestLibrary library, long imageId, string source, int dim)
+    {
+        library.Db.Run(conn =>
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                INSERT OR REPLACE INTO image_embeddings (image_id, model_id, dim, embedding, created_at, source)
+                VALUES ($id, $model, $dim, $blob, $now, $source);
+                """;
+            cmd.Parameters.AddWithValue("$id", imageId);
+            cmd.Parameters.AddWithValue("$model", "test");
+            cmd.Parameters.AddWithValue("$dim", dim);
+            cmd.Parameters.AddWithValue("$blob", new byte[dim * sizeof(float)]);
+            cmd.Parameters.AddWithValue("$now", "2026-01-01T00:00:00.000Z");
+            cmd.Parameters.AddWithValue("$source", source);
+            cmd.ExecuteNonQuery();
+        });
+    }
+
     private static string CreateTempDir()
     {
         string dir = Path.Combine(
