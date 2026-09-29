@@ -28,6 +28,13 @@ public sealed class LibraryFilter
 
     public GallerySort Sort { get; set; } = GallerySort.ImportedDesc;
 
+    /// <summary>
+    /// U2-B (§4.B.1): restrict to images imported within the last N days.
+    /// Null = no time filter (show all). 1 = today, 7 = last 7 days, etc.
+    /// Compared against images.created_at (UTC ISO-8601).
+    /// </summary>
+    public int? ImportedWithinDays { get; set; }
+
     public bool OnlyMissing { get; set; }
 
     /// <summary>
@@ -59,6 +66,7 @@ public sealed class LibraryFilter
         Text = Text,
         SearchMode = SearchMode,
         Sort = Sort,
+        ImportedWithinDays = ImportedWithinDays,
         OnlyMissing = OnlyMissing,
         SemanticResultIds = SemanticResultIds,
         SimilarToImageId = SimilarToImageId,

@@ -31,7 +31,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         ThumbnailProvider = new GalleryThumbnailProvider(services.Thumbnails);
         Gallery = new GalleryViewModel(services.ImageQuery, services.Settings, ThumbnailProvider);
         TopBar = new TopBarViewModel(Gallery, ImportAsync, services.Notifications, services.Ai,
-            services.AiAnalysis, services.Colors, services.SemanticSearch);
+            services.AiAnalysis, services.Colors, services.SemanticSearch, services.Settings);
         TagTree = new TagTreeViewModel(Gallery, services.ImageQuery, services.Tags);
         CollectionTree = new CollectionTreeViewModel(Gallery, services.Collections);
         PbrGroupTree = new PbrGroupTreeViewModel(Gallery, services.PbrGrouping);
@@ -370,7 +370,10 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         Gallery.Filter.Text = null;
         Gallery.Filter.SemanticResultIds = null;
         Gallery.Filter.SimilarToImageId = null;
+        // U2-B: 清除全部筛选 also resets the 最近入库 dropdown.
+        Gallery.Filter.ImportedWithinDays = null;
         TopBar.ClearSearchText();
+        TopBar.ClearRecentImport();
         TagTree.ResetSelection();
         CollectionTree.ResetSelection();
         PbrGroupTree.ResetSelection();

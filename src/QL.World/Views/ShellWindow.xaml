@@ -187,6 +187,14 @@
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
                             VerticalAlignment="Center">
+                    <!-- U2-B (§4.B.1): 最近入库 dropdown -->
+                    <ComboBox Width="118"
+                              ItemsSource="{Binding TopBar.RecentImportOptions}"
+                              DisplayMemberPath="Display"
+                              SelectedValuePath="Days"
+                              SelectedValue="{Binding TopBar.SelectedRecentImport}" />
+                    <Border Width="1" Height="24" Margin="12,0"
+                            Background="{DynamicResource BorderSubtleBrush}" />
                     <TextBox x:Name="SearchTextBox" Width="240" Height="32"
                              AutomationProperties.Name="SearchBox"
                              VerticalContentAlignment="Center"

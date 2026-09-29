@@ -35,6 +35,7 @@ public sealed class GalleryViewModel : ObservableObject
         Filter = new LibraryFilter
         {
             Sort = ParseSort(settings.GallerySort),
+            ImportedWithinDays = settings.GalleryRecentImportDays,
         };
         _isGridView = settings.GalleryViewMode == "Grid";
     }
@@ -263,6 +264,9 @@ public sealed class GalleryViewModel : ObservableObject
             parts.Add($"# {filter.Tag}");
         if (!string.IsNullOrWhiteSpace(filter.Text))
             parts.Add($"“{filter.Text.Trim()}”");
+        // U2-B: reflect 最近入库 in the filter summary chip.
+        if (filter.ImportedWithinDays is int days && days > 0)
+            parts.Add(days == 1 ? "今天" : $"近 {days} 天");
         return string.Join(" · ", parts);
     }
 

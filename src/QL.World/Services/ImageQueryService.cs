@@ -471,6 +471,16 @@ public sealed class ImageQueryService
             return;
         }
 
+        // U2-B (§4.B.1): 最近入库 — restrict to images created within last N days.
+        // created_at is UTC ISO-8601 ("yyyy-MM-dd'T'HH:mm:ss.fff'Z'"); same-format
+        // cutoff string compares lexicographically correctly.
+        if (filter.ImportedWithinDays is int days && days > 0)
+        {
+            sql.Append(HasWhere(sql) ? "\n  AND " : "\nWHERE ");
+            sql.Append("i.created_at >= $cutoff");
+            parameters.Add(("$cutoff", DbTime.Format(DateTime.UtcNow.AddDays(-days))));
+        }
+
         if (filter.OnlyMissing)
             sql.Append("\nWHERE i.is_missing = 1");
 

@@ -106,6 +106,15 @@ public sealed class AppSettingsService
             next => _settings.GallerySort = next);
     }
 
+    /// <summary>U2-B (§4.B.1): 最近入库 dropdown (null=全部, 1/7/30=N天).</summary>
+    public int? GalleryRecentImportDays
+    {
+        get => _settings.GalleryRecentImportDays;
+        set => SetAndSave(value,
+            () => _settings.GalleryRecentImportDays,
+            next => _settings.GalleryRecentImportDays = next);
+    }
+
     public int GalleryGridZoom
     {
         get => _settings.GalleryGridZoom;

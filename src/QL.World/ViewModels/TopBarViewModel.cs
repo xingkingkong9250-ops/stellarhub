@@ -18,12 +18,14 @@ public sealed class TopBarViewModel : ObservableObject
     private readonly AiAnalysisService _aiAnalysis;
     private readonly ColorAnalysisService _colors;
     private readonly SemanticSearchService _semanticSearch;
+    private readonly AppSettingsService _settings;
     private readonly DispatcherTimer _searchTimer;
     private string _searchText = string.Empty;
     private SearchMode _searchMode = SearchMode.Tag;
     private bool _isImporting;
     private bool _isColorRunning;
     private IReadOnlyList<SearchModeOption> _searchModes = DefaultSearchModes();
+    private int? _selectedRecentImport;
 
     public TopBarViewModel(
         GalleryViewModel gallery,
@@ -32,7 +34,8 @@ public sealed class TopBarViewModel : ObservableObject
         IAiService ai,
         AiAnalysisService aiAnalysis,
         ColorAnalysisService colors,
-        SemanticSearchService semanticSearch)
+        SemanticSearchService semanticSearch,
+        AppSettingsService settings)
     {
         _gallery = gallery;
         _notifications = notifications;
@@ -40,6 +43,9 @@ public sealed class TopBarViewModel : ObservableObject
         _aiAnalysis = aiAnalysis;
         _colors = colors;
         _semanticSearch = semanticSearch;
+        _settings = settings;
+        // U2-B: restore 最近入库 dropdown from persisted settings (null = 全部).
+        _selectedRecentImport = settings.GalleryRecentImportDays;
         Notifications = new NotificationListViewModel(notifications);
         ImportCommand = new AsyncRelayCommand(importAsync, () => !_isImporting);
         NotificationsCommand = new RelayCommand(() => Notifications.TogglePopup());
@@ -188,6 +194,30 @@ public sealed class TopBarViewModel : ObservableObject
         set => _gallery.IsGridView = value;
     }
 
+    // ─── U2-B (§4.B.1): 最近入库 dropdown ───────────────────────────────────
+
+    public IReadOnlyList<RecentImportOption> RecentImportOptions { get; } =
+    [
+        new(null, "全部"),
+        new(1, "今天"),
+        new(7, "最近 7 天"),
+        new(30, "最近 30 天"),
+    ];
+
+    public int? SelectedRecentImport
+    {
+        get => _selectedRecentImport;
+        set
+        {
+            if (SetProperty(ref _selectedRecentImport, value))
+            {
+                _gallery.Filter.ImportedWithinDays = value;
+                _settings.GalleryRecentImportDays = value;
+                _ = _gallery.RefreshAsync();
+            }
+        }
+    }
+
     /// <summary>Ctrl+F: the view subscribes and moves focus to the search box.</summary>
     public event Action? FocusSearchRequested;
 
@@ -201,6 +231,16 @@ public sealed class TopBarViewModel : ObservableObject
         _searchTimer.Stop();
         _searchText = string.Empty;
         OnPropertyChanged(nameof(SearchText));
+    }
+
+    /// <summary>U2-B: reset 最近入库 dropdown to 全部 (called by 清除全部筛选).</summary>
+    public void ClearRecentImport()
+    {
+        if (_selectedRecentImport is not null)
+        {
+            _selectedRecentImport = null;
+            OnPropertyChanged(nameof(SelectedRecentImport));
+        }
     }
 
     /// <summary>Called by ShellViewModel.FindSimilarAsync to reflect the new semantic filter state in the search box.</summary>
@@ -262,3 +302,5 @@ public sealed class TopBarViewModel : ObservableObject
 }
 
 public sealed record SearchModeOption(SearchMode Mode, string Display);
+
+public sealed record RecentImportOption(int? Days, string Display);

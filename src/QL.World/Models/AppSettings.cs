@@ -25,6 +25,9 @@ public sealed class AppSettings
     /// <summary>W1/B2-2 last chosen sort key.</summary>
     public string GallerySort { get; set; } = "ImportedDesc";
 
+    /// <summary>U2-B (§4.B.1): 最近入库 dropdown selection (null=全部, 1=今天, 7/30=N天).</summary>
+    public int? GalleryRecentImportDays { get; set; }
+
     /// <summary>B2-4 grid zoom (80–512).</summary>
     public int GalleryGridZoom { get; set; } = 200;
 
