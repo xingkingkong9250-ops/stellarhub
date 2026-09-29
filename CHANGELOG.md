@@ -5,6 +5,58 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-09-30 U2 UI 优化补丁
+
+### U2-A：品牌视觉
+
+- A1 Logo 文字块改为 AccentGradientBrush（Accent→AccentDim 线性渐变），与品牌色统一
+- A1 AI 按钮 hover 切换为 AccentGradientBrush 背景 + TextOnAccentBrush 文字
+- C1 状态栏新增细进度条（2px IsIndeterminate，AccentGradientBrush 前景），
+  StatusBarViewModel.IsLoading 每 500ms 刷新（导入/AI 运行/缩略图挂起时显示）
+- 主题新增 AccentGradientBrush、TextOnAccentBrush、AiButtonStyle
+
+### U2-B：§4.B.1 顶栏「最近入库」下拉
+
+- TopBarViewModel 新增 RecentImportOptions 与 SelectedRecentImport
+  （今天/近 7 天/近 30 天/全部），持久化到 AppSettings.GalleryRecentImportDays
+- LibraryFilter 新增 ImportedWithinDays（null=全部），
+  ImageQueryService 以 i.created_at >= cutoff 过滤
+- BuildSummary 显示「今天」/「近 N 天」
+- UI_NUMBERING 新增 B2-3-OL1
+
+### U2-C：§4.B.3 详情栏「相关资产」section
+
+- DetailViewModel 新增 RelatedAssets（前 6 个语义相似缩略图）+ HasRelatedAssets
+- 新增 FindSimilarRequested 事件与 SelectRelatedCommand；
+  ShellViewModel.FindSimilarAsync 支持按 imageId 查找相似
+- B3-9 ItemsControl 水平 VirtualizingStackPanel，64×64 缩略图按钮
+- UI_NUMBERING 新增 B3-9
+
+### U2-D：§4.C.2 类别/状态徽标（完整三态）
+
+- Schema.v4：image_embeddings 新增 source TEXT NOT NULL DEFAULT 'local'
+  + 索引；DbMigrator CURRENT_VERSION 3→4；历史 embedding 自动回填 'local'
+- AiAnalysisService.PersistEmbedding 写 source 列，
+  EmbeddingSource 从 IAiService.Mode 映射（Cloud→cloud，其余→local）
+- ImageQueryService.QueryGallery LEFT JOIN image_embeddings + CASE 计算
+  source_badge：cloud→云端 / local→本地 / 无 embedding 但有 AI tag→AI / 否则 null
+- GridCardTemplate 缩略图右下角 + ListRowTemplate 缩略图右上角加徽标 Border
+  （OverlayBrush 底 + TextOnOverlayBrush 文字），null 时整段隐藏
+- 主题新增 TextOnOverlay 色 + TextOnOverlayBrush（Dark #E6E6EC / Light #1A1A22）
+
+### U2-E：§4.D.1 卡片元数据条
+
+- GalleryItemViewModel 新增 TagsSummary 计算属性：取前 2 标签以「, 」连接，
+  超过 2 个追加「 +N」，无标签返回空串
+- GridCardTemplate StackPanel 新增第三行标签摘要 TextBlock
+  （TextMutedBrush + CharacterEllipsis + NullVis 隐藏）
+
+### U2-F：§4.E.2 品牌化版本号
+
+- AppInfo 新增 MilestoneLabel = "U2 发布基线"
+- ShellViewModel.VersionText 改为 $"v{Version} · {MilestoneLabel}"
+- SettingsViewModel.VersionText 保持纯语义版本（关于页不变）
+
 ## [1.1.0] — 2026-09-28 U1 UI 优化补丁
 
 ### U1-A：选中态边框色（§4.A.1）

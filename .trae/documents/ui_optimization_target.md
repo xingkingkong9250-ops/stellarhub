@@ -150,6 +150,8 @@
 
 **落地提示**：新建 `LinearGradientBrush` 资源 `AccentGradientBrush`（#7C5CFF → #A48BFF），主题文件中按 Dark/Light 各自定义；不替换 `AccentBrush`。
 
+**状态**：已落地（U2-A）。AccentGradientBrush + TextOnAccentBrush + AiButtonStyle 已加入 Dark/Light 主题；Logo 文字块用 AccentGradientBrush；AI 按钮 hover 切渐变背景；C1 状态栏新增 2px IsIndeterminate 细进度条（AccentGradientBrush 前景），StatusBarViewModel.IsLoading 每 500ms 刷新。
+
 #### 4.A.3 缩略图遮罩统一走 OverlayBrush（P0，已落地）
 
 **目标**：所有覆盖在缩略图上的半透明遮罩一律用 [OverlayBrush](file:///c:/AI_Programming/APP/QL_World_dotnet/src/QL.World/Themes/Dark.xaml#L39)，禁止硬编码 hex。
@@ -166,6 +168,8 @@
 
 **落地提示**：A1 区加 `「最近入库 ▾」` 下拉（今天 / 7 天 / 30 天 / 全部），与 [ShellWindow.xaml](file:///c:/AI_Programming/APP/QL_World_dotnet/src/QL.World/Views/ShellWindow.xaml) 现有 A1-3 视图切换并列；下拉选中态映射到 LibraryFilter。新增编号 A1-9。
 
+**状态**：已落地（U2-B）。TopBarViewModel 新增 SelectedRecentImport（今天/近 7 天/近 30 天/全部），持久化到 settings.gallery_recent_import_days；LibraryFilter.ImportedWithinDays 驱动 ImageQueryService 的 created_at 过滤；BuildSummary 显示「今天」/「近 N 天」。UI 编号 B2-3-OL1。
+
 #### 4.B.2 左栏筛选维度分组化（P2）
 
 **目标**：参考千岚·商城左栏「来源格式 / UE 版本 / 资产类型 / 建筑风格」分组化筛选，QL World 在 B1 现有「素材库树 / 收藏夹 / Top50 标签 / 贴图组」基础上增加「按属性筛选」折叠组（颜色 / 分辨率 / 文件大小 / 评分）。
@@ -181,6 +185,8 @@
 **理由**：当前 B3-8 是模态触发，用户需点击后切回画廊看结果；内嵌预览减少切换。
 
 **落地提示**：B3 底部新增 `B3-9 相关资产` 横向缩略图条；数据复用 [SemanticSearchService](file:///c:/AI_Programming/APP/QL_World_dotnet/src/QL.World/Services) 缓存；无 embedding 时整段隐藏不报错。
+
+**状态**：已落地（U2-C）。DetailViewModel.RelatedAssets 取 SemanticSearchService.SearchByImageId 前 6；FindSimilarRequested 事件 + SelectRelatedCommand 驱动 ShellViewModel.FindSimilarAsync(imageId)；B3-9 ItemsControl 水平 VirtualizingStackPanel，64×64 缩略图按钮，无结果整段隐藏。
 
 ### 4.C 控件
 
@@ -200,6 +206,8 @@
 
 **落地提示**：徽标复用 [OverlayBrush](file:///c:/AI_Programming/APP/QL_World_dotnet/src/QL.World/Themes/Dark.xaml#L39) 半透明底 + 反色文字；编号 B2-3-OL1（overlay 标记位）。
 
+**状态**：已落地（U2-D，完整三态）。Schema.v4 为 image_embeddings 新增 source 列（DEFAULT 'local'）；AiAnalysisService.PersistEmbedding 写 source（Cloud→cloud，其余→local）；ImageQueryService LEFT JOIN + CASE 计算 source_badge（云端/本地/AI/null）；GridCard 右下角 + ListRow 右上角徽标（OverlayBrush 底 + TextOnOverlayBrush 文字），null 时隐藏。UI 编号 B2-3-BDG。
+
 ### 4.D 信息密度
 
 #### 4.D.1 卡片元数据条（P1）
@@ -209,6 +217,8 @@
 **理由**：千岚·商城卡片三行密度均衡，QL World 当前两行偏稀疏；标签是 QL World 的核心分类维度，前置可见降低筛选成本。
 
 **落地提示**：在 [GridCardTemplate StackPanel](file:///c:/AI_Programming/APP/QL_World_dotnet/src/QL.World/Views/ShellWindow.xaml#L49) 后追加 `TextBlock TagsSummary`；超过 2 个标签用 `+N` 折叠。
+
+**状态**：已落地（U2-E）。GalleryItemViewModel.TagsSummary 计算属性（前 2 标签 +N，无标签空串）；GridCardTemplate 第三行 TextBlock（TextMutedBrush + CharacterEllipsis + NullVis 隐藏）；ListRowTemplate 已显示完整 TagsCsv 不变。UI 编号 B2-3-TAG。
 
 #### 4.D.2 顶栏计数显式化（P0）
 
@@ -239,6 +249,8 @@
 **理由**：版本号品牌化有助于里程碑可识别；节日徽标不采纳（详见 §5）。
 
 **落地提示**：版本号绑定 ViewModel `VersionLabel` 属性；里程碑标签从 csproj `<Version>`+`<Description>` 解析；不强制。
+
+**状态**：已落地（U2-F）。AppInfo.MilestoneLabel = "U2 发布基线"；ShellViewModel.VersionText = $"v{Version} · {MilestoneLabel}"；SettingsViewModel.VersionText 保持纯版本（W3/A5 关于页不变）。UI 编号 C1-VER。
 
 #### 4.E.3 节点折叠态计数（P2）
 
@@ -283,3 +295,4 @@
 |---|---|---|
 | 2026-09-24 | 初版，基于两张参考图归纳 | 用户提供的两张截图 |
 | 2026-09-28 | U1 落地状态标注：§4.A.1 / §4.A.3 / §4.D.2 / §4.E.1 均已落地 | U1-Z 收尾 |
+| 2026-09-30 | U2 落地状态标注：§4.A.2 / §4.B.1 / §4.B.3 / §4.C.2 / §4.D.1 / §4.E.2 均已落地 | U2-Z 收尾 |
