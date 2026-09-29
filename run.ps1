@@ -100,7 +100,7 @@ $process = Start-Process -FilePath $applicationExe `
 Start-Sleep -Seconds 1
 
 if ($process.HasExited) {
-    Write-Error "[QLWorld] App exited during startup (exit code $($process.ExitCode)). See %APPDATA%\Qianlan_App\QL_World\logs\error.log."
+    Write-Error "[QLWorld] App exited during startup (exit code $($process.ExitCode)). See %APPDATA%\Qianlan_App\StellarHub\logs\error.log."
     exit $process.ExitCode
 }
 
