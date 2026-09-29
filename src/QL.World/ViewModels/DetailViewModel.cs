@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Threading;
 using QL.World.Helpers;
@@ -140,6 +141,11 @@ public sealed class DetailViewModel : ObservableObject
     public bool IsMissing => Record?.IsMissing ?? false;
 
     public GalleryItemViewModel? Preview => Primary;
+
+    /// <summary>U4-A (B3-4 主色调)：解析 images.dominant_colors 得到的 "#RRGGBB" 列表；未分析/数据损坏时为空。</summary>
+    public IReadOnlyList<string> DominantColors { get; private set; } = [];
+
+    public bool HasDominantColors => DominantColors.Count > 0;
 
     public int Rating
     {
@@ -341,7 +347,10 @@ public sealed class DetailViewModel : ObservableObject
         if (IsSingle && Primary is not null)
             _ = ReloadSingleAsync(Primary.Id);
         else
+        {
             Record = null;
+            DominantColors = [];
+        }
 
         RaiseAllInfoProperties();
     }
@@ -351,6 +360,7 @@ public sealed class DetailViewModel : ObservableObject
         ImageRecord? record = await Task.Run(() => _query.GetById(id));
         if (record is null) return;
         Record = record;
+        DominantColors = ParseDominantColors(record.DominantColorsJson);
 
         Rating = record.Rating;
         _notesText = record.Notes;
@@ -441,6 +451,22 @@ public sealed class DetailViewModel : ObservableObject
         OnPropertyChanged(nameof(CreatedAtText));
         OnPropertyChanged(nameof(IsMissing));
         OnPropertyChanged(nameof(Preview));
+        OnPropertyChanged(nameof(DominantColors));
+        OnPropertyChanged(nameof(HasDominantColors));
+    }
+
+    /// <summary>dominant_colors 是 JSON 数组；null/空/损坏 JSON 一律解析为空列表（B3-4 整行隐藏）。</summary>
+    private static IReadOnlyList<string> ParseDominantColors(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return [];
+        try
+        {
+            return JsonSerializer.Deserialize<List<string>>(json) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     private static void CommandManagerInvalidate() =>

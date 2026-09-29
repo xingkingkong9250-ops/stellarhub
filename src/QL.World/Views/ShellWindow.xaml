@@ -26,6 +26,7 @@
         <conv:NullToVisibilityConverter x:Key="NullVis" />
         <conv:ZeroToVisibilityConverter x:Key="ZeroVis" />
         <conv:RatingStarBrushConverter x:Key="StarBrush" />
+        <conv:HexBrushConverter x:Key="HexBrush" />
 
         <!-- U3-A (§4.B.2): B1-5 attribute filter chip — accent when active -->
         <Style x:Key="FilterChipStyle" TargetType="Button" BasedOn="{StaticResource ChipButtonStyle}">
@@ -824,6 +825,24 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+
+                            <!-- U4-A: B3-4 主色调色块（仅展示 + tooltip hex；未分析/无数据整行隐藏） -->
+                            <StackPanel Visibility="{Binding Detail.HasDominantColors, Converter={StaticResource BoolVis}}">
+                                <TextBlock Text="主色调" Margin="2,12,0,0" Style="{StaticResource SectionCaptionStyle}" />
+                                <ItemsControl ItemsSource="{Binding Detail.DominantColors}" Margin="0,4,0,0">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Width="20" Height="20" CornerRadius="3" Margin="0,0,4,0"
+                                                    BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1"
+                                                    Background="{Binding Converter={StaticResource HexBrush}}"
+                                                    ToolTip="{Binding}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
 
                             <TextBlock Text="分类" Margin="2,12,0,0" Style="{StaticResource SectionCaptionStyle}" />
                             <ComboBox Margin="0,2,0,0" HorizontalAlignment="Stretch"
