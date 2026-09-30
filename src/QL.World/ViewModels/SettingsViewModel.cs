@@ -27,6 +27,8 @@ public sealed class SettingsViewModel : ObservableObject
     private readonly NotificationService _notifications;
     private readonly string _logsDirectory;
     private readonly INasConnectorFactory _nasConnectorFactory;
+    private readonly AccountService? _accounts;
+    private readonly CurrentUser? _currentUser;
 
     private string _selectedTheme;
     private string? _selectedWatcherDirectory;
@@ -52,7 +54,9 @@ public sealed class SettingsViewModel : ObservableObject
         NotificationService notifications,
         string logsDirectory,
         PbrGroupingService pbrGrouping,
-        INasConnectorFactory nasConnectorFactory)
+        INasConnectorFactory nasConnectorFactory,
+        AccountService? accounts,
+        CurrentUser? currentUser)
     {
         _settings = settings;
         _thumbnails = thumbnails;
@@ -63,6 +67,8 @@ public sealed class SettingsViewModel : ObservableObject
         _notifications = notifications;
         _logsDirectory = logsDirectory;
         _nasConnectorFactory = nasConnectorFactory;
+        _accounts = accounts;
+        _currentUser = currentUser;
         PbrRules = new PbrRulesViewModel(settings, pbrGrouping);
 
         _selectedTheme = settings.Theme;
@@ -109,8 +115,16 @@ public sealed class SettingsViewModel : ObservableObject
             TestNasConnectionAsync,
             () => SelectedNasConnection is not null && !IsTestingNasConnection);
 
+        // M6-C: user management (admin only)
+        AddUserCommand = new AsyncRelayCommand(AddUserAsync, () => IsUserManagementEnabled);
+        ToggleUserStatusCommand = new AsyncRelayCommand(ToggleUserStatusAsync, () => SelectedAccount is not null);
+        ResetPasswordCommand = new AsyncRelayCommand(ResetPasswordAsync, () => SelectedAccount is not null);
+        DeleteUserCommand = new AsyncRelayCommand(DeleteUserAsync, () => SelectedAccount is not null);
+        RefreshAccountsCommand = new AsyncRelayCommand(RefreshAccountsAsync, () => IsUserManagementEnabled);
+
         RefreshLocalModelState();
         RefreshStatistics();
+        _ = LoadAccountsAsync();
     }
 
     // ─── A1 常规 ────────────────────────────────────────────────────────────
@@ -726,5 +740,145 @@ public sealed class SettingsViewModel : ObservableObject
         int total = _imageQuery.TotalCount();
         int missing = _imageQuery.MissingCount();
         StatisticsText = $"图片 {total} 张，其中缺失 {missing} 张";
+    }
+
+    // ─── M6-C 用户管理（仅管理员）──────────────────────────────────────────
+
+    /// <summary>True when the current user is an admin and NAS account service is available.</summary>
+    public bool IsUserManagementEnabled => _accounts is not null && _currentUser?.IsAdmin == true;
+
+    public ObservableCollection<UserAccount> Accounts { get; } = new();
+
+    private UserAccount? _selectedAccount;
+    public UserAccount? SelectedAccount
+    {
+        get => _selectedAccount;
+        set => SetProperty(ref _selectedAccount, value);
+    }
+
+    private string _newUserName = string.Empty;
+    public string NewUserName
+    {
+        get => _newUserName;
+        set => SetProperty(ref _newUserName, value);
+    }
+
+    private string _newUserPassword = string.Empty;
+    public string NewUserPassword
+    {
+        get => _newUserPassword;
+        set => SetProperty(ref _newUserPassword, value);
+    }
+
+    private bool _newUserIsAdmin;
+    public bool NewUserIsAdmin
+    {
+        get => _newUserIsAdmin;
+        set => SetProperty(ref _newUserIsAdmin, value);
+    }
+
+    private string _userManagementStatus = string.Empty;
+    public string UserManagementStatus
+    {
+        get => _userManagementStatus;
+        set => SetProperty(ref _userManagementStatus, value);
+    }
+
+    public AsyncRelayCommand AddUserCommand { get; }
+    public AsyncRelayCommand ToggleUserStatusCommand { get; }
+    public AsyncRelayCommand ResetPasswordCommand { get; }
+    public AsyncRelayCommand DeleteUserCommand { get; }
+    public AsyncRelayCommand RefreshAccountsCommand { get; }
+
+    private async Task LoadAccountsAsync()
+    {
+        if (!IsUserManagementEnabled) return;
+        try
+        {
+            var accounts = await _accounts!.ListAccountsAsync(CancellationToken.None);
+            Accounts.Clear();
+            foreach (var a in accounts)
+                Accounts.Add(a);
+        }
+        catch (Exception ex)
+        {
+            UserManagementStatus = $"加载账号失败：{ex.Message}";
+        }
+    }
+
+    private async Task RefreshAccountsAsync() => await LoadAccountsAsync();
+
+    private async Task AddUserAsync()
+    {
+        if (_accounts is null || _currentUser is null) return;
+        if (string.IsNullOrWhiteSpace(NewUserName) || string.IsNullOrEmpty(NewUserPassword))
+        {
+            UserManagementStatus = "请输入用户名和密码";
+            return;
+        }
+        try
+        {
+            var role = NewUserIsAdmin ? UserRole.Admin : UserRole.User;
+            await _accounts.CreateAccountAsync(NewUserName, NewUserPassword, role, _currentUser.Username, CancellationToken.None);
+            NewUserName = string.Empty;
+            NewUserPassword = string.Empty;
+            NewUserIsAdmin = false;
+            UserManagementStatus = "用户已创建";
+            await LoadAccountsAsync();
+        }
+        catch (Exception ex)
+        {
+            UserManagementStatus = $"创建失败：{ex.Message}";
+        }
+    }
+
+    private async Task ToggleUserStatusAsync()
+    {
+        if (_accounts is null || SelectedAccount is null) return;
+        try
+        {
+            if (SelectedAccount.IsActive)
+                await _accounts.DisableAccountAsync(SelectedAccount.Username, CancellationToken.None);
+            else
+                await _accounts.EnableAccountAsync(SelectedAccount.Username, CancellationToken.None);
+            UserManagementStatus = "状态已更新";
+            await LoadAccountsAsync();
+        }
+        catch (Exception ex)
+        {
+            UserManagementStatus = $"操作失败：{ex.Message}";
+        }
+    }
+
+    private async Task ResetPasswordAsync()
+    {
+        if (_accounts is null || SelectedAccount is null) return;
+        // Reset to a known default; admin should tell the user to change it.
+        const string defaultPassword = "StellarHub123";
+        try
+        {
+            await _accounts.ResetPasswordAsync(SelectedAccount.Username, defaultPassword, CancellationToken.None);
+            UserManagementStatus = $"密码已重置为 {defaultPassword}，请通知用户登录后修改";
+        }
+        catch (Exception ex)
+        {
+            UserManagementStatus = $"重置失败：{ex.Message}";
+        }
+    }
+
+    private async Task DeleteUserAsync()
+    {
+        if (_accounts is null || SelectedAccount is null || _currentUser is null) return;
+        try
+        {
+            await _accounts.DeleteAccountAsync(SelectedAccount.Username, _currentUser.Username, CancellationToken.None);
+            SelectedAccount = null;
+            UserManagementStatus = "用户已删除";
+            await LoadAccountsAsync();
+        }
+        catch (Exception ex)
+        {
+            UserManagementStatus = $"删除失败：{ex.Message}";
+        }
     }
 }

@@ -37,7 +37,9 @@ public sealed class SettingsViewModelTests : IDisposable
             _notifications,
             Path.Combine(_lib.DirectoryRoot, "logs"),
             new PbrGroupingService(_lib.Db, _settings),
-            _nasFactory);
+            _nasFactory,
+            accounts: null,
+            currentUser: null);
     }
 
     [Fact]
@@ -62,7 +64,9 @@ public sealed class SettingsViewModelTests : IDisposable
             _notifications,
             Path.Combine(_lib.DirectoryRoot, "logs"),
             new PbrGroupingService(_lib.Db, _settings),
-            _nasFactory);
+            _nasFactory,
+            accounts: null,
+            currentUser: null);
 
         Assert.Equal("图片 2 张，其中缺失 1 张", fresh.StatisticsText);
     }

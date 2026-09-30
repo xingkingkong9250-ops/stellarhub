@@ -41,7 +41,9 @@ public sealed class SettingsViewModelNasTests : IDisposable
             _notifications,
             Path.Combine(_lib.DirectoryRoot, "logs"),
             new PbrGroupingService(_lib.Db, _settings),
-            _nasFactory);
+            _nasFactory,
+            accounts: null,
+            currentUser: null);
     }
 
     [Fact]

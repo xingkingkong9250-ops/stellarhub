@@ -286,7 +286,9 @@ public partial class App : Application
                 _services.Notifications,
                 _logDirectory,
                 _services.PbrGrouping,
-                _services.NasFactory);
+                _services.NasFactory,
+                _services.Accounts,
+                _services.CurrentUser);
             settingsViewModel.ThemeChanged += theme =>
             {
                 SetTheme(theme);

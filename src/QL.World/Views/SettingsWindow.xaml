@@ -382,6 +382,92 @@
                     </Border>
                 </Grid>
             </TabItem>
+
+            <!-- ═══ A7 用户管理（M6-C，仅管理员）═══ -->
+            <TabItem Header="用户管理"
+                     Visibility="{Binding IsUserManagementEnabled, Converter={StaticResource BoolVis}}">
+                <Grid Margin="14,12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- 账号列表 + 刷新 -->
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="账号列表"
+                                   Style="{StaticResource SectionCaptionStyle}" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Content="刷新"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                Command="{Binding RefreshAccountsCommand}" />
+                    </Grid>
+
+                    <ListBox Grid.Row="1" Margin="0,6,0,0" MinHeight="120"
+                             ItemsSource="{Binding Accounts}"
+                             SelectedItem="{Binding SelectedAccount}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Username}" Width="120"
+                                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <TextBlock Text="{Binding Role}" Width="60"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <TextBlock Text="{Binding Status}"
+                                               Foreground="{DynamicResource TextMutedBrush}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- 选中账号操作 -->
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0"
+                                Visibility="{Binding SelectedAccount, Converter={StaticResource NullVis}}">
+                        <Button Content="启用/禁用"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                Command="{Binding ToggleUserStatusCommand}" />
+                        <Button Content="重置密码" Margin="8,0,0,0"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                Command="{Binding ResetPasswordCommand}" />
+                        <Button Content="删除" Margin="8,0,0,0"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                Command="{Binding DeleteUserCommand}" />
+                    </StackPanel>
+
+                    <!-- 新建用户表单 -->
+                    <Border Grid.Row="2" Margin="0,50,0,0" Padding="10,8"
+                            BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
+                        <StackPanel>
+                            <TextBlock Text="新建用户" Style="{StaticResource SectionCaptionStyle}" />
+                            <Grid Margin="0,6,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Grid.Column="0" Margin="0,0,4,0"
+                                         Text="{Binding NewUserName, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="新建用户名" />
+                                <TextBox Grid.Column="1" Margin="4,0,4,0"
+                                         Text="{Binding NewUserPassword, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="新建用户密码" />
+                                <Button Grid.Column="2" Content="添加"
+                                        Style="{StaticResource AccentButtonStyle}"
+                                        Command="{Binding AddUserCommand}" />
+                            </Grid>
+                            <CheckBox Content="设为管理员" Margin="0,6,0,0"
+                                      IsChecked="{Binding NewUserIsAdmin}" />
+                            <TextBlock Text="{Binding UserManagementStatus}" Margin="0,6,0,0"
+                                       FontSize="12" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Visibility="{Binding UserManagementStatus, Converter={StaticResource NullVis}}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
         </TabControl>
 
         <Border Grid.Row="1" Padding="12,8"
