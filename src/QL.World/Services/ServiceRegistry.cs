@@ -88,6 +88,14 @@ public sealed class ServiceRegistry
     public NasConnectionRegistry? NasRegistry { get; set; }
 
     /// <summary>
+    /// M8-C: 聚合视图服务。并发加载主库 + 所有副库的 library.json，注入
+    /// <see cref="SharedImageRecord.SourceNasId"/>，主库优先去重。用户视角无主副之分。
+    /// 旧 <see cref="SharedLibrary"/> 仍指向主库实例（兼容单库调用点）。
+    /// Null in local-only mode.
+    /// </summary>
+    public AggregatedSharedLibraryService? AggregatedLibrary { get; set; }
+
+    /// <summary>
     /// M8-B: 当前所有副库（Role != Primary）的 SharedStorageService 快照。
     /// 主库不包含在内。聚合视图（M8-C AggregatedSharedLibraryService）遍历此列表
     /// 并发加载每库 library。NasRegistry 未初始化（local-only）时返回空数组。

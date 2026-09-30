@@ -82,6 +82,11 @@ public sealed class SharedGalleryViewModel : ObservableObject
     /// Replaces displayed items from the loaded shared records. Id is a local
     /// sequence (shared items never drive local-DB operations); FileHash is
     /// the record id used for thumbnail lookup.
+    /// M8-C: 聚合后每条 record 都带 SourceNasId（AggregatedSharedLibraryService
+    /// 已注入）；GalleryListItem.NasConnectionId + Source=Remote 让
+    /// GalleryThumbnailProvider.CreateSource 自动按 NasConnectionId 路由到对应
+    /// 副库 connector。FilePath 编码为 <c>nas://{id}{SourceNasPath}</c> 以兼容
+    /// StripNasPrefix 还原逻辑（line 250-301）。
     /// </summary>
     public void Load(IReadOnlyList<SharedImageRecord> records)
     {
@@ -97,7 +102,7 @@ public sealed class SharedGalleryViewModel : ObservableObject
             {
                 Id = sequence,
                 FileName = record.FileName,
-                FilePath = string.Empty,
+                FilePath = BuildCanonicalPath(record),
                 FileHash = record.Id,
                 FileSize = record.FileSize,
                 Width = record.Width,
@@ -106,6 +111,8 @@ public sealed class SharedGalleryViewModel : ObservableObject
                 Rating = record.Rating,
                 PrimaryCategory = record.PrimaryCategory,
                 TagsCsv = string.Join(',', record.Tags),
+                Source = ImageSource.Remote,
+                NasConnectionId = record.SourceNasId,
                 SourceBadge = "共享",
                 CreatedAt = record.ApprovedAt.DateTime,
             });
@@ -114,6 +121,18 @@ public sealed class SharedGalleryViewModel : ObservableObject
         }
         Refreshed?.Invoke();
         (Thumbnails as Services.Nas.SharedThumbnailCache)?.Prefetch(Items);
+    }
+
+    /// <summary>
+    /// M8-C: 构造 <c>nas://{SourceNasId}{SourceNasPath}</c> 规范路径，供
+    /// GalleryThumbnailProvider.StripNasPrefix 还原 remote path。当 SourceNasId
+    /// 或 SourceNasPath 缺失时返回空串（缩略图加载会失败回占位符，同本地缺失文件 UX）。
+    /// </summary>
+    private static string BuildCanonicalPath(SharedImageRecord r)
+    {
+        if (r.SourceNasId is int id && r.SourceNasPath is { } path)
+            return $"nas://{id}{path}";
+        return string.Empty;
     }
 
     /// <summary>U6-D: full shared record behind a gallery item hash (null when gone).</summary>

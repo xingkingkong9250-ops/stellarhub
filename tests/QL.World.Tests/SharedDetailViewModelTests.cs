@@ -12,6 +12,7 @@ public sealed class SharedDetailViewModelTests : IDisposable
 {
     private readonly string _dir;
     private readonly InMemoryNasConnector _nas = new();
+    private readonly NasConnectionRegistry _registry;
     private readonly SharedGalleryViewModel _gallery;
     private readonly SharedDetailViewModel _detail;
 
@@ -22,7 +23,14 @@ public sealed class SharedDetailViewModelTests : IDisposable
         var settings = new AppSettingsService(_dir);
         var cache = new SharedThumbnailCache(_nas, Path.Combine(_dir, "thumbs"));
         _gallery = new SharedGalleryViewModel(settings, cache);
-        _detail = new SharedDetailViewModel(_gallery, _nas);
+
+        // M8-C: SharedDetailViewModel 改用 NasConnectionRegistry；用 SingleConnectorFactory
+        // 包装 InMemoryNasConnector，spec 设为 Primary 让 GetPrimary 能解析到它。
+        var primarySpec = new NasConnectionSpec { Id = 1, Name = "test", Host = "h", Role = NasRole.Primary };
+        var factory = new SingleConnectorFactory(_nas, primarySpec);
+        _registry = new NasConnectionRegistry(factory);
+        _registry.EnsureAll(new[] { primarySpec });
+        _detail = new SharedDetailViewModel(_gallery, _registry);
     }
 
     [Fact]
@@ -129,8 +137,27 @@ public sealed class SharedDetailViewModelTests : IDisposable
 
     public void Dispose()
     {
+        _registry.Dispose();
         _nas.Dispose();
         try { Directory.Delete(_dir, recursive: true); }
         catch (IOException) { /* best effort */ }
+    }
+
+    /// <summary>
+    /// 测试专用：始终返回同一个 InMemoryNasConnector 实例，spec 设为 Primary。
+    /// 让 NasConnectionRegistry.GetPrimary 能解析到该 connector。
+    /// </summary>
+    private sealed class SingleConnectorFactory : INasConnectorFactory
+    {
+        private readonly InMemoryNasConnector _connector;
+        public NasConnectionSpec Spec { get; }
+
+        public SingleConnectorFactory(InMemoryNasConnector connector, NasConnectionSpec spec)
+        {
+            _connector = connector;
+            Spec = spec;
+        }
+
+        public INasConnector Create(NasConnectionSpec spec, string? plaintextPassword) => _connector;
     }
 }

@@ -101,15 +101,16 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         AddSelectedToCollectionCommand = new RelayCommand(AddSelectedToCollection);
 
         // M6-D / U6-A: shared library (NAS). Available only when logged in with a NAS account.
+        // M8-C: SharedDetailViewModel 改用 NasConnectionRegistry（按 SourceNasId 路由）。
         IsSharedLibraryAvailable = _services.SharedLibrary is not null;
-        if (IsSharedLibraryAvailable && _services.SharedStorage is { } sharedStorage)
+        if (IsSharedLibraryAvailable && _services.SharedStorage is { } sharedStorage && _services.NasRegistry is { } nasRegistry)
         {
             SharedThumbnails = new SharedThumbnailCache(
                 sharedStorage.Connector,
                 Path.Combine(_services.Settings.DataRoot, "shared-thumbs"),
                 _services.NetworkMonitor);
             SharedGallery = new SharedGalleryViewModel(_services.Settings, SharedThumbnails);
-            SharedDetail = new SharedDetailViewModel(SharedGallery, sharedStorage.Connector);
+            SharedDetail = new SharedDetailViewModel(SharedGallery, nasRegistry);
             SharedDetail.RequestSaveFile += defaultName =>
                 RequestSaveCopyDialog?.Invoke(defaultName);
             SharedDetail.SaveCompleted += (kind, title, message) =>
@@ -237,10 +238,17 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
     private async Task LoadSharedGalleryAsync()
     {
-        if (_services.SharedLibrary is null || SharedGallery is null) return;
+        // M8-C: 优先调聚合器（主+副并发加载+去重+注入 SourceNasId）；
+        // 聚合器不可用时回退主库 SharedLibrary.LoadAsync（兼容旧调用链）。
+        if (SharedGallery is null) return;
         try
         {
-            var images = await _services.SharedLibrary.LoadAsync(CancellationToken.None);
+            IReadOnlyList<SharedImageRecord> images =
+                _services.AggregatedLibrary is { } agg
+                    ? await agg.LoadAllAsync(CancellationToken.None)
+                    : _services.SharedLibrary is { } lib
+                        ? await lib.LoadAsync(CancellationToken.None)
+                        : Array.Empty<SharedImageRecord>();
             SharedGallery.Load(images);
         }
         catch (Exception ex)

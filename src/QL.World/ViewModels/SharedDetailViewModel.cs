@@ -13,7 +13,7 @@ namespace QL.World.ViewModels;
 public sealed class SharedDetailViewModel : ObservableObject
 {
     private readonly SharedGalleryViewModel _gallery;
-    private readonly INasConnector _connector;
+    private readonly NasConnectionRegistry _registry;
 
     private bool _hasSelection;
     private int _selectedCount;
@@ -22,10 +22,10 @@ public sealed class SharedDetailViewModel : ObservableObject
 
     public SharedDetailViewModel(
         SharedGalleryViewModel gallery,
-        INasConnector connector)
+        NasConnectionRegistry registry)
     {
         _gallery = gallery ?? throw new ArgumentNullException(nameof(gallery));
-        _connector = connector ?? throw new ArgumentNullException(nameof(connector));
+        _registry = registry ?? throw new ArgumentNullException(nameof(registry));
 
         SaveCopyCommand = new AsyncRelayCommand(SaveCopyAsync);
         CopyNasPathCommand = new RelayCommand(CopyNasPath);
@@ -87,12 +87,23 @@ public sealed class SharedDetailViewModel : ObservableObject
     {
         if (_item is null || NasPath is not { } nasPath) return;
 
+        // M8-C: 按 _record.SourceNasId 路由到对应 NAS connector（主或副）。
+        // SourceNasId 为 null 时（旧 library.json 主库记录）回退主 NAS。
+        INasConnector? connector = ResolveConnector(_record?.SourceNasId);
+        if (connector is null)
+        {
+            SaveCompleted?.Invoke(NotificationKind.SharedSubmission,
+                "保存副本失败",
+                "无法解析数据来源 NAS，可能已下线或被移除。");
+            return;
+        }
+
         string? target = RequestSaveFile?.Invoke(_item.FileName);
         if (string.IsNullOrEmpty(target)) return;
 
         try
         {
-            await _connector.DownloadFileAsync(nasPath, target, CancellationToken.None);
+            await connector.DownloadFileAsync(nasPath, target, CancellationToken.None);
             SaveCompleted?.Invoke(NotificationKind.SharedSubmission,
                 "已保存副本",
                 $"「{_item.FileName}」已保存到：{target}");
@@ -103,6 +114,26 @@ public sealed class SharedDetailViewModel : ObservableObject
                 "保存副本失败",
                 $"无法下载原图：{ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// M8-C: 按记录的 SourceNasId 从 NasConnectionRegistry 取对应 connector。
+    /// id 为副库 → GetSecondary(id)；id 为主库或 null → GetPrimary。
+    /// id 不在缓存（库下线/被删）→ 回退主 NAS，让下载尝试后失败而非直接报错。
+    /// </summary>
+    private INasConnector? ResolveConnector(int? sourceNasId)
+    {
+        if (sourceNasId is int id)
+        {
+            var sec = _registry.GetSecondary(id);
+            if (sec is { } s) return s.Connector;
+            // 可能 id 是主库（GetSecondary 对主库返回 null）或副库已下线
+            var pri = _registry.GetPrimary();
+            if (pri is { } p && p.Spec.Id == id) return p.Connector;
+            // id 既不在副库也不在主库 → 回退主库 connector 让下载尝试
+            return pri?.Connector;
+        }
+        return _registry.GetPrimary()?.Connector;
     }
 
     private void CopyNasPath()

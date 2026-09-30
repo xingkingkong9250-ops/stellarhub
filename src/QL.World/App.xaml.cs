@@ -487,6 +487,7 @@ public partial class App : Application
                 services.Thumbnails, services.Settings);
 
             services.NasRegistry = nasRegistry;
+            services.AggregatedLibrary = new AggregatedSharedLibraryService(nasRegistry);
             services.SharedStorage = storage;
             services.Accounts = accounts;
             services.SharedLibrary = sharedLibrary;
