@@ -63,13 +63,16 @@
 | W3/A4 | 监控目录页签 | 已实现（M2） | 目录列表/添加/移除/自动导入开关，即时生效 |
 | W3/A5 | 关于页签 | 已实现（M2） | 版本/统计/旧版 Python 库导入/打开日志文件夹 |
 | W3/A6 | 贴图组规则页签 | 已实现（M4） | 尾缀→角色规则行（模式/角色下拉/启用/删除）+ 添加规则/保存并重建/仅重建/恢复默认 + 状态文本 |
-| W3/A7 | NAS 连接页签 | 已实现（M5 WebDav + M7 Smb + v0.2.1 主 NAS/门禁） | 连接列表（N1）/ 详情表单 N2-N5 / 测试连接 + 设为主 NAS + 保存（N6）；Sftp 留待 M8；v0.2.1 加管理员门禁（IsNasManagementEnabled：未登录或管理员可见，普通用户隐藏） |
-| W3/A7-N1 | NAS 连接列表 + 新建/删除 + 主 NAS 标记 | 已实现（M5-C + v0.2.1） | ObservableCollection 绑定；新建按钮分配单调递增 id（不复用已删除）；删除按钮清除选中连接（含密码）；v0.2.1 列表项「★ 主」徽标（IsPrimary=true 显示），登录自动取主 NAS（无主取第一个） |
+| W3/A7 | NAS 连接页签 | 已实现（M5 WebDav + M7 Smb + v0.2.1 主 NAS/门禁 + M8 ShareLink/聚合/迁移） | 连接列表（N1）/ 详情表单 N2-N5 / 测试连接 + 设为主 NAS + 保存（N6）；M8-D 加「🔗 分享链接」入口 + 列表 🔗 图标区分 ShareLink 副库；M8-E 加「设为主 NAS 并迁移数据」+「搬运到此处...」（管理员可见）+ 迁移进度文案 +「显示数据来源徽章」CheckBox；v0.2.1 加管理员门禁（IsNasManagementEnabled：未登录或管理员可见，普通用户隐藏） |
+| W3/A7-N1 | NAS 连接列表 + 新建/删除 + 主 NAS 标记 + 分享链接 | 已实现（M5-C + v0.2.1 + M8-D） | ObservableCollection 绑定；新建按钮分配单调递增 id（不复用已删除）；M8-D 加「🔗 分享链接」按钮（Role=ShareLink，匿名访问，无密码框）；删除按钮清除选中连接（含密码）；v0.2.1 列表项「★ 主」徽标（IsPrimary=true 显示），M8-D 加「🔗」图标（IsShareLink=true 显示） |
 | W3/A7-N2 | 名称 | 已实现（M5-C） | 唯一显示名；绑定 SelectedNasConnection.Name |
 | W3/A7-N3 | 协议 + 主机 + 端口 | 已实现（M5-C + M7-C） | 协议下拉 WebDav + Smb（M7；Sftp 留 M8）；主机文本（IP/域名，不含 scheme）；端口提示按协议显隐（WebDav 443/80 / Smb 445）；切换协议若 Port 为前一默认或 null 自动填新协议默认（非默认值保留） |
 | W3/A7-N4 | 用户名 + 密码 | 已实现（M5-C） | 用户名留空=匿名；PasswordBox 永不回填（安全），DPAPI(CurrentUser) 加密落 config.json |
 | W3/A7-N5 | 根路径 + TLS + 自签 | 已实现（M5-C + M7-C） | 根路径提示按协议显隐（WebDav `/photos/` / Smb `StellarHubShared/`）；UseTls 标签随协议切换（WebDav「使用 HTTPS/TLS（推荐）」/ Smb「SMB3 加密协商」），Visibility 绑 IsTlsApplicable；TrustSelfSigned 仅 WebDav 显（绑 IsTrustSelfSignedApplicable） |
-| W3/A7-N6 | 测试连接 + 设为主 NAS + 保存 | 已实现（M5-C + v0.2.1） | 测试：INasConnectorFactory.Create + TestConnectionAsync；设为主 NAS（v0.2.1）：SetPrimaryCommand 选中项 IsPrimary=true + 其他全部 false + 逐个 UpdateNasConnection 持久化（选中项已为主时禁用）；保存：UpdateNasConnection（保留 EncryptedPassword/CreatedAt） |
+| W3/A7-N6 | 测试连接 + 设为主 NAS（仅切标记）+ 保存 | 已实现（M5-C + v0.2.1 + M8-E 改名） | 测试：INasConnectorFactory.Create + TestConnectionAsync；设为主 NAS（仅切标记，v0.2.1）：SetPrimaryCommand 选中项 IsPrimary=true + 其他全部 false + 逐个 UpdateNasConnection 持久化（选中项已为主时禁用；M8-E 起亦在 IsMigrating 时禁用）；保存：UpdateNasConnection（保留 EncryptedPassword/CreatedAt） |
+| W3/A7-N6-MIG | 设为主 NAS 并迁移数据 | 已实现（M8-E） | 管理员可见（IsAdmin）；SetPrimaryWithMigrationCommand 选中副库时可用；SetPrimaryWithMigrationAsync 递归统计源主库 originals+thumbnails+pending 文件数+字节数 → 弹确认框「将迁移约 N 个文件（约 X MB）」→ 调 PrimaryMigrationService.MigrateAsync 4 阶段（元数据/文件树/accounts 最后覆盖/Role 切换）；进度回调实时刷新 MigrationStatusText；失败不切 Role 保留旧主可重试（幂等） |
+| W3/A7-N6-XFER | 搬运到此处... | 已实现（M8-E） | 管理员 + 选中副库（非 Primary/非 ShareLink）时可用；TransferToHereCommand 弹引导 MessageBox「请在共享画廊选中 N 张图片 → 右键 → 搬运到副库」（实际搬运流程入口在画廊右键菜单，DataTransferService 已就绪） |
+| W3/A7-N6-SOURCE | 显示数据来源徽章 CheckBox | 已实现（M8-E） | IsChecked 绑 ShowSourceBadge（AppSettingsService 持久化，默认 false）；开启后画廊 SourceBadge 由「共享」改显「nas://{id}」便于管理员区分主副库数据 |
 | W1-N7 | 扫描 NAS 库 | 已实现（M5-D） | 工具栏「📡 扫描 NAS」按钮；0 连接→提示并打开 W3/A7；1 连接→直扫；>1 连接→代码内建选择器（ComboBox + 扫描/取消）；ScanNasLibraryCommand→RemoteLibraryScanner→ImportService(Source=Remote)→source='remote' + nas_connection_id 落库；进度上 C1 状态栏 |
 | W1-N8 | 下载队列入口 | 已实现（M5-G） | 工具栏「📥 下载队列」按钮；ShowDownloadQueueCommand 打开 W4；无远程图片时按钮仍可点（窗口显示空队列引导） |
 | W1/B2-3-DL | 图卡右键「下载到本地...」 | 已实现（M5-G） | 远程项（Source=Remote）右键菜单条目；本地项隐藏；弹出 System.Windows.Forms.FolderBrowserDialog 选目录→加入下载队列 |
@@ -83,7 +86,7 @@
 | W5 | 登录窗口 | 已实现（M6-B/U6 + v0.2.1 简化） | 用户名 + 密码 + 登录按钮 + 仅本地模式 + 「打开 NAS 设置」入口（v0.2.1）；v0.2.1 移除 NAS 下拉（系统自动取主 NAS IsPrimary=true 优先，无主取第一个）；首次启动检测主 NAS accounts.json 为空 → 自动创建预置管理员 XingKongKong/zzh18254359250 + 用户名预填；登录按钮 CanLogin 联动 IsBusy + 有可用 NAS |
 | W3/A8 | 用户管理页签 | 已实现（M6-C/U6 编号确认） | 仅管理员可见；账号列表/新建用户/启用禁用/重置密码/删除用户；M6-C 初编 A7 与 NAS 页签撞号，U6 起统一改 A8 |
 | W1/B1-SCOPE | 本地库/共享库分段切换 | 已实现（U6-A） | 画廊上方分段控件；仅 NAS 登录用户可切共享段；切换时详情栏（B3）随作用域换模板，搜索词按作用域重新应用 |
-| W1/B2-SHARED | 共享库画廊 | 已实现（U6-A） | SharedGalleryList：共享 ListBox 复用 B2-3 网格/列表 DataTemplate；缩略图走 SharedThumbnailCache（弱网同样跳过）；SourceBadge=「共享」 |
+| W1/B2-SHARED | 共享库画廊 | 已实现（U6-A + M8-C 聚合 + M8-E 来源徽章） | SharedGalleryList：共享 ListBox 复用 B2-3 网格/列表 DataTemplate；缩略图走 SharedThumbnailCache（弱网同样跳过）；M8-C 起用 AggregatedSharedLibraryService 并发加载主+副 library.json 主库优先去重，每条注入 SourceNasId；SourceBadge 默认「共享」，M8-E 起当 ShowSourceBadge=true 改显「nas://{SourceNasId}」便于管理员区分来源 |
 | W1/B2-3-SUB | 图卡右键「提交到共享库」 | 已实现（U6-B） | 仅本地项可见；上传原图+缩略图+pending JSON；hash 查重（库内已有/审核中均拒绝）；CanSubmitToShared=false 时置灰 |
 | W1/A1-REV | 「审核队列」入口 + 待审角标 | 已实现（U6-C） | 工具栏「🛡 审核队列」按钮，仅管理员可见；右上角红色圆角角标显示 pending 数，0 时隐藏；关闭 W6 后自动刷新 |
 | W6 | 审核队列窗口 | 已实现（U6-C） | 720×540，最小 600 宽；行：96×72 待审缩略图 + 提交人/时间/尺寸/大小/标签 + ✓通过/✕拒绝；空态「没有待审核的提交」；通过/拒绝后行即时移除 |

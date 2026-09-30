@@ -9,6 +9,51 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-09-30 M8 多 NAS 聚合 + 主 NAS 迁移
+
+v0.2.1 单实例假设限制：登录后只能访问主 NAS，副库需重新登录；画廊无主副
+聚合视图；管理员切换主 NAS 需手动搬数据。M8 打破单实例瓶颈，引入聚合视图、
+ShareLink 匿名分享、自主迁移 + 手动搬运能力，让多 NAS 部署成为一等公民。
+
+### M8-A · NasRole 枚举 + 主 NAS 强制校验 + SourceNasId 字段
+
+- `NasRole` 枚举（Primary=0/Secondary=1/ShareLink=2）替换 `IsPrimary` 布尔，`IsPrimary` 保留为计算属性 + 副作用 setter 兼容旧 config
+- `AppSettingsService.ValidateNasRoles` 保证全列表至多 1 个 Primary
+- `SharedImageRecord` 加 `SourceNasId` 字段持久化 library.json 便于跨重启保留来源
+
+### M8-B · 多实例 ServiceRegistry + 副库连接注册
+
+- `NasConnectionRegistry`（新建）：按 spec.Id 缓存 `INasConnector` + `SharedStorageService` 副本，fingerprint 变化触发重建，主库失败抛异常副库失败仅 Debug 日志
+- `ServiceRegistry.NasRegistry` + `SecondaryStorages` 字段；旧 SharedStorage/Accounts/SharedLibrary/Submissions 仍指向主库实例（向后兼容）
+- `App.xaml.cs` 登录后构造 NasRegistry + EnsureAll，OnExit 统一释放
+
+### M8-C · 聚合视图 + 来源注入
+
+- `AggregatedSharedLibraryService`（新建）：并发加载主库 + 所有副库 library.json，注入 `SourceNasId`，主库优先去重
+- `SharedGalleryViewModel.Load` 用 aggregator 替代单库 Load（带回退）
+- `SharedDetailViewModel` 加 `ResolveConnector(int?)` 按 SourceNasId 路由 connector
+
+### M8-D · 副库权限分级 + ShareLink 副库
+
+- `PermissionService` 加 CanWriteToSecondaryNas / CanDownloadFromSecondaryNas / CanMigratePrimary / CanSubmitToSecondaryNas
+- `WebDavConnectorFactory` 跳过 Basic-auth for ShareLink（匿名访问）
+- `SubmissionService` 加 `NotPermitted` outcome；普通用户提交副库返回 NotPermitted
+- `SettingsViewModel` 加 `AddShareLinkCommand` 单独入口；A7 列表 🔗 图标区分
+
+### M8-E · 主 NAS 迁移 + 管理员数据搬运 + 来源徽章开关
+
+- `PrimaryMigrationService`（新建）：4 阶段迁移（元数据 JSON / originals+thumbnails 文件树 / accounts 最后覆盖 / Role 切换），幂等复制（GetMetadataAsync 探测跳过），失败不切 Role 保留旧主
+- `DataTransferService`（新建，VMs/Support）：管理员手动搬运 N 张共享图，同 connector 优先 MOVE，跨主机 download→upload→delete 源；目标 library AddOrUpdate + 源 library Remove；单条失败计入 errors 不阻断
+- `SettingsViewModel.SetPrimaryWithMigrationAsync`：递归预览源主库文件数+字节数 → 弹确认框 → 调迁移服务，进度回调实时刷新
+- A7 加「设为主 NAS 并迁移数据」+「搬运到此处...」+ 迁移进度文案 +「显示数据来源徽章」CheckBox
+- `AppSettingsService.ShowSourceBadge` 布尔设置项（默认 false）；开启后画廊 SourceBadge 显示 `nas://{id}`
+
+### 变更
+
+- 版本号 0.2.1 → 0.3.0（NO.M 功能里程碑，次版本号 +0.1.0，修订号归零）
+- 全量测试 553 项全绿（519 → 553，+34：M8-A/B/C/D/E 各阶段新增测试）
+- 6 个子阶段独立提交（70aec3c M8-A / 4fb23da M8-B / 0f8dbc8 M8-C / 86e0e9a M8-D / 2893f49 M8-E / M8-Z 本次）
+
 ## [0.2.1] — 2026-09-30 预置管理员 + 主 NAS 标记 + 登录窗口简化
 
 v0.2.0 发布后实测痛点：首次启动需手动点「初始化管理员」且默认 admin/admin123 繁琐；登录窗口 NAS 下拉对单 NAS 用户多余；W3/A7 NAS 配置页签无管理员门禁，普通用户可误改。本轮补丁修复上述体验问题。
