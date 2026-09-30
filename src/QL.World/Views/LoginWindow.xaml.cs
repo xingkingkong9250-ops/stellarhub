@@ -39,15 +39,18 @@ public partial class LoginWindow : Window
 
     private async void OnLoginClick(object sender, RoutedEventArgs e)
     {
-        LoginButton.IsEnabled = false;
+        // IsBusy 由 ViewModel 控制 CanLogin，从而联动 LoginButton.IsEnabled。
         await _viewModel.LoginAsync(PasswordBox.Password);
         // If login succeeded the window is already closed by the event handler.
-        if (IsLoaded)
-            LoginButton.IsEnabled = true;
     }
 
     private void OnLocalModeClick(object sender, RoutedEventArgs e)
     {
         _viewModel.LocalModeCommand.Execute(null);
+    }
+
+    private void OnOpenNasSettingsClick(object sender, RoutedEventArgs e)
+    {
+        _viewModel.OpenNasSettingsCommand.Execute(null);
     }
 }

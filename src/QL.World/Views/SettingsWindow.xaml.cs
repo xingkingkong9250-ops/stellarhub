@@ -68,4 +68,10 @@ public partial class SettingsWindow : Window
         if (sender is ComboBox cb && cb.SelectedItem is NasConnectionProtocol p)
             _viewModel.OnNasProtocolChanged(p);
     }
+
+    /// <summary>
+    /// v0.2.1: 未登录场景下打开设置窗口时直接定位到 A7 NAS 页签（index 6），
+    /// 便于首次启动配置 NAS。仅当 caller 显式调用时生效；普通打开走默认选中。
+    /// </summary>
+    public void SelectNasTab() => MainTabs.SelectedIndex = 6;
 }

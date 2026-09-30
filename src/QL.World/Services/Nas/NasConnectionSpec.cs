@@ -47,6 +47,14 @@ public sealed class NasConnectionSpec
     /// <summary>Trust self-signed TLS certs (M5-B). Defaults to false for safety.</summary>
     public bool TrustSelfSigned { get; set; } = false;
 
+    /// <summary>
+    /// v0.2.1: 管理员标记的主 NAS。登录时系统自动取 IsPrimary=true 的连接
+    /// 作为共享目录入口；无主 NAS 时回退取列表第一个。仅允许一个 IsPrimary=true
+    /// （SettingsViewModel.SetPrimaryCommand 设置时把其他改为 false）。
+    /// 默认 false，旧 config.json 反序列化兼容。
+    /// </summary>
+    public bool IsPrimary { get; set; } = false;
+
     public DateTimeOffset CreatedAt { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }

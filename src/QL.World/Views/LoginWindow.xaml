@@ -5,20 +5,18 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:conv="clr-namespace:QL.World.Views.Converters"
         mc:Ignorable="d"
-        Width="420" Height="380"
+        Width="420" Height="320"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen"
         Title="登录 — 千星汇图">
 
     <Window.Resources>
-        <conv:BoolToVisibilityConverter x:Key="InverseBoolVis" Parameter="Invert" />
         <conv:NullToVisibilityConverter x:Key="NullVis" />
     </Window.Resources>
 
     <Grid Background="{DynamicResource BackgroundBrush}">
         <Grid Margin="28,24">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -37,33 +35,23 @@
                        Foreground="{DynamicResource TextMutedBrush}"
                        HorizontalAlignment="Center" />
 
-            <!-- NAS 连接 -->
-            <TextBlock Grid.Row="2" Text="NAS 连接" FontSize="12"
-                       Foreground="{DynamicResource TextSecondaryBrush}" />
-            <ComboBox Grid.Row="2" Margin="0,18,0,0"
-                      ItemsSource="{Binding NasConnections}"
-                      SelectedItem="{Binding SelectedConnection}"
-                      DisplayMemberPath="Name"
-                      Height="28"
-                      Foreground="{DynamicResource TextPrimaryBrush}" />
-
             <!-- 用户名 -->
-            <TextBlock Grid.Row="3" Margin="0,12,0,0" Text="用户名" FontSize="12"
+            <TextBlock Grid.Row="2" Text="用户名" FontSize="12"
                        Foreground="{DynamicResource TextSecondaryBrush}" />
-            <TextBox Grid.Row="3" Margin="0,30,0,0"
+            <TextBox Grid.Row="2" Margin="0,18,0,0"
                      Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"
                      Height="28"
                      Foreground="{DynamicResource TextPrimaryBrush}" />
 
             <!-- 密码 -->
-            <TextBlock Grid.Row="4" Margin="0,12,0,0" Text="密码" FontSize="12"
+            <TextBlock Grid.Row="3" Margin="0,12,0,0" Text="密码" FontSize="12"
                        Foreground="{DynamicResource TextSecondaryBrush}" />
-            <PasswordBox x:Name="PasswordBox" Grid.Row="4" Margin="0,30,0,0"
+            <PasswordBox x:Name="PasswordBox" Grid.Row="3" Margin="0,30,0,0"
                          Height="28"
                          Foreground="{DynamicResource TextPrimaryBrush}" />
 
             <!-- 错误消息 -->
-            <TextBlock Grid.Row="5" Margin="0,12,0,0"
+            <TextBlock Grid.Row="4" Margin="0,12,0,0"
                        Text="{Binding ErrorMessage}"
                        FontSize="11" TextWrapping="Wrap"
                        Foreground="{DynamicResource WarningBrush}"
@@ -71,11 +59,15 @@
                        VerticalAlignment="Top" />
 
             <!-- 按钮区 -->
-            <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Center">
+            <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Center">
                 <Button x:Name="LoginButton" Content="登录" Width="96" Height="30" Margin="0,0,8,0"
                         Click="OnLoginClick"
                         IsDefault="True"
+                        IsEnabled="{Binding CanLogin}"
                         Style="{StaticResource AccentButtonStyle}" />
+                <Button Content="打开 NAS 设置" Width="110" Height="30" Margin="8,0,8,0"
+                        Click="OnOpenNasSettingsClick"
+                        Style="{StaticResource SubtleButtonStyle}" />
                 <Button Content="仅本地模式" Width="96" Height="30" Margin="8,0,0,0"
                         Click="OnLocalModeClick"
                         Style="{StaticResource SubtleButtonStyle}" />

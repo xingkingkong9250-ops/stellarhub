@@ -146,6 +146,52 @@ public sealed class SettingsViewModelNasTests : IDisposable
         Assert.True(_viewModel.TestNasConnectionCommand.CanExecute(null));
     }
 
+    [Fact]
+    public void IsNasManagementEnabled_true_when_currentUser_null()
+    {
+        // v0.2.1: 未登录场景（首次启动配置 NAS）应可见
+        Assert.True(_viewModel.IsNasManagementEnabled);
+    }
+
+    [Fact]
+    public void SetPrimary_marks_selected_and_clears_others()
+    {
+        // v0.2.1: 主 NAS 标记——选中项 IsPrimary=true，其他全部 false
+        _viewModel.AddNasConnectionCommand.Execute(null); // id=1
+        _viewModel.AddNasConnectionCommand.Execute(null); // id=2
+        Assert.False(_viewModel.NasConnections[0].IsPrimary);
+        Assert.False(_viewModel.NasConnections[1].IsPrimary);
+
+        // 选中第 2 个并设为主
+        _viewModel.SelectedNasConnection = _viewModel.NasConnections[1];
+        _viewModel.SetPrimaryCommand.Execute(null);
+
+        Assert.False(_viewModel.NasConnections[0].IsPrimary);
+        Assert.True(_viewModel.NasConnections[1].IsPrimary);
+        Assert.Contains("主 NAS", _viewModel.NasStatusText);
+        // 命令在选中项已 IsPrimary=true 时禁用
+        Assert.False(_viewModel.SetPrimaryCommand.CanExecute(null));
+
+        // 切换选中第 1 个，命令重新可用
+        _viewModel.SelectedNasConnection = _viewModel.NasConnections[0];
+        Assert.True(_viewModel.SetPrimaryCommand.CanExecute(null));
+        _viewModel.SetPrimaryCommand.Execute(null);
+        Assert.True(_viewModel.NasConnections[0].IsPrimary);
+        Assert.False(_viewModel.NasConnections[1].IsPrimary);
+    }
+
+    [Fact]
+    public void SetPrimary_persists_to_settings()
+    {
+        _viewModel.AddNasConnectionCommand.Execute(null);
+        _viewModel.SetPrimaryCommand.Execute(null);
+
+        var reloaded = new AppSettingsService(_lib.DirectoryRoot);
+        reloaded.Load();
+        var c = Assert.Single(reloaded.NasConnections);
+        Assert.True(c.IsPrimary);
+    }
+
     public void Dispose()
     {
         _thumbnails.Dispose();

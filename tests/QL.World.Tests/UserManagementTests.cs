@@ -21,7 +21,7 @@ public sealed class UserManagementTests
         var storage = new SharedStorageService(connector);
         var accounts = new AccountService(storage);
         // Bootstrap an admin account.
-        accounts.InitializeAdminAsync("admin123", CancellationToken.None).GetAwaiter().GetResult();
+        accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None).GetAwaiter().GetResult();
         var admin = accounts.AuthenticateAsync("admin", "admin123", CancellationToken.None).GetAwaiter().GetResult()!;
 
         var settings = new AppSettingsService(Path.Combine(Path.GetTempPath(), $"stellarhub_um_{Guid.NewGuid():N}"));

@@ -21,9 +21,11 @@ public sealed class AccountService
 
     /// <summary>
     /// Creates the first admin account when accounts.json does not exist or
-    /// is empty. Returns the created admin; throws if accounts already exist.
+    /// is empty. v0.2.1 起接受 <paramref name="username"/> 参数（不再硬编码
+    /// "admin"），用于预置管理员账号（如 XingKongKong）。Returns the created
+    /// admin; throws if accounts already exist.
     /// </summary>
-    public async Task<UserAccount> InitializeAdminAsync(string defaultPassword, CancellationToken ct)
+    public async Task<UserAccount> InitializeAdminAsync(string username, string defaultPassword, CancellationToken ct)
     {
         var accounts = (await _storage.LoadAccountsAsync(ct).ConfigureAwait(false)).ToList();
         if (accounts.Count > 0)
@@ -32,7 +34,7 @@ public sealed class AccountService
         var (hash, salt) = PasswordHasher.Hash(defaultPassword);
         var admin = new UserAccount
         {
-            Username = "admin",
+            Username = username,
             PasswordHash = hash,
             Salt = salt,
             Role = UserRole.Admin,

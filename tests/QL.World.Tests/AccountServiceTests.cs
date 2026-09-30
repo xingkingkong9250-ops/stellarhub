@@ -26,7 +26,7 @@ public class AccountServiceTests
     [Fact]
     public async Task InitializeAdmin_creates_admin_when_empty()
     {
-        var admin = await _accounts.InitializeAdminAsync("admin123", CancellationToken.None);
+        var admin = await _accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None);
 
         Assert.Equal("admin", admin.Username);
         Assert.Equal(UserRole.Admin, admin.Role);
@@ -36,16 +36,27 @@ public class AccountServiceTests
     [Fact]
     public async Task InitializeAdmin_throws_when_accounts_exist()
     {
-        await _accounts.InitializeAdminAsync("admin123", CancellationToken.None);
+        await _accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _accounts.InitializeAdminAsync("admin123", CancellationToken.None));
+            _accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task InitializeAdmin_v021_accepts_custom_username()
+    {
+        // v0.2.1: 预置管理员 XingKongKong 的回归保险——非默认用户名也能创建
+        var admin = await _accounts.InitializeAdminAsync("XingKongKong", "zzh18254359250", CancellationToken.None);
+
+        Assert.Equal("XingKongKong", admin.Username);
+        Assert.Equal(UserRole.Admin, admin.Role);
+        Assert.True(admin.IsActive);
     }
 
     [Fact]
     public async Task CreateAccount_adds_user()
     {
-        await _accounts.InitializeAdminAsync("admin123", CancellationToken.None);
+        await _accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None);
 
         var user = await _accounts.CreateAccountAsync("alice", "pass123", UserRole.User, "admin", CancellationToken.None);
 
@@ -57,7 +68,7 @@ public class AccountServiceTests
     [Fact]
     public async Task CreateAccount_rejects_duplicate_username_case_insensitive()
     {
-        await _accounts.InitializeAdminAsync("admin123", CancellationToken.None);
+        await _accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None);
         await _accounts.CreateAccountAsync("Alice", "pass123", UserRole.User, "admin", CancellationToken.None);
 
         await Assert.ThrowsAsync<ArgumentException>(() =>
@@ -70,7 +81,7 @@ public class AccountServiceTests
     [InlineData("thisusernameiswaytoolong01234567890123456")]
     public async Task CreateAccount_rejects_invalid_username(string username)
     {
-        await _accounts.InitializeAdminAsync("admin123", CancellationToken.None);
+        await _accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None);
 
         await Assert.ThrowsAsync<ArgumentException>(() =>
             _accounts.CreateAccountAsync(username, "pass123", UserRole.User, "admin", CancellationToken.None));
@@ -81,7 +92,7 @@ public class AccountServiceTests
     [InlineData("12345")]
     public async Task CreateAccount_rejects_short_password(string password)
     {
-        await _accounts.InitializeAdminAsync("admin123", CancellationToken.None);
+        await _accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None);
 
         await Assert.ThrowsAsync<ArgumentException>(() =>
             _accounts.CreateAccountAsync("bob", password, UserRole.User, "admin", CancellationToken.None));
@@ -90,7 +101,7 @@ public class AccountServiceTests
     [Fact]
     public async Task Authenticate_returns_account_on_success()
     {
-        await _accounts.InitializeAdminAsync("admin123", CancellationToken.None);
+        await _accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None);
 
         var account = await _accounts.AuthenticateAsync("admin", "admin123", CancellationToken.None);
 
@@ -101,7 +112,7 @@ public class AccountServiceTests
     [Fact]
     public async Task Authenticate_returns_null_on_wrong_password()
     {
-        await _accounts.InitializeAdminAsync("admin123", CancellationToken.None);
+        await _accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None);
 
         var account = await _accounts.AuthenticateAsync("admin", "wrong", CancellationToken.None);
 
@@ -111,7 +122,7 @@ public class AccountServiceTests
     [Fact]
     public async Task Authenticate_returns_null_on_unknown_user()
     {
-        await _accounts.InitializeAdminAsync("admin123", CancellationToken.None);
+        await _accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None);
 
         var account = await _accounts.AuthenticateAsync("nobody", "admin123", CancellationToken.None);
 
@@ -121,7 +132,7 @@ public class AccountServiceTests
     [Fact]
     public async Task Authenticate_returns_null_for_disabled_account()
     {
-        await _accounts.InitializeAdminAsync("admin123", CancellationToken.None);
+        await _accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None);
         await _accounts.CreateAccountAsync("alice", "pass123", UserRole.User, "admin", CancellationToken.None);
 
         await _accounts.DisableAccountAsync("alice", CancellationToken.None);
@@ -133,7 +144,7 @@ public class AccountServiceTests
     [Fact]
     public async Task EnableAccount_allows_login_again()
     {
-        await _accounts.InitializeAdminAsync("admin123", CancellationToken.None);
+        await _accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None);
         await _accounts.CreateAccountAsync("alice", "pass123", UserRole.User, "admin", CancellationToken.None);
         await _accounts.DisableAccountAsync("alice", CancellationToken.None);
 
@@ -146,7 +157,7 @@ public class AccountServiceTests
     [Fact]
     public async Task ResetPassword_changes_password()
     {
-        await _accounts.InitializeAdminAsync("admin123", CancellationToken.None);
+        await _accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None);
         await _accounts.CreateAccountAsync("alice", "oldpass", UserRole.User, "admin", CancellationToken.None);
 
         await _accounts.ResetPasswordAsync("alice", "newpass", CancellationToken.None);
@@ -158,7 +169,7 @@ public class AccountServiceTests
     [Fact]
     public async Task DeleteAccount_removes_user()
     {
-        await _accounts.InitializeAdminAsync("admin123", CancellationToken.None);
+        await _accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None);
         await _accounts.CreateAccountAsync("alice", "pass123", UserRole.User, "admin", CancellationToken.None);
 
         await _accounts.DeleteAccountAsync("alice", "admin", CancellationToken.None);
@@ -170,7 +181,7 @@ public class AccountServiceTests
     [Fact]
     public async Task DeleteAccount_cannot_delete_self()
     {
-        await _accounts.InitializeAdminAsync("admin123", CancellationToken.None);
+        await _accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _accounts.DeleteAccountAsync("admin", "admin", CancellationToken.None));
@@ -179,7 +190,7 @@ public class AccountServiceTests
     [Fact]
     public async Task DeleteAccount_cannot_delete_last_admin()
     {
-        await _accounts.InitializeAdminAsync("admin123", CancellationToken.None);
+        await _accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None);
         await _accounts.CreateAccountAsync("alice", "pass123", UserRole.Admin, "admin", CancellationToken.None);
         await _accounts.DisableAccountAsync("alice", CancellationToken.None);
 

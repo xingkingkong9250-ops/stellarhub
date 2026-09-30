@@ -111,6 +111,8 @@ public sealed class SettingsViewModel : ObservableObject
             DeleteNasConnection, () => SelectedNasConnection is not null);
         SaveNasConnectionCommand = new RelayCommand(
             SaveNasConnection, () => SelectedNasConnection is not null);
+        SetPrimaryCommand = new RelayCommand(
+            SetPrimary, () => SelectedNasConnection is not null && !SelectedNasConnection.IsPrimary);
         TestNasConnectionCommand = new AsyncRelayCommand(
             TestNasConnectionAsync,
             () => SelectedNasConnection is not null && !IsTestingNasConnection);
@@ -596,7 +598,16 @@ public sealed class SettingsViewModel : ObservableObject
     public RelayCommand AddNasConnectionCommand { get; }
     public RelayCommand DeleteNasConnectionCommand { get; }
     public RelayCommand SaveNasConnectionCommand { get; }
+    public RelayCommand SetPrimaryCommand { get; }
     public AsyncRelayCommand TestNasConnectionCommand { get; }
+
+    /// <summary>
+    /// v0.2.1: A7 NAS 页签管理员门禁。未登录（首次配置场景）或当前用户为
+    /// 管理员时可见；普通用户隐藏。与 <see cref="IsUserManagementEnabled"/>
+    /// 的「仅管理员」不同——本属性允许 null currentUser 以支持首次启动
+    /// 配置 NAS。
+    /// </summary>
+    public bool IsNasManagementEnabled => _currentUser is null || _currentUser.IsAdmin;
 
     private void AddNasConnection()
     {
@@ -627,6 +638,30 @@ public sealed class SettingsViewModel : ObservableObject
         _settings.UpdateNasConnection(SelectedNasConnection);
         NasStatusText = "已保存连接。";
         RefreshNasConnections();
+    }
+
+    /// <summary>
+    /// v0.2.1: 把选中 NAS 标记为主 NAS（IsPrimary=true），其他连接全部
+    /// 设为 false（仅允许一个主 NAS）。逐个调 UpdateNasConnection 持久化。
+    /// 刷新列表 + 重选当前项以触发 UI「主」徽标更新。
+    /// </summary>
+    private void SetPrimary()
+    {
+        if (SelectedNasConnection is null) return;
+        int primaryId = SelectedNasConnection.Id;
+        foreach (var c in NasConnections)
+        {
+            bool newPrimary = c.Id == primaryId;
+            if (c.IsPrimary != newPrimary)
+            {
+                c.IsPrimary = newPrimary;
+                _settings.UpdateNasConnection(c);
+            }
+        }
+        NasStatusText = "已设为主 NAS。";
+        RefreshNasConnections();
+        SelectedNasConnection = NasConnections.FirstOrDefault(c => c.Id == primaryId);
+        SetPrimaryCommand.RaiseCanExecuteChanged();
     }
 
     private async Task TestNasConnectionAsync()

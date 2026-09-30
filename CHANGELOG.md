@@ -9,6 +9,47 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-09-30 预置管理员 + 主 NAS 标记 + 登录窗口简化
+
+v0.2.0 发布后实测痛点：首次启动需手动点「初始化管理员」且默认 admin/admin123 繁琐；登录窗口 NAS 下拉对单 NAS 用户多余；W3/A7 NAS 配置页签无管理员门禁，普通用户可误改。本轮补丁修复上述体验问题。
+
+### 预置管理员账号
+
+- 启动检测主 NAS 可达 + accounts.json 为空 → 自动创建预置管理员 `XingKongKong` / `zzh18254359250`，登录窗口用户名预填
+- `AccountService.InitializeAdminAsync` 签名加 `username` 参数（不再硬编码 "admin"），保持向后兼容调用方需显式传用户名
+
+### 主 NAS 标记
+
+- `NasConnectionSpec` 加 `IsPrimary` 字段（默认 false，旧 config.json 反序列化兼容）
+- 登录时系统自动取 `IsPrimary=true` 的连接；无主则取列表第一个
+- W3/A7 列表加「★ 主」徽标（IsPrimary=true 显示），详情区 N6 加「设为主 NAS」按钮（选中项已为主时禁用）
+- `SettingsViewModel.SetPrimaryCommand` 把选中项 IsPrimary=true + 其他全部 false + 逐个 `UpdateNasConnection` 持久化
+
+### 登录窗口简化
+
+- 移除 NAS 连接下拉（`NasConnections` / `SelectedConnection` 字段删除）
+- 加「打开 NAS 设置」按钮——未登录也可打开 SettingsWindow 的 A7 页签配置 NAS；关闭后 `RefreshNasState()` 让登录窗口立即生效新配置（无需重启）
+- `LoginViewModel.CanLogin` 取决于是否有可用 NAS + 未在登录中（`IsBusy` 联动）
+- `LoginViewModel.Username` 接受 `presetUsername` 参数（App.xaml.cs 启动自动初始化管理员后预填）
+
+### W3/A7 NAS 页签管理员门禁
+
+- `SettingsViewModel.IsNasManagementEnabled` = `_currentUser is null || _currentUser.IsAdmin`（未登录可见以便首次配置；普通用户隐藏）
+- A7 TabItem `Visibility` 绑 `IsNasManagementEnabled` + `BoolToVisibilityConverter`
+- A8 用户管理页签 `IsUserManagementEnabled` 不动（仅管理员）
+
+### 部署说明
+
+- 首次启动：登录窗口显示「打开 NAS 设置」入口 → 配好 NAS + 标记主 NAS + 保存 → 关闭 → 登录按钮自动启用
+- 第二次启动：自动连接主 NAS + 自动创建 XingKongKong 管理员 + 用户名预填 → 输密码 `zzh18254359250` 登录
+- 多 NAS 场景：管理员在 W3/A7 标记某个为主，登录用主 NAS；其他 NAS 仅配置不用于登录
+
+### 变更
+
+- 版本号 0.2.0 → 0.2.1（NO.P 补丁，修订号 +0.0.1）
+- 全量测试 519 项全绿（512 → 519，+7：AccountServiceTests +1 + LoginViewModelTests +3 + SettingsViewModelNasTests +3）
+- 0 警告 0 错误
+
 ## [0.2.0] — 2026-09-30 M7 NAS SMB 协议扩展
 
 v0.1.1 已支持 WebDAV NAS 协议，但用户使用绿联成品 NAS（UGOS）——UGOS 默认开启 SMB 文件服务，WebDAV 需额外配置，对成品 NAS 用户不友好。M7 在现有 `INasConnector` 抽象上加 SMB 协议驱动（仅 SMB；SFTP 推到 M8 单独里程碑）。选型与 enum 注释一致——Win32 `mpr.dll` P/Invoke（zero new NuGet），与项目「零依赖」风格统一。

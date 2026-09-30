@@ -386,13 +386,44 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// M6-B: shows the login window and wires multi-user services on success.
-    /// Returns the authenticated CurrentUser, or null when the user chose
-    /// local-only mode (shared library unavailable).
+    /// M6-B + v0.2.1: 启动登录窗口。系统自动取主 NAS（IsPrimary=true 优先，
+    /// 无主则取列表第一个）；首次启动检测 accounts.json 为空时自动创建预置
+    /// 管理员 XingKongKong/zzh18254359250，并预填用户名。NAS 配置入口在登录
+    /// 窗口的「打开 NAS 设置」按钮，便于未配置 NAS 时直接进入 A7 页签。
     /// </summary>
     private CurrentUser? ShowLoginGate(ServiceRegistry services)
     {
-        var loginVm = new LoginViewModel(services.Settings, services.NasFactory);
+        // v0.2.1: 解析主 NAS + 探测 accounts.json 是否需初始化预置管理员
+        var primarySpec = services.Settings.NasConnections.FirstOrDefault(c => c.IsPrimary)
+            ?? services.Settings.NasConnections.FirstOrDefault();
+
+        string? presetUsername = null;
+        if (primarySpec is not null)
+        {
+            try
+            {
+                using var probeConnector = services.NasFactory.Create(primarySpec, plaintextPassword: null);
+                var probeStorage = new SharedStorageService(probeConnector);
+                var probeAccounts = new AccountService(probeStorage);
+                var existing = probeStorage.LoadAccountsAsync(CancellationToken.None).GetAwaiter().GetResult();
+                if (existing.Count == 0)
+                {
+                    probeAccounts.InitializeAdminAsync(
+                        username: "XingKongKong",
+                        defaultPassword: "zzh18254359250",
+                        CancellationToken.None).GetAwaiter().GetResult();
+                    WriteLog("[LOGIN] Bootstrap admin 'XingKongKong' created on primary NAS.");
+                    presetUsername = "XingKongKong";
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteLog($"[LOGIN] Primary NAS probe failed (user will see error in login window): {ex.Message}");
+            }
+        }
+
+        var loginVm = new LoginViewModel(services.Settings, services.NasFactory, presetUsername);
+        loginVm.NasSettingsRequested += () => OpenNasSettings(services, loginVm);
         var loginWindow = new LoginWindow(loginVm);
 
         bool? result = loginWindow.ShowDialog();
@@ -407,7 +438,7 @@ public partial class App : Application
         if (currentUser is null)
             return null;
 
-        // Build NAS connector + shared services for the selected connection.
+        // Build NAS connector + shared services for the user's NAS connection.
         try
         {
             var spec = services.Settings.NasConnections.FirstOrDefault(c => c.Id == currentUser.NasConnectionId);
@@ -417,8 +448,6 @@ public partial class App : Application
                 return null;
             }
 
-            // Re-authenticate to get the account (the window already verified).
-            // Here we just set up the services for the session.
             var connector = services.NasFactory.Create(spec, plaintextPassword: null);
             var storage = new SharedStorageService(connector);
             var accounts = new AccountService(storage);
@@ -440,6 +469,38 @@ public partial class App : Application
             WriteLog($"[LOGIN] Failed to initialize shared services: {ex}");
             return null;
         }
+    }
+
+    /// <summary>
+    /// v0.2.1: 登录窗口「打开 NAS 设置」按钮回调。构造 SettingsViewModel
+    /// （accounts=null / currentUser=null，因未登录；A8 用户管理页签自动隐藏
+    /// 因 IsUserManagementEnabled=false，A7 NAS 页签可见因 IsNasManagementEnabled
+    /// 允许 null currentUser）+ SettingsWindow + SelectNasTab + ShowDialog。
+    /// 关闭后调 loginVm.RefreshNasState() 让登录窗口立即生效新配置。
+    /// </summary>
+    private void OpenNasSettings(ServiceRegistry services, ViewModels.LoginViewModel loginVm)
+    {
+        var settingsVm = new ViewModels.SettingsViewModel(
+            services.Settings,
+            services.Thumbnails,
+            services.ImageQuery,
+            services.Watcher,
+            services.LegacyImporter,
+            new ModelDownloadService(services.Settings.DataRoot, WriteLog),
+            services.Notifications,
+            _logDirectory,
+            services.PbrGrouping,
+            services.NasFactory,
+            accounts: null,
+            currentUser: null);
+        var window = new Views.SettingsWindow(settingsVm)
+        {
+            Owner = null,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen
+        };
+        window.SelectNasTab();
+        window.ShowDialog();
+        loginVm.RefreshNasState();
     }
 
     private static void EnsureDataDirectories(string dataRoot)

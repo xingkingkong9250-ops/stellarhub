@@ -24,7 +24,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TabControl Grid.Row="0" Margin="12" Background="Transparent"
+        <TabControl x:Name="MainTabs" Grid.Row="0" Margin="12" Background="Transparent"
                     BorderBrush="{DynamicResource BorderSubtleBrush}">
 
             <!-- ═══ A1 常规 ═══ -->
@@ -285,8 +285,9 @@
                 </Grid>
             </TabItem>
 
-            <!-- ═══ A7 NAS 连接 (M5 N1-N6) ═══ -->
-            <TabItem Header="NAS 连接">
+            <!-- ═══ A7 NAS 连接 (M5 N1-N6 + v0.2.1 主 NAS 标记) ═══ -->
+            <TabItem Header="NAS 连接"
+                     Visibility="{Binding IsNasManagementEnabled, Converter={StaticResource BoolVis}}">
                 <Grid Margin="14,12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -300,7 +301,7 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="NAS 连接（M5 仅 WebDAV；SMB/SFTP 预留）"
+                        <TextBlock Grid.Column="0" Text="NAS 连接（WebDav + Smb；Sftp 留待 M8）"
                                    Style="{StaticResource SectionCaptionStyle}" VerticalAlignment="Center" />
                         <Button Grid.Column="1" Content="＋ 新建" Margin="8,0,0,0"
                                 Style="{StaticResource SubtleButtonStyle}"
@@ -316,7 +317,12 @@
                              SelectedItem="{Binding SelectedNasConnection}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding Name}" />
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="★ 主 " FontWeight="Bold"
+                                               Foreground="{DynamicResource AccentBrush}"
+                                               Visibility="{Binding IsPrimary, Converter={StaticResource BoolVis}}" />
+                                    <TextBlock Text="{Binding Name}" />
+                                </StackPanel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
@@ -367,11 +373,15 @@
                                       Visibility="{Binding IsTrustSelfSignedApplicable, Converter={StaticResource BoolVis}}"
                                       AutomationProperties.Name="NAS 信任自签" />
 
-                            <!-- N6 测试连接 + 保存 -->
+                            <!-- N6 测试连接 + 设为主 NAS + 保存 -->
                             <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
                                 <Button Content="测试连接" Style="{StaticResource SubtleButtonStyle}"
                                         Command="{Binding TestNasConnectionCommand}"
                                         AutomationProperties.Name="测试 NAS 连接" />
+                                <Button Content="设为主 NAS" Margin="8,0,0,0"
+                                        Style="{StaticResource SubtleButtonStyle}"
+                                        Command="{Binding SetPrimaryCommand}"
+                                        AutomationProperties.Name="设为主 NAS" />
                                 <Button Content="保存" Margin="8,0,0,0"
                                         Style="{StaticResource AccentButtonStyle}"
                                         Command="{Binding SaveNasConnectionCommand}"
