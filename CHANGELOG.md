@@ -9,6 +9,53 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.1.0] — 2026-09-30 M6 多用户管理
+
+引入 NAS 共享目录多用户体系：账号存 NAS 共享目录，管理员可管理用户、审核提交，所有用户共享同一份图库。不新建服务端，通过 WebDAV 读写 NAS JSON。
+
+### M6-A：账号系统 + NAS 共享存储
+
+- 新增 `UserRole`（Admin/User）、`UserAccount`、`SharedImageRecord`、`PendingSubmission` 模型
+- 新增 `PasswordHasher`（PBKDF2 10000 轮 HMAC-SHA256，16B salt，32B hash，固定时间比较）
+- 新增 `SharedStorageService`（NAS JSON 读写：accounts.json / library.json / pending/）
+- 新增 `AccountService`（账号 CRUD + 初始化管理员 + 认证）
+- 账号表存 NAS 共享目录，所有用户共享同一份
+- 用户名 2-32 字符，密码至少 6 字符，唯一性不区分大小写
+
+### M6-B：登录界面 + 启动流程
+
+- 新增 `CurrentUser` 模型（登录用户上下文）
+- 新增 `LoginViewModel` + `LoginWindow`（W4）：NAS 连接下拉 + 账号密码 + 本地模式 + 初始化管理员
+- `App.xaml.cs` 启动流程改为 `LoginWindow` → 认证成功 → `ShellWindow`
+- `INasConnector` 继承 `IDisposable`
+- `ServiceRegistry` 注入 UserIdentity / CurrentUser / SharedStorage / Accounts
+
+### M6-C：管理员用户管理界面
+
+- `SettingsWindow` 新增 A7「用户管理」页签（仅管理员可见）
+- 支持账号列表、新建用户、启用/禁用、重置密码、删除用户
+
+### M6-D：NAS 共享库基础
+
+- 新增 `SharedLibraryService`（library.json 读写 + 去重添加/删除/查询）
+- `ShellViewModel` 集成共享图库加载（仅 NAS 登录用户可用）
+
+### M6-E：数据提交审核流程
+
+- 新增 `SubmissionService`（提交/列表/审核通过/拒绝）
+- 审核通过后提交提升到共享图库并删除 pending 文件
+
+### M6-F：权限校验集成
+
+- 新增 `PermissionService`（登录/管理员/用户管理/审核/提交/查看权限）
+- 管理员专属：用户管理、审核提交；普通用户：查看共享库、提交审核
+
+### 变更
+
+- 版本号 0.0.1 → 0.1.0（新增功能里程碑）
+- `AppInfo.MilestoneLabel` → "M6 多用户管理"
+- 全量测试 458 项全绿，0 警告 0 错误
+
 ## [0.0.1] — 2026-09-30 版本重编码基线
 
 版本号从 1.6.0 重新编码为 0.0.1，启用新三段式版本编码规则。功能基线与 v1.6.0 完全一致（M0–M5 全部功能保留）。

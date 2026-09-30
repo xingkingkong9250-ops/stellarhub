@@ -9,7 +9,8 @@ README/AGENTS/PRD 与本文件冲突时，以本文件为准。
 - 技术栈：C# / .NET 10 (`net10.0-windows`) / WPF，纯 MVVM
 - 形态：Windows 10 21H2+ / 11 原生桌面应用；**禁止** WebView2、Electron、任何 HTML UI
 - 产品基线：`PRD/QL_World_产品需求与重写方案.md`（已评审，M0–M4 基线）
-- 里程碑状态：见 `CHANGELOG.md`；当前 **M0–M5 全部功能完成，版本号已重编码为 0.0.1 起始基线** ——PRD 核心功能 100% 覆盖基线不变
+- 里程碑状态：见 `CHANGELOG.md`；当前 **M0–M6 全部功能完成，版本号 0.1.0** ——PRD 核心功能 100% 覆盖基线不变
+- M6 多用户管理（2026-09-30）：NAS 共享目录多用户体系。账号表存 NAS 共享目录（accounts.json，PBKDF2 哈希），所有用户共享同一份；登录窗口（LoginWindow W4）→ 认证成功 → ShellWindow；管理员用户管理页签（SettingsWindow A7，新建/启用禁用/重置密码/删除）；NAS 共享库（library.json，SharedLibraryService 去重读写）；数据提交审核流程（SubmissionService：pending/ → 审核通过提升到共享库 → 删除 pending）；权限校验（PermissionService：管理员专属用户管理/审核，普通用户查看共享库/提交审核）。不新建服务端，通过 INasConnector（WebDAV）读写 NAS JSON。INasConnector 继承 IDisposable。ServiceRegistry 注入 CurrentUser/SharedStorage/Accounts/SharedLibrary/Submissions/Permissions
 - M5 NAS 远程库（2026-09-30）：WebDAV 协议接入群晖/威联通等 NAS；零新增第三方依赖（仅 BCL HttpClient + System.Xml）。平台抽象层（INasConnector / IFileSystemAccessor / IUserIdentity）+ WebDAV 连接器（XNamespace D="DAV:" 兼容群晖/威联通，ServerCertificateCustomValidationCallback 适配自签证书）+ 远程库扫描（schema v6 source/nas_connection_id）+ IImageSource 抽象（本地/远程同源）+ 三级缩略图（Thumb 256px / Preview 1024px / Original 按需）+ LRU 缓存上限（ThumbnailCacheService 后台 Timer 清理）+ 下载队列（schema v7，2 并发 worker，.part 断点续传 + 416 重启 + 3 次指数退避重试）+ 弱网检测（NetworkConditionMonitor 10 样本滑动窗口，失败率 >50% 或延迟 >3000ms 跳过远程请求）+ 邻近图片预加载（RequestPrefetch 低优先级批量入队）+ ProgressiveImage 三层 Image 渐显控件（PlaceholderLayer→PreviewLayer→FinalLayer，200ms QuadraticEase 淡入，上层完成才折叠下层避免闪烁）。为 M6 多用户/macOS/SMB/SFTP 留路
 - U5 品牌升级（2026-09-29）：窗口标题/Logo/关于页=千星汇图；exe=StellarHub.exe；程序集 Product/Copyright/Description 改为千星汇图/StellarHub；五件套命名 QL World_v{ver}→StellarHub_v{ver}；数据目录 %APPDATA%\Qianlan_App\QL_World\→StellarHub\（原子迁移+.migrated 标记+失败 fallback 旧路径）。内部 mutex/event 名与 db 文件名 qlworld.db 保留以减少升级期副作用
 
