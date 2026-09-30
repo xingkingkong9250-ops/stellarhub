@@ -122,6 +122,9 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         SubmitToSharedCommand = new AsyncRelayCommand<object?>(
             SubmitToSharedAsync,
             p => (p as GalleryItemViewModel)?.CanSubmitToShared == true);
+        SubmitToSecondaryNasCommand = new AsyncRelayCommand<NasConnectionSpec?>(
+            SubmitToSecondaryNasAsync,
+            spec => _services.Permissions.CanSubmitToSecondaryNas && spec is not null && Gallery.PrimarySelected is not null);
         if (IsSharedLibraryAvailable)
             _ = LoadSharedGalleryAsync();
 
@@ -165,6 +168,21 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>True when the user logged in with a NAS account (shared library available).</summary>
     public bool IsSharedLibraryAvailable { get; }
+
+    /// <summary>
+    /// M8-D: 当前登录用户是否管理员。供 UI 绑定「提交到副库」菜单项的 Visibility
+    /// （仅 admin 可见）。普通用户该菜单项折叠。
+    /// </summary>
+    public bool IsAdmin => _services.Permissions.IsAdmin;
+
+    /// <summary>
+    /// M8-D: 当前所有副库（Role==Secondary）连接配置，供「提交到副库」子菜单绑定。
+    /// ShareLink 副库不含（无写权限）。每次访问现算以保持与配置同步。
+    /// </summary>
+    public IReadOnlyList<NasConnectionSpec> SecondaryNasConnections
+        => _services.Settings.NasConnections
+            .Where(c => c.Role == NasRole.Secondary)
+            .ToList();
 
     /// <summary>Gallery VM for the NAS shared library; null in local-only mode.</summary>
     public SharedGalleryViewModel? SharedGallery { get; }
@@ -236,6 +254,13 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>U6-B: 「提交到共享库」context-menu command; parameter is the clicked item.</summary>
     public AsyncRelayCommand<object?> SubmitToSharedCommand { get; }
 
+    /// <summary>
+    /// M8-D: 「提交到副库」context-menu command; parameter is the target
+    /// <see cref="NasConnectionSpec"/>（副库）。仅管理员可见/可执行（CanSubmitToSecondaryNas）。
+    /// 普通用户该命令的菜单项不显示（ShellWindow.xaml 用 IsAdmin 绑定 Visibility）。
+    /// </summary>
+    public AsyncRelayCommand<NasConnectionSpec?> SubmitToSecondaryNasCommand { get; }
+
     private async Task LoadSharedGalleryAsync()
     {
         // M8-C: 优先调聚合器（主+副并发加载+去重+注入 SourceNasId）；
@@ -294,6 +319,81 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
                 _services.Notifications.Publish(NotificationKind.SharedSubmission,
                     "提交失败",
                     $"「{item.FileName}」的本地原文件不存在或不可访问");
+                break;
+            case SubmissionOutcome.NotPermitted:
+                _services.Notifications.Publish(NotificationKind.SharedSubmission,
+                    "权限不足",
+                    "仅管理员可向副库提交数据");
+                break;
+        }
+    }
+
+    /// <summary>
+    /// M8-D: 提交到副库。仅管理员可执行（CanSubmitToSecondaryNas）。
+    /// 从 NasRegistry 取副库 SharedStorageService，构造临时 SubmissionService
+    /// 调 SubmitFromLocalAsync。非 admin 由 CanExecute 拦截（菜单项不显示），
+    /// 但方法内仍 defensive 校验权限以防绕过。
+    /// </summary>
+    private async Task SubmitToSecondaryNasAsync(NasConnectionSpec? spec)
+    {
+        if (spec is null) return;
+        var item = Gallery.PrimarySelected;
+        if (item is null || _services.CurrentUser is not { } user) return;
+
+        // Defensive 权限校验（CanExecute 已拦，但防绕过）
+        if (!_services.Permissions.CanSubmitToSecondaryNas)
+        {
+            _services.Notifications.Publish(NotificationKind.SharedSubmission,
+                "权限不足",
+                "仅管理员可向副库提交数据");
+            return;
+        }
+
+        var entry = _services.NasRegistry?.GetSecondary(spec.Id);
+        if (entry is null)
+        {
+            _services.Notifications.Publish(NotificationKind.SharedSubmission,
+                "副库不可用",
+                $"目标副库「{spec.Name}」未连接或已下线");
+            return;
+        }
+
+        // 构造临时 SubmissionService 绑定副库 storage
+        var storage = entry.Value.Storage;
+        var library = new SharedLibraryService(storage);
+        var submissions = new SubmissionService(storage, library,
+            _services.Thumbnails, _services.Settings);
+
+        var result = await submissions
+            .SubmitFromLocalAsync(item, user.Username, CancellationToken.None)
+            .ConfigureAwait(true);
+
+        switch (result.Outcome)
+        {
+            case SubmissionOutcome.Submitted:
+                _services.Notifications.Publish(NotificationKind.SharedSubmission,
+                    "已提交到副库",
+                    $"「{item.FileName}」已上传到副库「{spec.Name}」，等待管理员审核");
+                break;
+            case SubmissionOutcome.DuplicateInLibrary:
+                _services.Notifications.Publish(NotificationKind.SharedSubmission,
+                    "无需重复提交",
+                    $"「{item.FileName}」已存在于副库「{spec.Name}」");
+                break;
+            case SubmissionOutcome.DuplicatePending:
+                _services.Notifications.Publish(NotificationKind.SharedSubmission,
+                    "正在审核中",
+                    $"「{item.FileName}」已提交到副库「{spec.Name}」，正在等待审核");
+                break;
+            case SubmissionOutcome.MissingLocalFile:
+                _services.Notifications.Publish(NotificationKind.SharedSubmission,
+                    "提交失败",
+                    $"「{item.FileName}」的本地原文件不存在或不可访问");
+                break;
+            case SubmissionOutcome.NotPermitted:
+                _services.Notifications.Publish(NotificationKind.SharedSubmission,
+                    "权限不足",
+                    "仅管理员可向副库提交数据");
                 break;
         }
     }

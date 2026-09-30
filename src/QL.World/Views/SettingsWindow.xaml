@@ -300,6 +300,7 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="NAS 连接（WebDav + Smb；Sftp 留待 M8）"
                                    Style="{StaticResource SectionCaptionStyle}" VerticalAlignment="Center" />
@@ -307,7 +308,12 @@
                                 Style="{StaticResource SubtleButtonStyle}"
                                 Command="{Binding AddNasConnectionCommand}"
                                 AutomationProperties.Name="新建 NAS 连接" />
-                        <Button Grid.Column="2" Content="删除选中" Margin="8,0,0,0"
+                        <!-- M8-D: 添加分享链接（ShareLink 副库，匿名访问） -->
+                        <Button Grid.Column="2" Content="🔗 分享链接" Margin="8,0,0,0"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                Command="{Binding AddShareLinkCommand}"
+                                AutomationProperties.Name="添加分享链接" />
+                        <Button Grid.Column="3" Content="删除选中" Margin="8,0,0,0"
                                 Style="{StaticResource SubtleButtonStyle}"
                                 Command="{Binding DeleteNasConnectionCommand}"
                                 AutomationProperties.Name="删除 NAS 连接" />
@@ -321,6 +327,10 @@
                                     <TextBlock Text="★ 主 " FontWeight="Bold"
                                                Foreground="{DynamicResource AccentBrush}"
                                                Visibility="{Binding IsPrimary, Converter={StaticResource BoolVis}}" />
+                                    <!-- M8-D: ShareLink 副库用 🔗 图标区分 -->
+                                    <TextBlock Text="🔗 " FontWeight="Bold"
+                                               Foreground="{DynamicResource AccentBrush}"
+                                               Visibility="{Binding IsShareLink, Converter={StaticResource BoolVis}}" />
                                     <TextBlock Text="{Binding Name}" />
                                 </StackPanel>
                             </DataTemplate>

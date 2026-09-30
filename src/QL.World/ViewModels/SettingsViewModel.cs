@@ -107,6 +107,7 @@ public sealed class SettingsViewModel : ObservableObject
             () => !_isDownloading && _localModelState != LocalModelState.NotDownloaded);
 
         AddNasConnectionCommand = new RelayCommand(AddNasConnection);
+        AddShareLinkCommand = new RelayCommand(AddShareLink);
         DeleteNasConnectionCommand = new RelayCommand(
             DeleteNasConnection, () => SelectedNasConnection is not null);
         SaveNasConnectionCommand = new RelayCommand(
@@ -596,6 +597,8 @@ public sealed class SettingsViewModel : ObservableObject
     }
 
     public RelayCommand AddNasConnectionCommand { get; }
+    /// <summary>M8-D: 添加分享链接（ShareLink 副库，匿名访问，无凭据）。</summary>
+    public RelayCommand AddShareLinkCommand { get; }
     public RelayCommand DeleteNasConnectionCommand { get; }
     public RelayCommand SaveNasConnectionCommand { get; }
     public RelayCommand SetPrimaryCommand { get; }
@@ -617,6 +620,26 @@ public sealed class SettingsViewModel : ObservableObject
             Protocol = NasConnectionProtocol.WebDav,
             RootPath = "/",
             UseTls = true,
+            Role = NasRole.Secondary, // M8-D: 新增连接默认副库
+        };
+        _settings.AddNasConnection(spec);
+        RefreshNasConnections();
+        SelectedNasConnection = NasConnections.FirstOrDefault(c => c.Id == spec.Id);
+    }
+
+    /// <summary>
+    /// M8-D: 添加分享链接（ShareLink 副库）。匿名访问，无 Username/Password，
+    /// 仅需 Host + RootPath。A7 UI 隐藏密码框（Role==ShareLink 时）。
+    /// </summary>
+    private void AddShareLink()
+    {
+        var spec = new NasConnectionSpec
+        {
+            Name = "新分享链接",
+            Protocol = NasConnectionProtocol.WebDav,
+            RootPath = "/",
+            UseTls = true,
+            Role = NasRole.ShareLink,
         };
         _settings.AddNasConnection(spec);
         RefreshNasConnections();

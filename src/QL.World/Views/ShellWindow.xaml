@@ -752,6 +752,18 @@
                                               Visibility="{Binding CanSubmitToShared, Converter={StaticResource BoolVis}}"
                                               Command="{Binding DataContext.SubmitToSharedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                               CommandParameter="{Binding}" />
+                                    <!-- M8-D：提交到副库（仅管理员可见，含各副库子项） -->
+                                    <MenuItem Header="提交到副库"
+                                              Visibility="{Binding DataContext.IsAdmin, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolVis}}"
+                                              ItemsSource="{Binding DataContext.SecondaryNasConnections, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                                        <MenuItem.ItemContainerStyle>
+                                            <Style TargetType="MenuItem">
+                                                <Setter Property="Header" Value="{Binding Name}" />
+                                                <Setter Property="Command" Value="{Binding DataContext.SubmitToSecondaryNasCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                <Setter Property="CommandParameter" Value="{Binding}" />
+                                            </Style>
+                                        </MenuItem.ItemContainerStyle>
+                                    </MenuItem>
                                     <Separator Style="{StaticResource MenuSeparatorStyle}" />
                                     <MenuItem Header="评分">
                                         <MenuItem.ItemsSource>

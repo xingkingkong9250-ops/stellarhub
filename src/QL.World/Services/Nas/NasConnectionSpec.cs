@@ -68,6 +68,16 @@ public sealed class NasConnectionSpec
         set => Role = value ? NasRole.Primary : NasRole.Secondary;
     }
 
+    /// <summary>
+    /// M8-D: 是否为分享链接副库（计算属性，<see cref="Role"/>==<see cref="NasRole.ShareLink"/>）。
+    /// 供 A7 NAS 列表 XAML 绑定 🔗 图标 Visibility。无副作用 setter。
+    /// </summary>
+    public bool IsShareLink
+    {
+        get => Role == NasRole.ShareLink;
+        set => Role = value ? NasRole.ShareLink : NasRole.Secondary;
+    }
+
     public DateTimeOffset CreatedAt { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }

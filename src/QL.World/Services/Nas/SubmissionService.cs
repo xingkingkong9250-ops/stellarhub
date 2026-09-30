@@ -14,6 +14,8 @@ public enum SubmissionOutcome
     DuplicateInLibrary,
     DuplicatePending,
     MissingLocalFile,
+    /// <summary>M8-D: 非 admin 尝试提交到副库时返回（权限拒绝）。</summary>
+    NotPermitted,
 }
 
 /// <summary>Result of a submit attempt.</summary>

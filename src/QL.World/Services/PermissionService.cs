@@ -55,4 +55,18 @@ public sealed class PermissionService
     /// 主库下载同样允许（<see cref="CanViewSharedLibrary"/> 已覆盖）。
     /// </summary>
     public bool CanDownloadFromSecondaryNas => IsLoggedIn;
+
+    // ─── M8-D 副库权限分级 ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// M8-D: 仅管理员可发起主 NAS 迁移（切换主库 + 自主迁移数据）。
+    /// 普通用户无此权限。迁移是高影响操作，必须 admin 角色。
+    /// </summary>
+    public bool CanMigratePrimary => IsAdmin;
+
+    /// <summary>
+    /// M8-D: 仅管理员可向副库提交新数据（写权限）。普通用户对副库只读可下载。
+    /// 主库提交权限仍由 <see cref="CanSubmitToLibrary"/>（IsLoggedIn）决定，行为不变。
+    /// </summary>
+    public bool CanSubmitToSecondaryNas => IsAdmin;
 }

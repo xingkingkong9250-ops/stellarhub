@@ -38,7 +38,10 @@ public sealed class WebDavConnectorFactory : INasConnectorFactory
 
         var http = new HttpClient(handler) { BaseAddress = baseAddress, Timeout = TIMEOUT };
 
-        if (!string.IsNullOrEmpty(spec.Username))
+        // M8-D: ShareLink 副库走匿名访问——即使 spec 误填了凭据也不加 Basic-auth。
+        // AppSettingsService.ValidateNasRoles 已在 Load 时清空 ShareLink 的凭据，
+        // 此处 defensive 再判一次确保 connector 不会带 Authorization header。
+        if (spec.Role != NasRole.ShareLink && !string.IsNullOrEmpty(spec.Username))
         {
             string password = !string.IsNullOrEmpty(plaintextPassword)
                 ? plaintextPassword
