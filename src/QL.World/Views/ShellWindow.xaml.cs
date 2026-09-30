@@ -126,6 +126,16 @@ public partial class ShellWindow : Window
         }
     }
 
+    /// <summary>U6-A: mirrors the shared list selection into SharedGalleryViewModel.</summary>
+    private void SharedGalleryList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_viewModel.SharedGallery is not { } shared) return;
+        shared.SelectedItems.Clear();
+        foreach (GalleryItemViewModel item in SharedGalleryList.SelectedItems)
+            shared.SelectedItems.Add(item);
+        shared.NotifySelectionChanged();
+    }
+
     private void GalleryList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (GalleryList.SelectedItem is null) return;

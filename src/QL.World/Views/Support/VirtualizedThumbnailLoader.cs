@@ -57,7 +57,7 @@ public static class VirtualizedThumbnailLoader
 
     private static void HookRealizedContainers(ListBox list)
     {
-        GalleryThumbnailProviderBridge? provider = GetProvider(list);
+        IGalleryThumbnailProvider? provider = GetProvider(list);
         if (provider is null) return;
 
         ItemContainerGenerator generator = list.ItemContainerGenerator;
@@ -88,16 +88,11 @@ public static class VirtualizedThumbnailLoader
         }
     }
 
-    private static GalleryThumbnailProviderBridge? GetProvider(ListBox list) =>
-        list.DataContext is GalleryViewModel gallery
-            ? new GalleryThumbnailProviderBridge(gallery.Thumbnails)
-            : null;
-}
-
-/// <summary>Small indirection keeps the support namespace free of VM internals.</summary>
-internal sealed class GalleryThumbnailProviderBridge(GalleryThumbnailProvider provider)
-{
-    public void Attach(GalleryItemViewModel item) => provider.Attach(item);
-    public void Detach(GalleryItemViewModel item) => provider.Detach(item);
-    public void ClearRealized() => provider.ClearRealized();
+    private static IGalleryThumbnailProvider? GetProvider(ListBox list) =>
+        list.DataContext switch
+        {
+            GalleryViewModel gallery => gallery.Thumbnails,
+            SharedGalleryViewModel shared => shared.Thumbnails,
+            _ => null,
+        };
 }

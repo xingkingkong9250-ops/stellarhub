@@ -97,13 +97,22 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         SetCollectionCoverCommand = new RelayCommand(SetCollectionCover);
         AddSelectedToCollectionCommand = new RelayCommand(AddSelectedToCollection);
 
-        // M6-D: shared library (NAS). Available only when logged in with NAS account.
+        // M6-D / U6-A: shared library (NAS). Available only when logged in with a NAS account.
         IsSharedLibraryAvailable = _services.SharedLibrary is not null;
-        LoadSharedLibraryCommand = new AsyncRelayCommand(
-            LoadSharedLibraryAsync,
+        if (IsSharedLibraryAvailable && _services.SharedStorage is { } sharedStorage)
+        {
+            var cache = new SharedThumbnailCache(
+                sharedStorage.Connector,
+                Path.Combine(_services.Settings.DataRoot, "shared-thumbs"),
+                _services.NetworkMonitor);
+            SharedGallery = new SharedGalleryViewModel(_services.Settings, cache);
+            SharedGallery.SelectionChanged += OnSharedSelectionChanged;
+        }
+        SwitchToLocalCommand = new RelayCommand(() => IsLocalScope = true);
+        SwitchToSharedCommand = new RelayCommand(() => IsLocalScope = false,
             () => IsSharedLibraryAvailable);
         if (IsSharedLibraryAvailable)
-            _ = LoadSharedLibraryAsync();
+            _ = LoadSharedGalleryAsync();
     }
 
     public AppSettingsService Settings => _services.Settings;
@@ -133,30 +142,47 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public DetailViewModel Detail { get; }
     public StatusBarViewModel StatusBar { get; }
 
-    // ─── M6-D: shared library ─────────────────────────────────────────────
+    // ─── M6-D / U6-A: shared library ─────────────────────────────────────
 
     /// <summary>True when the user logged in with a NAS account (shared library available).</summary>
     public bool IsSharedLibraryAvailable { get; }
 
-    public ObservableCollection<SharedImageRecord> SharedImages { get; } = new();
+    /// <summary>Gallery VM for the NAS shared library; null in local-only mode.</summary>
+    public SharedGalleryViewModel? SharedGallery { get; }
 
-    public AsyncRelayCommand LoadSharedLibraryCommand { get; }
-
-    private async Task LoadSharedLibraryAsync()
+    private bool _isLocalScope = true;
+    /// <summary>True while the local gallery is displayed.</summary>
+    public bool IsLocalScope
     {
-        if (_services.SharedLibrary is null) return;
+        get => _isLocalScope;
+        set
+        {
+            if (SetProperty(ref _isLocalScope, value))
+                OnPropertyChanged(nameof(IsSharedScope));
+        }
+    }
+
+    public bool IsSharedScope => !_isLocalScope;
+
+    public RelayCommand SwitchToLocalCommand { get; }
+    public RelayCommand SwitchToSharedCommand { get; }
+
+    private async Task LoadSharedGalleryAsync()
+    {
+        if (_services.SharedLibrary is null || SharedGallery is null) return;
         try
         {
             var images = await _services.SharedLibrary.LoadAsync(CancellationToken.None);
-            SharedImages.Clear();
-            foreach (var img in images)
-                SharedImages.Add(img);
+            SharedGallery.Load(images);
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[SHARED] Load failed: {ex.Message}");
         }
     }
+
+    /// <summary>U6-A placeholder; U6-D binds the shared detail pane here.</summary>
+    private void OnSharedSelectionChanged() { }
 
     public RelayCommand FocusSearchCommand { get; }
     public RelayCommand ClearFiltersCommand { get; }

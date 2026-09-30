@@ -21,7 +21,7 @@ namespace QL.World.ViewModels.Support;
 /// <see cref="GalleryItemViewModel.PreviewImage"/> without caching (the
 /// detail pane shows one item at a time).
 /// </summary>
-public sealed class GalleryThumbnailProvider : IDisposable
+public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDisposable
 {
     private const int CACHE_LIMIT = 500;
     private const int PREFETCH_RANGE = 15;
@@ -315,7 +315,7 @@ public sealed class GalleryThumbnailProvider : IDisposable
             try
             {
                 if (!File.Exists(path)) return;
-                BitmapSource? bitmap = DecodeWebp(path);
+                BitmapSource? bitmap = Helpers.WebpImageDecoder.DecodeFile(path);
                 if (bitmap is null) return;
 
                 lock (_gate)
@@ -361,7 +361,7 @@ public sealed class GalleryThumbnailProvider : IDisposable
             try
             {
                 if (!File.Exists(path)) return;
-                BitmapSource? bitmap = DecodeWebp(path);
+                BitmapSource? bitmap = Helpers.WebpImageDecoder.DecodeFile(path);
                 if (bitmap is null) return;
 
                 lock (_gate)
@@ -386,31 +386,6 @@ public sealed class GalleryThumbnailProvider : IDisposable
                 }
             }
         });
-    }
-
-    private static BitmapSource? DecodeWebp(string path)
-    {
-        byte[] rgba;
-        int width;
-        int height;
-
-        using (SixLabors.ImageSharp.Image<Rgba32> image =
-               SixLabors.ImageSharp.Image.Load<Rgba32>(path))
-        {
-            width = image.Width;
-            height = image.Height;
-            rgba = new byte[width * height * 4];
-            image.CopyPixelDataTo(rgba);
-        }
-
-        // R,G,B,A → B,G,R,A for PixelFormats.Bgra32.
-        for (int i = 0; i < rgba.Length; i += 4)
-            (rgba[i], rgba[i + 2]) = (rgba[i + 2], rgba[i]);
-
-        var bitmap = BitmapSource.Create(
-            width, height, 96, 96, PixelFormats.Bgra32, null, rgba, width * 4);
-        bitmap.Freeze();
-        return bitmap;
     }
 
     private void TouchLru(string key)

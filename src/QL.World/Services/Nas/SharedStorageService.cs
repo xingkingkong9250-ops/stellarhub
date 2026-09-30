@@ -15,12 +15,6 @@ namespace QL.World.Services.Nas;
 /// </summary>
 public sealed class SharedStorageService
 {
-    private const string SharedDir = "StellarHubShared";
-    private const string AccountsFileName = "accounts.json";
-    private const string LibraryFileName = "library.json";
-    private const string PendingDir = "pending";
-    private const string ThumbnailsDir = "thumbnails";
-
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         WriteIndented = true,
@@ -35,51 +29,56 @@ public sealed class SharedStorageService
         _connector = connector ?? throw new ArgumentNullException(nameof(connector));
     }
 
+    /// <summary>U6-A: the underlying connector (shared thumbnail cache reuses it).</summary>
+    internal INasConnector Connector => _connector;
+
     /// <summary>Creates the shared directory structure on the NAS (idempotent).</summary>
     public async Task EnsureSharedStructureAsync(CancellationToken ct)
     {
-        await _connector.MakeDirectoryAsync(SharedDir, ct).ConfigureAwait(false);
-        await _connector.MakeDirectoryAsync($"{SharedDir}/{PendingDir}", ct).ConfigureAwait(false);
-        await _connector.MakeDirectoryAsync($"{SharedDir}/{ThumbnailsDir}", ct).ConfigureAwait(false);
+        await _connector.MakeDirectoryAsync(SharedPaths.Root, ct).ConfigureAwait(false);
+        await _connector.MakeDirectoryAsync($"{SharedPaths.Root}/{SharedPaths.PendingDir}", ct).ConfigureAwait(false);
+        await _connector.MakeDirectoryAsync($"{SharedPaths.Root}/{SharedPaths.ThumbnailsDir}", ct).ConfigureAwait(false);
+        await _connector.MakeDirectoryAsync($"{SharedPaths.Root}/{SharedPaths.OriginalsDir}", ct).ConfigureAwait(false);
+        await _connector.MakeDirectoryAsync($"{SharedPaths.Root}/{SharedPaths.PendingDir}/{SharedPaths.PendingFilesDir}", ct).ConfigureAwait(false);
     }
 
     // ─── accounts.json ──────────────────────────────────────────────────
 
     public async Task<IReadOnlyList<UserAccount>> LoadAccountsAsync(CancellationToken ct)
     {
-        var wrapper = await ReadJsonAsync<AccountsFile>($"{SharedDir}/{AccountsFileName}", ct).ConfigureAwait(false);
+        var wrapper = await ReadJsonAsync<AccountsFile>(SharedPaths.Accounts, ct).ConfigureAwait(false);
         return wrapper?.Accounts ?? [];
     }
 
     public async Task SaveAccountsAsync(IReadOnlyList<UserAccount> accounts, CancellationToken ct)
     {
         var wrapper = new AccountsFile { Version = 1, Accounts = accounts.ToList() };
-        await WriteJsonAsync($"{SharedDir}/{AccountsFileName}", wrapper, ct).ConfigureAwait(false);
+        await WriteJsonAsync(SharedPaths.Accounts, wrapper, ct).ConfigureAwait(false);
     }
 
     // ─── library.json ───────────────────────────────────────────────────
 
     public async Task<IReadOnlyList<SharedImageRecord>> LoadLibraryAsync(CancellationToken ct)
     {
-        var wrapper = await ReadJsonAsync<LibraryFile>($"{SharedDir}/{LibraryFileName}", ct).ConfigureAwait(false);
+        var wrapper = await ReadJsonAsync<LibraryFile>(SharedPaths.Library, ct).ConfigureAwait(false);
         return wrapper?.Images ?? [];
     }
 
     public async Task SaveLibraryAsync(IReadOnlyList<SharedImageRecord> images, CancellationToken ct)
     {
         var wrapper = new LibraryFile { Version = 1, Images = images.ToList() };
-        await WriteJsonAsync($"{SharedDir}/{LibraryFileName}", wrapper, ct).ConfigureAwait(false);
+        await WriteJsonAsync(SharedPaths.Library, wrapper, ct).ConfigureAwait(false);
     }
 
     // ─── pending/*.json ─────────────────────────────────────────────────
 
     public async Task<IReadOnlyList<PendingSubmission>> LoadPendingAsync(CancellationToken ct)
     {
-        var files = await _connector.ListFilesAsync($"{SharedDir}/{PendingDir}", ct).ConfigureAwait(false);
+        var files = await _connector.ListFilesAsync($"{SharedPaths.Root}/{SharedPaths.PendingDir}", ct).ConfigureAwait(false);
         var result = new List<PendingSubmission>();
         foreach (var f in files.Where(f => !f.IsDirectory && f.Name.EndsWith(".json", StringComparison.OrdinalIgnoreCase)))
         {
-            var sub = await ReadJsonAsync<PendingSubmission>($"{SharedDir}/{PendingDir}/{f.Name}", ct).ConfigureAwait(false);
+            var sub = await ReadJsonAsync<PendingSubmission>(SharedPaths.PendingJson(f.Name[..^5]), ct).ConfigureAwait(false);
             if (sub is not null)
                 result.Add(sub);
         }
@@ -88,12 +87,12 @@ public sealed class SharedStorageService
 
     public async Task SavePendingAsync(PendingSubmission submission, CancellationToken ct)
     {
-        await WriteJsonAsync($"{SharedDir}/{PendingDir}/{submission.SubmitId}.json", submission, ct).ConfigureAwait(false);
+        await WriteJsonAsync(SharedPaths.PendingJson(submission.SubmitId), submission, ct).ConfigureAwait(false);
     }
 
     public async Task DeletePendingAsync(string submitId, CancellationToken ct)
     {
-        await _connector.DeleteAsync($"{SharedDir}/{PendingDir}/{submitId}.json", ct).ConfigureAwait(false);
+        await _connector.DeleteAsync(SharedPaths.PendingJson(submitId), ct).ConfigureAwait(false);
     }
 
     // ─── JSON helpers ───────────────────────────────────────────────────

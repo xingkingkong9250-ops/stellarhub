@@ -316,6 +316,22 @@
                     <Border Width="1" Height="24" Margin="12,0"
                             Background="{DynamicResource BorderSubtleBrush}" />
 
+                    <!-- U6-A B1-SCOPE: 本地库/共享库切换（仅 NAS 登录可见） -->
+                    <StackPanel Orientation="Horizontal"
+                                Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}">
+                        <ToggleButton Style="{StaticResource ToggleButtonStyle}"
+                                      IsChecked="{Binding IsLocalScope}"
+                                      Content="本地库" ToolTip="本地图片库" />
+                        <ToggleButton Style="{StaticResource ToggleButtonStyle}" Margin="4,0,0,0"
+                                      IsChecked="{Binding IsSharedScope, Mode=OneWay}"
+                                      Command="{Binding SwitchToSharedCommand}"
+                                      Content="共享库" ToolTip="NAS 共享图库" />
+                    </StackPanel>
+
+                    <Border Width="1" Height="24" Margin="12,0"
+                            Background="{DynamicResource BorderSubtleBrush}"
+                            Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}" />
+
                     <ToggleButton Style="{StaticResource ToggleButtonStyle}"
                                   IsChecked="{Binding TopBar.IsGridView}"
                                   Content="▦ 网格" ToolTip="网格视图" />
@@ -683,6 +699,7 @@
                                  VirtualizingPanel.IsVirtualizing="True"
                                  VirtualizingPanel.VirtualizationMode="Recycling"
                                  VirtualizingPanel.ScrollUnit="Pixel"
+                                 Visibility="{Binding DataContext.IsLocalScope, RelativeSource={RelativeSource AncestorType=Window}}"
                                  SelectionChanged="GalleryList_SelectionChanged"
                                  MouseDoubleClick="GalleryList_MouseDoubleClick">
                             <ListBox.Style>
@@ -736,14 +753,52 @@
                             </ListBox.ContextMenu>
                         </ListBox>
 
+                        <!-- U6-A B2: 共享库 ListBox（与本地 ListBox 互斥，复用同一套卡片/行模板） -->
+                        <ListBox x:Name="SharedGalleryList"
+                                 DataContext="{Binding SharedGallery}"
+                                 ItemsSource="{Binding Items}"
+                                 SelectionMode="Extended"
+                                 support:VirtualizedThumbnailLoader.Enabled="True"
+                                 VirtualizingPanel.IsVirtualizing="True"
+                                 VirtualizingPanel.VirtualizationMode="Recycling"
+                                 VirtualizingPanel.ScrollUnit="Pixel"
+                                 Visibility="{Binding DataContext.IsSharedScope, RelativeSource={RelativeSource AncestorType=Window}}"
+                                 SelectionChanged="SharedGalleryList_SelectionChanged">
+                            <ListBox.Style>
+                                <Style TargetType="ListBox">
+                                    <Setter Property="ItemsPanel" Value="{StaticResource GridPanelTemplate}" />
+                                    <Setter Property="ItemTemplate" Value="{StaticResource GridCardTemplate}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding DataContext.Gallery.IsListView, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                            <Setter Property="ItemsPanel" Value="{StaticResource ListPanelTemplate}" />
+                                            <Setter Property="ItemTemplate" Value="{StaticResource ListRowTemplate}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ListBox.Style>
+                        </ListBox>
+
+                        <!-- U6-A: 共享库空提示 -->
+                        <Border Visibility="{Binding DataContext.IsSharedScope, RelativeSource={RelativeSource AncestorType=Window}}">
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                                        Visibility="{Binding SharedGallery.Items.Count, Converter={StaticResource ZeroVis}}">
+                                <TextBlock Text="共享库中还没有图片" FontSize="18" FontWeight="SemiBold"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Margin="0,8" Foreground="{DynamicResource TextMutedBrush}"
+                                           Text="在本地库右键图片「提交到共享库」，等待管理员审核" />
+                            </StackPanel>
+                        </Border>
+
                         <!-- Empty library hint -->
-                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
-                                    Visibility="{Binding Gallery.Items.Count, Converter={StaticResource ZeroVis}}">
-                            <TextBlock Text="图库还是空的" FontSize="18" FontWeight="SemiBold"
-                                       HorizontalAlignment="Center" />
-                            <TextBlock Margin="0,8" Foreground="{DynamicResource TextMutedBrush}"
-                                       Text="点击左上角「＋ 导入图片」（Ctrl+I）开始建立素材库" />
-                        </StackPanel>
+                        <Border Visibility="{Binding DataContext.IsLocalScope, RelativeSource={RelativeSource AncestorType=Window}}">
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                                        Visibility="{Binding Gallery.Items.Count, Converter={StaticResource ZeroVis}}">
+                                <TextBlock Text="图库还是空的" FontSize="18" FontWeight="SemiBold"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Margin="0,8" Foreground="{DynamicResource TextMutedBrush}"
+                                           Text="点击左上角「＋ 导入图片」（Ctrl+I）开始建立素材库" />
+                            </StackPanel>
+                        </Border>
 
                         <!-- Undo bar -->
                         <Border HorizontalAlignment="Center" VerticalAlignment="Bottom"

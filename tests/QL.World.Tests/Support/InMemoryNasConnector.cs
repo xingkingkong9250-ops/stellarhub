@@ -104,6 +104,12 @@ internal sealed class InMemoryNasConnector : INasConnector
         _files[remotePath] = Encoding.UTF8.GetBytes(content);
     }
 
+    /// <summary>U6-A test helper: inject arbitrary bytes (e.g. encoded WebP).</summary>
+    public void SeedBytes(string remotePath, byte[] bytes)
+    {
+        _files[remotePath] = bytes;
+    }
+
     /// <summary>Test helper: read back stored bytes as string.</summary>
     public string ReadStoredText(string remotePath)
     {
