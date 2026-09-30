@@ -101,11 +101,11 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         IsSharedLibraryAvailable = _services.SharedLibrary is not null;
         if (IsSharedLibraryAvailable && _services.SharedStorage is { } sharedStorage)
         {
-            var cache = new SharedThumbnailCache(
+            SharedThumbnails = new SharedThumbnailCache(
                 sharedStorage.Connector,
                 Path.Combine(_services.Settings.DataRoot, "shared-thumbs"),
                 _services.NetworkMonitor);
-            SharedGallery = new SharedGalleryViewModel(_services.Settings, cache);
+            SharedGallery = new SharedGalleryViewModel(_services.Settings, SharedThumbnails);
             SharedGallery.SelectionChanged += OnSharedSelectionChanged;
         }
         SwitchToLocalCommand = new RelayCommand(() => IsLocalScope = true);
@@ -116,6 +116,14 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
             p => (p as GalleryItemViewModel)?.CanSubmitToShared == true);
         if (IsSharedLibraryAvailable)
             _ = LoadSharedGalleryAsync();
+
+        // U6-C: admin review queue entry + pending badge count.
+        IsReviewAvailable = _services.Permissions.CanApproveSubmissions;
+        ShowReviewQueueCommand = new RelayCommand(
+            () => ShowReviewQueueDialog?.Invoke(),
+            () => IsReviewAvailable);
+        if (IsReviewAvailable)
+            _ = RefreshPendingCountAsync();
     }
 
     public AppSettingsService Settings => _services.Settings;
@@ -152,6 +160,43 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>Gallery VM for the NAS shared library; null in local-only mode.</summary>
     public SharedGalleryViewModel? SharedGallery { get; }
+
+    /// <summary>U6-C: NAS thumbnail cache (also feeds the review window).</summary>
+    public SharedThumbnailCache? SharedThumbnails { get; }
+
+    /// <summary>U6-C: true for admins (review queue entry visible).</summary>
+    public bool IsReviewAvailable { get; }
+
+    /// <summary>U6-C: opens the W6 review queue window.</summary>
+    public RelayCommand ShowReviewQueueCommand { get; }
+
+    /// <summary>U6-C: bound by App to instantiate <see cref="Views.ReviewQueueWindow"/>.</summary>
+    public event Action? ShowReviewQueueDialog;
+
+    private int _pendingCount;
+    /// <summary>U6-C: number of submissions awaiting review (toolbar badge).</summary>
+    public int PendingCount
+    {
+        get => _pendingCount;
+        private set => SetProperty(ref _pendingCount, value);
+    }
+
+    /// <summary>U6-C: reloads the pending badge count (also called when the review window closes).</summary>
+    public async Task RefreshPendingCountAsync()
+    {
+        if (_services.Submissions is null) return;
+        try
+        {
+            var pending = await _services.Submissions
+                .ListPendingAsync(CancellationToken.None)
+                .ConfigureAwait(true);
+            PendingCount = pending.Count;
+        }
+        catch (NasConnectionException)
+        {
+            PendingCount = 0;
+        }
+    }
 
     private bool _isLocalScope = true;
     /// <summary>True while the local gallery is displayed.</summary>

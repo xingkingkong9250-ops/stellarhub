@@ -180,11 +180,32 @@ public sealed class SubmissionService
             StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Admin approves: promotes the submission into the shared library and
-    /// deletes the pending file. Returns the created SharedImageRecord.
+    /// Admin approves: relocates the uploaded original and thumbnail from
+    /// <c>pending/files/&lt;id&gt;/</c> into the library shards
+    /// (<c>originals/</c>, <c>thumbnails/</c>), promotes the metadata into the
+    /// shared library and deletes the pending JSON + files container. Missing
+    /// files never block approval. Returns the created SharedImageRecord.
     /// </summary>
     public async Task<SharedImageRecord> ApproveAsync(PendingSubmission sub, string approvedBy, CancellationToken ct)
     {
+        INasConnector connector = _storage.Connector;
+        string prefix = SharedPaths.Prefix(sub.FileHash);
+        await connector.MakeDirectoryAsync(
+            $"{SharedPaths.Root}/{SharedPaths.OriginalsDir}/{prefix}", ct).ConfigureAwait(false);
+        await connector.MakeDirectoryAsync(
+            $"{SharedPaths.Root}/{SharedPaths.ThumbnailsDir}/{prefix}", ct).ConfigureAwait(false);
+
+        string originalDest = SharedPaths.Original(sub.FileHash,
+            Path.GetExtension(sub.FileName));
+        bool originalMoved = false;
+        if (sub.OriginalNasPath is not null)
+            originalMoved = await TryMoveAsync(connector, sub.OriginalNasPath, originalDest, ct)
+                .ConfigureAwait(false);
+
+        if (sub.ThumbnailNasPath is not null)
+            await TryMoveAsync(connector, sub.ThumbnailNasPath,
+                SharedPaths.Thumbnail(sub.FileHash), ct).ConfigureAwait(false);
+
         var record = new SharedImageRecord
         {
             Id = sub.FileHash,
@@ -199,13 +220,49 @@ public sealed class SubmissionService
             SubmittedBy = sub.SubmittedBy,
             ApprovedBy = approvedBy,
             ApprovedAt = DateTimeOffset.UtcNow,
+            SourceNasPath = originalMoved ? originalDest : null,
         };
         await _library.AddOrUpdateAsync(record, ct);
         await _storage.DeletePendingAsync(sub.SubmitId, ct);
+
+        // Best-effort cleanup of the now-empty pending files container.
+        try
+        {
+            await connector.DeleteAsync(SharedPaths.PendingFiles(sub.SubmitId), ct)
+                .ConfigureAwait(false);
+        }
+        catch (NasConnectionException) { /* non-empty or unsupported; harmless */ }
+
         return record;
     }
 
-    /// <summary>Admin rejects: deletes the pending file without promotion.</summary>
-    public Task RejectAsync(string submitId, CancellationToken ct)
-        => _storage.DeletePendingAsync(submitId, ct);
+    /// <summary>Moves while tolerating a missing/unreadable source.</summary>
+    private static async Task<bool> TryMoveAsync(
+        INasConnector connector, string src, string dst, CancellationToken ct)
+    {
+        try
+        {
+            await connector.MoveAsync(src, dst, ct).ConfigureAwait(false);
+            return true;
+        }
+        catch (NasConnectionException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Admin rejects: deletes the pending JSON and its uploaded files
+    /// container (best effort) without promotion.
+    /// </summary>
+    public async Task RejectAsync(string submitId, CancellationToken ct)
+    {
+        await _storage.DeletePendingAsync(submitId, ct).ConfigureAwait(false);
+        try
+        {
+            await _storage.Connector.DeleteAsync(SharedPaths.PendingFiles(submitId), ct)
+                .ConfigureAwait(false);
+        }
+        catch (NasConnectionException) { /* already gone or non-empty; harmless */ }
+    }
 }

@@ -151,6 +151,7 @@ public partial class App : Application
             _shellViewModel.RequestInputDialog += ShowInputDialog;
             _shellViewModel.ShowSettingsDialog += ShowSettingsDialog;
             _shellViewModel.ShowDownloadQueueDialog += ShowDownloadQueueDialog;
+            _shellViewModel.ShowReviewQueueDialog += ShowReviewQueueDialog;
             _shellWindow = new ShellWindow(_shellViewModel);
 
             MainWindow = _shellWindow;
@@ -304,6 +305,34 @@ public partial class App : Application
         catch (Exception ex)
         {
             WriteLog($"[SETTINGS] Dialog failed: {ex}");
+        }
+    }
+
+    private void ShowReviewQueueDialog()
+    {
+        if (_shellWindow is null || _services is null ||
+            _services.Submissions is null ||
+            _shellViewModel?.SharedThumbnails is null ||
+            _services.CurrentUser is null)
+        {
+            return;
+        }
+        try
+        {
+            var dialog = new ReviewQueueWindow(
+                _services.Submissions,
+                _shellViewModel.SharedThumbnails,
+                _services.CurrentUser.Username)
+            {
+                Owner = _shellWindow,
+            };
+            dialog.ShowDialog();
+            // Refresh the toolbar badge after approvals/rejections.
+            _ = _shellViewModel.RefreshPendingCountAsync();
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"[REVIEW] Dialog failed: {ex}");
         }
     }
 

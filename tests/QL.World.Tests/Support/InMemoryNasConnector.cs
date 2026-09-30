@@ -98,6 +98,17 @@ internal sealed class InMemoryNasConnector : INasConnector
         return Task.CompletedTask;
     }
 
+    /// <summary>U6-C: relocates stored bytes; missing source is a quiet no-op.</summary>
+    public Task MoveAsync(string sourcePath, string destinationPath, CancellationToken ct)
+    {
+        if (_files.TryGetValue(sourcePath, out var bytes))
+        {
+            _files[destinationPath] = bytes;
+            _files.Remove(sourcePath);
+        }
+        return Task.CompletedTask;
+    }
+
     /// <summary>Test helper: inject raw bytes for a path.</summary>
     public void SeedFile(string remotePath, string content)
     {

@@ -92,6 +92,8 @@ public sealed class WebDavConnectorFactory : INasConnectorFactory
             _inner.MakeDirectoryAsync(remotePath, cancellationToken);
         public Task DeleteAsync(string remotePath, CancellationToken cancellationToken) =>
             _inner.DeleteAsync(remotePath, cancellationToken);
+        public Task MoveAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken) =>
+            _inner.MoveAsync(sourcePath, destinationPath, cancellationToken);
 
         public void Dispose()
         {

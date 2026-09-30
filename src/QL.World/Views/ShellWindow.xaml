@@ -290,6 +290,33 @@
                             Content="📥 下载队列" ToolTip="打开下载队列（NAS→本地，支持续传/重试）"
                             AutomationProperties.Name="下载队列"
                             Command="{Binding ShowDownloadQueueCommand}" />
+                    <!-- U6-C: 管理员审核队列入口（含 pending 角标） -->
+                    <Grid Margin="8,0,0,0"
+                          Visibility="{Binding IsReviewAvailable, Converter={StaticResource BoolVis}}">
+                        <Button x:Name="ReviewQueueButton" Style="{StaticResource SubtleButtonStyle}"
+                                Content="🛡 审核队列" ToolTip="审核用户提交到共享库的图片"
+                                AutomationProperties.Name="审核队列"
+                                Command="{Binding ShowReviewQueueCommand}" />
+                        <Border MinWidth="16" Height="16" Padding="4,0"
+                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Margin="0,-4,-6,0" CornerRadius="8"
+                                Background="{DynamicResource WarningBrush}">
+                            <TextBlock FontSize="10" FontWeight="Bold" Foreground="White"
+                                       Text="{Binding PendingCount}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding PendingCount}" Value="0">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Border>
+                    </Grid>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"

@@ -182,6 +182,9 @@ public sealed class INasConnectorContractTests
         public Task DeleteAsync(string remotePath, CancellationToken cancellationToken)
             => Task.CompletedTask;
 
+        public Task MoveAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+
         public void Dispose() { }
     }
 }

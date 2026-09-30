@@ -83,4 +83,13 @@ public interface INasConnector : IDisposable
     /// must NOT throw when the path is already gone (404 treated as success).
     /// </summary>
     Task DeleteAsync(string remotePath, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// U6-C: server-side move/rename (WebDAV MOVE with Overwrite:T). Used by
+    /// review approval to relocate pending files into the library's
+    /// originals/thumbnails shards without re-uploading bytes. Implementations
+    /// SHOULD fall back to download → upload → delete when the server rejects
+    /// MOVE. Destination's parent directory must already exist.
+    /// </summary>
+    Task MoveAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken);
 }

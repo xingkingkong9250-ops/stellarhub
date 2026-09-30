@@ -13,7 +13,7 @@ namespace QL.World.Services.Nas;
 /// pending-review thumbnails via <see cref="EnsurePendingAsync"/>.
 /// Thread-safe; in-flight requests are deduplicated by hash.
 /// </summary>
-public sealed class SharedThumbnailCache : ViewModels.IGalleryThumbnailProvider
+public sealed class SharedThumbnailCache : IGalleryThumbnailProvider
 {
     private readonly INasConnector _connector;
     private readonly string _cacheDir;
@@ -68,64 +68,80 @@ public sealed class SharedThumbnailCache : ViewModels.IGalleryThumbnailProvider
 
     /// <summary>
     /// Ensures a library thumbnail is cached locally, then decodes and pushes
-    /// it to every realized item with the same hash. No-op when the local
-    /// file already exists or a request is in flight.
+    /// it to every realized item with the same hash.
     /// </summary>
-    public Task EnsureAsync(string hash)
-        => EnsureFromRemoteAsync(hash, SharedPaths.Thumbnail(hash));
+    public async Task EnsureAsync(string hash)
+    {
+        if (!IsWeakNetwork)
+            await EnsureLocalAsync(hash, SharedPaths.Thumbnail(hash)).ConfigureAwait(false);
+        PushIfRealized(hash);
+    }
 
     /// <summary>
-    /// Ensures a pending-review thumbnail for <paramref name="submitId"/>.
+    /// U6-C: ensures a pending-review thumbnail for <paramref name="submitId"/>
+    /// is cached and returns the decoded bitmap (null when absent/unreadable).
     /// </summary>
-    public Task EnsurePendingAsync(string hash, string submitId)
-        => EnsureFromRemoteAsync(hash, SharedPaths.PendingThumbnail(submitId));
+    public async Task<BitmapSource?> EnsurePendingAsync(string hash, string submitId)
+    {
+        await EnsureLocalAsync(hash, SharedPaths.PendingThumbnail(submitId))
+            .ConfigureAwait(false);
+        string localPath = LocalPath(hash);
+        return File.Exists(localPath)
+            ? WebpImageDecoder.DecodeFile(localPath)
+            : null;
+    }
 
-    private async Task EnsureFromRemoteAsync(string hash, string remotePath)
+    /// <summary>
+    /// Downloads <paramref name="remotePath"/> into the cache when missing.
+    /// In-flight requests are deduplicated; 404 and other failures leave no
+    /// local file and never throw.
+    /// </summary>
+    private async Task EnsureLocalAsync(string hash, string remotePath)
     {
         string localPath = LocalPath(hash);
 
         lock (_gate)
         {
-            if (!_inFlight.Add(hash))
+            if (File.Exists(localPath) || !_inFlight.Add(hash))
                 return;
         }
 
         try
         {
-            if (!File.Exists(localPath))
-            {
-                try
-                {
-                    await _connector.DownloadFileAsync(remotePath, localPath, CancellationToken.None)
-                        .ConfigureAwait(false);
-                }
-                catch (NasConnectionException ex) when (ex.Kind == NasConnectionKind.NotFound)
-                {
-                    return;
-                }
-                catch
-                {
-                    TryDelete(localPath);
-                    return;
-                }
-            }
-
-            BitmapSource? bitmap = WebpImageDecoder.DecodeFile(localPath);
-            if (bitmap is null)
-            {
-                TryDelete(localPath);
-                return;
-            }
-
-            lock (_gate)
-            {
-                if (_realized.TryGetValue(hash, out var item))
-                    item.ThumbnailImage = bitmap;
-            }
+            await _connector.DownloadFileAsync(remotePath, localPath, CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+        catch (NasConnectionException ex) when (ex.Kind == NasConnectionKind.NotFound)
+        {
+            TryDelete(localPath);
+        }
+        catch
+        {
+            TryDelete(localPath);
         }
         finally
         {
             lock (_gate) { _inFlight.Remove(hash); }
+        }
+    }
+
+    /// <summary>Decodes the cached file and pushes it into the realized item (if any).</summary>
+    private void PushIfRealized(string hash)
+    {
+        string localPath = LocalPath(hash);
+        if (!File.Exists(localPath)) return;
+
+        BitmapSource? bitmap = WebpImageDecoder.DecodeFile(localPath);
+        if (bitmap is null)
+        {
+            TryDelete(localPath);
+            return;
+        }
+
+        lock (_gate)
+        {
+            if (_realized.TryGetValue(hash, out var item))
+                item.ThumbnailImage = bitmap;
         }
     }
 

@@ -143,6 +143,22 @@ public sealed class SubmissionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Approve_relocates_pending_files_into_library_shards()
+    {
+        var item = MakeLocalItem("cat.png", "hF");
+        await _svc.SubmitFromLocalAsync(item, "alice", CancellationToken.None);
+        var sub = Assert.Single(await _svc.ListPendingAsync(CancellationToken.None));
+
+        var record = await _svc.ApproveAsync(sub, "admin", CancellationToken.None);
+
+        Assert.Equal(SharedPaths.Original("hF", ".png"), record.SourceNasPath);
+        using (await _connector.OpenReadAsync(record.SourceNasPath!, CancellationToken.None)) { }
+        using (await _connector.OpenReadAsync(SharedPaths.Thumbnail("hF"), CancellationToken.None)) { }
+        await Assert.ThrowsAsync<NasConnectionException>(() => _connector.OpenReadAsync(
+            SharedPaths.PendingOriginal(sub.SubmitId, "cat.png"), CancellationToken.None));
+    }
+
+    [Fact]
     public async Task SubmitFromLocal_returns_MissingLocalFile_for_bad_path()
     {
         var item = new GalleryItemViewModel(new GalleryListItem

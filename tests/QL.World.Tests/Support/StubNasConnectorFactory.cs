@@ -61,6 +61,9 @@ internal sealed class StubNasConnectorFactory : INasConnectorFactory
         public Task DeleteAsync(string p, CancellationToken ct) =>
             throw new NotSupportedException();
 
+        public Task MoveAsync(string sourcePath, string destinationPath, CancellationToken ct) =>
+            throw new NotSupportedException();
+
         public void Dispose()
         {
             if (_disposed) return;

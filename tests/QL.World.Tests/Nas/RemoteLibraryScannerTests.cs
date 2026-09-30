@@ -183,6 +183,9 @@ public sealed class RemoteLibraryScannerTests
         public Task DeleteAsync(string remotePath, CancellationToken ct)
             => throw new NotSupportedException();
 
+        public Task MoveAsync(string sourcePath, string destinationPath, CancellationToken ct)
+            => throw new NotSupportedException();
+
         public void Dispose()
         {
             if (_disposed) return;

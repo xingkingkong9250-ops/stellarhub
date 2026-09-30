@@ -258,6 +258,61 @@ public sealed class WebDavNasConnector : INasConnector
         catch (Exception ex) { throw MapNetworkException(ex); }
     }
 
+    public async Task MoveAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken)
+    {
+        string src = ResolveRemotePath(sourcePath);
+        string dst = ResolveRemotePath(destinationPath);
+
+        bool moved = await TryServerSideMoveAsync(src, dst, cancellationToken).ConfigureAwait(false);
+        if (moved) return;
+
+        // Fallback: MOVE unsupported/rejected — round-trip via a local temp file.
+        string temp = Path.Combine(Path.GetTempPath(), $"webdav-move-{Guid.NewGuid():N}");
+        try
+        {
+            await DownloadFileAsync(sourcePath, temp, cancellationToken).ConfigureAwait(false);
+            await UploadFileAsync(temp, destinationPath, cancellationToken).ConfigureAwait(false);
+            await DeleteAsync(sourcePath, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            try { if (File.Exists(temp)) File.Delete(temp); }
+            catch (IOException) { /* best effort */ }
+        }
+    }
+
+    /// <summary>
+    /// Attempts an RFC4918 MOVE. Returns false (never throws) when the server
+    /// rejects the verb — the caller then uses the download/upload fallback.
+    /// </summary>
+    private async Task<bool> TryServerSideMoveAsync(string src, string dst, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Destination must be an absolute URI; BaseAddress ends with the
+            // configured RootPath so a rooted relative URI composes correctly.
+            if (_http.BaseAddress is null)
+                return false;
+            var destinationUri = new Uri(_http.BaseAddress, dst);
+
+            using var req = new HttpRequestMessage(new HttpMethod("MOVE"), src);
+            req.Headers.Add("Destination", destinationUri.AbsoluteUri);
+            req.Headers.Add("Overwrite", "T");
+
+            using HttpResponseMessage resp = await SendAsync(req, cancellationToken).ConfigureAwait(false);
+            return resp.IsSuccessStatusCode;
+        }
+        catch (NasConnectionException)
+        {
+            return false;
+        }
+        catch (InvalidOperationException)
+        {
+            // Malformed Destination URI / header value — use fallback.
+            return false;
+        }
+    }
+
     // ─── helpers ────────────────────────────────────────────────────────────
 
     private async Task<HttpResponseMessage> SendPropFindAsync(string path, string depth, CancellationToken cancellationToken)
