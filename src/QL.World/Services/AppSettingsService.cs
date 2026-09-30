@@ -557,6 +557,52 @@ public sealed class AppSettingsService
             if (c.CreatedAt == default) c.CreatedAt = DateTimeOffset.UtcNow;
             if (c.UpdatedAt == default) c.UpdatedAt = c.CreatedAt;
         }
+        // M8-A: 校验 NasRole——≤1 个 Primary；无 Primary 时第一项收敛为 Primary；
+        // ShareLink 角色强制无账号密码（System.Text.Json 不识别 [OnDeserialized]，
+        // 这里集中处理）。
+        ValidateNasRoles();
+    }
+
+    /// <summary>
+    /// M8-A: 强约束：全列表至多 1 个 Primary；无 Primary 时第一项设为 Primary
+    /// （沿用 v0.2.1 兜底）；多 Primary 时只保留第一个为 Primary，其他降级 Secondary；
+    /// ShareLink 强制清空 Username/EncryptedPassword。空列表跳过。
+    /// </summary>
+    private void ValidateNasRoles()
+    {
+        if (_settings.NasConnections.Count == 0) return;
+
+        bool seenPrimary = false;
+        NasConnectionSpec? firstPrimary = null;
+        foreach (var c in _settings.NasConnections)
+        {
+            // ShareLink 强制无凭据（防用户错填或旧数据迁移）
+            if (c.Role == NasRole.ShareLink)
+            {
+                c.Username = string.Empty;
+                c.EncryptedPassword = null;
+            }
+
+            if (c.Role == NasRole.Primary)
+            {
+                if (seenPrimary)
+                {
+                    // 已有 Primary，多余的降级
+                    c.Role = NasRole.Secondary;
+                }
+                else
+                {
+                    seenPrimary = true;
+                    firstPrimary = c;
+                }
+            }
+        }
+
+        if (!seenPrimary)
+        {
+            // 无 Primary：第一项设为 Primary（与 v0.2.1 行为一致）
+            _settings.NasConnections[0].Role = NasRole.Primary;
+        }
     }
 
     private static bool TryLoadFile(

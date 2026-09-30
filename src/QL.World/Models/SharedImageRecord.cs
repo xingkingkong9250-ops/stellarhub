@@ -47,6 +47,14 @@ public sealed record SharedImageRecord
     [JsonPropertyName("source_nas_path")]
     public string? SourceNasPath { get; init; }
 
+    /// <summary>
+    /// M8-A: 该条数据所属的 NAS 连接 ID（spec.Id）。持久化于 library.json 便于
+    /// 跨重启保留来源；运行时由 <c>AggregatedSharedLibraryService</c> 按 spec.Id
+    /// 覆盖（防 spec 删除后 stale）。null 表示主库（向后兼容旧 library.json）。
+    /// </summary>
+    [JsonPropertyName("source_nas_id")]
+    public int? SourceNasId { get; init; }
+
     [JsonPropertyName("submitted_by")]
     public string SubmittedBy { get; init; } = string.Empty;
 

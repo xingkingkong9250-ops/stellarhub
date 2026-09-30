@@ -386,14 +386,18 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// M6-B + v0.2.1: 启动登录窗口。系统自动取主 NAS（IsPrimary=true 优先，
-    /// 无主则取列表第一个）；首次启动检测 accounts.json 为空时自动创建预置
-    /// 管理员 XingKongKong/zzh18254359250，并预填用户名。NAS 配置入口在登录
-    /// 窗口的「打开 NAS 设置」按钮，便于未配置 NAS 时直接进入 A7 页签。
+    /// M6-B + v0.2.1 + v0.3.0 M8-A: 启动登录窗口。系统自动取主 NAS
+    /// （<see cref="NasConnectionSpec.IsPrimary"/>==<see cref="NasRole.Primary"/>）；
+    /// M8-A 起 AppSettingsService.ValidateNasRoles 保证非空列表必含 1 个 Primary，
+    /// 因此 FirstOrDefault(IsPrimary) 必中。首次启动检测 accounts.json 为空时
+    /// 自动创建预置管理员 XingKongKong/zzh18254359250 并预填用户名。NAS 配置入口
+    /// 在登录窗口的「打开 NAS 设置」按钮，便于未配置 NAS 时直接进入 A7 页签。
     /// </summary>
     private CurrentUser? ShowLoginGate(ServiceRegistry services)
     {
         // v0.2.1: 解析主 NAS + 探测 accounts.json 是否需初始化预置管理员
+        // v0.3.0 M8-A: IsPrimary 现是 Role==Primary 的计算属性；ValidateNasRoles
+        // 已在 Load() 中收敛，空列表时此处 primarySpec=null（用户须先去 A7 配置）
         var primarySpec = services.Settings.NasConnections.FirstOrDefault(c => c.IsPrimary)
             ?? services.Settings.NasConnections.FirstOrDefault();
 

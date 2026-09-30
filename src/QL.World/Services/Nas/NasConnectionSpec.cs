@@ -48,12 +48,25 @@ public sealed class NasConnectionSpec
     public bool TrustSelfSigned { get; set; } = false;
 
     /// <summary>
-    /// v0.2.1: 管理员标记的主 NAS。登录时系统自动取 IsPrimary=true 的连接
-    /// 作为共享目录入口；无主 NAS 时回退取列表第一个。仅允许一个 IsPrimary=true
-    /// （SettingsViewModel.SetPrimaryCommand 设置时把其他改为 false）。
-    /// 默认 false，旧 config.json 反序列化兼容。
+    /// M8-A: NAS 角色（Primary/Secondary/ShareLink）。默认 Secondary 与 v0.2.1
+    /// IsPrimary 默认 false 保持语义一致。<see cref="IsPrimary"/> 是其计算属性，
+    /// 保留 setter 用于旧 config 反序列化兼容（IsPrimary=true → Role=Primary）。
+    /// <see cref="AppSettingsService.ValidateNasRoles"/> 保证全列表至多 1 个 Primary。
     /// </summary>
-    public bool IsPrimary { get; set; } = false;
+    public NasRole Role { get; set; } = NasRole.Secondary;
+
+    /// <summary>
+    /// v0.2.1: 管理员标记的主 NAS（计算属性）。
+    /// M8-A: 升级为 <see cref="Role"/>==<see cref="NasRole.Primary"/> 的语义；
+    /// 此处保留为计算属性 + 副作用 setter，向后兼容旧 config.json 反序列化
+    /// （旧 JSON 含 isPrimary=true 字段时 setter 会把 Role 设为 Primary）。
+    /// 新代码应直接读写 <see cref="Role"/> 字段。
+    /// </summary>
+    public bool IsPrimary
+    {
+        get => Role == NasRole.Primary;
+        set => Role = value ? NasRole.Primary : NasRole.Secondary;
+    }
 
     public DateTimeOffset CreatedAt { get; set; }
 

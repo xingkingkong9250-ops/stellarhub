@@ -1,4 +1,5 @@
 using System.IO;
+using QL.World.Models;
 using QL.World.Services;
 using QL.World.Services.Nas;
 
@@ -227,5 +228,138 @@ public sealed class AppSettingsServiceNasTests : IDisposable
         second.Load();
         var c = Assert.Single(second.NasConnections);
         Assert.False(c.UseTls);
+    }
+
+    // ─── M8-A: NasRole 枚举 + 强制主 NAS 校验 ───────────────────────────────
+
+    [Fact]
+    public void Role_defaults_to_Secondary_for_new_spec()
+    {
+        var spec = new NasConnectionSpec { Name = "n" };
+        Assert.Equal(NasRole.Secondary, spec.Role);
+        Assert.False(spec.IsPrimary); // 计算属性同步
+    }
+
+    [Fact]
+    public void IsPrimary_legacy_field_translates_to_Role_on_deserialize()
+    {
+        // 旧 v0.2.1 config 只写 isPrimary=true，没有 role 字段
+        File.WriteAllText(
+            Path.Combine(_directory, "config.json"),
+            "{\"nasConnections\":[{\"id\":1,\"name\":\"legacy\",\"host\":\"h\",\"isPrimary\":true}]}");
+
+        var settings = new AppSettingsService(_directory);
+        settings.Load();
+
+        var c = Assert.Single(settings.NasConnections);
+        Assert.Equal(NasRole.Primary, c.Role);
+        Assert.True(c.IsPrimary);
+    }
+
+    [Fact]
+    public void IsPrimary_legacy_false_translates_to_Secondary()
+    {
+        // 旧 v0.2.1 config 只写 isPrimary=false → 应被识别为 Secondary
+        // （ValidateNasRoles 之后第一项会兜底成 Primary，所以测两项）
+        File.WriteAllText(
+            Path.Combine(_directory, "config.json"),
+            "{\"nasConnections\":[" +
+            "{\"id\":1,\"name\":\"a\",\"host\":\"h\",\"isPrimary\":false}," +
+            "{\"id\":2,\"name\":\"b\",\"host\":\"h\",\"isPrimary\":true}" +
+            "]}");
+
+        var settings = new AppSettingsService(_directory);
+        settings.Load();
+
+        Assert.Equal(2, settings.NasConnections.Count);
+        Assert.Equal(NasRole.Secondary, settings.NasConnections[0].Role);
+        Assert.Equal(NasRole.Primary, settings.NasConnections[1].Role);
+    }
+
+    [Fact]
+    public void Load_converges_multiple_Primary_to_exactly_one()
+    {
+        File.WriteAllText(
+            Path.Combine(_directory, "config.json"),
+            "{\"nasConnections\":[" +
+            "{\"id\":1,\"name\":\"a\",\"host\":\"h\",\"role\":0}," +
+            "{\"id\":2,\"name\":\"b\",\"host\":\"h\",\"role\":0}," +
+            "{\"id\":3,\"name\":\"c\",\"host\":\"h\",\"role\":0}" +
+            "]}");
+
+        var settings = new AppSettingsService(_directory);
+        settings.Load();
+
+        int primaryCount = settings.NasConnections.Count(c => c.Role == NasRole.Primary);
+        Assert.Equal(1, primaryCount);
+        Assert.Equal(NasRole.Primary, settings.NasConnections[0].Role);
+        Assert.Equal(NasRole.Secondary, settings.NasConnections[1].Role);
+        Assert.Equal(NasRole.Secondary, settings.NasConnections[2].Role);
+    }
+
+    [Fact]
+    public void Load_auto_assigns_Primary_to_first_when_none()
+    {
+        File.WriteAllText(
+            Path.Combine(_directory, "config.json"),
+            "{\"nasConnections\":[" +
+            "{\"id\":1,\"name\":\"a\",\"host\":\"h\",\"role\":1}," +
+            "{\"id\":2,\"name\":\"b\",\"host\":\"h\",\"role\":1}" +
+            "]}");
+
+        var settings = new AppSettingsService(_directory);
+        settings.Load();
+
+        Assert.Equal(NasRole.Primary, settings.NasConnections[0].Role);
+        Assert.Equal(NasRole.Secondary, settings.NasConnections[1].Role);
+    }
+
+    [Fact]
+    public void Load_forces_ShareLink_no_credentials()
+    {
+        // ShareLink 配置中误填了 username 和 encryptedPassword → 应被强制清空
+        File.WriteAllText(
+            Path.Combine(_directory, "config.json"),
+            "{\"nasConnections\":[" +
+            "{\"id\":1,\"name\":\"main\",\"host\":\"h\",\"role\":0}," +
+            "{\"id\":2,\"name\":\"share\",\"host\":\"h\",\"role\":2," +
+            "\"username\":\"bad\",\"encryptedPassword\":\"bad\"}" +
+            "]}");
+
+        var settings = new AppSettingsService(_directory);
+        settings.Load();
+
+        var share = settings.NasConnections.First(c => c.Name == "share");
+        Assert.Equal(NasRole.ShareLink, share.Role);
+        Assert.Equal(string.Empty, share.Username);
+        Assert.Null(share.EncryptedPassword);
+    }
+
+    [Fact]
+    public void Load_empty_list_skips_role_validation()
+    {
+        // 空列表不应抛异常
+        File.WriteAllText(
+            Path.Combine(_directory, "config.json"),
+            "{\"nasConnections\":[]}");
+
+        var settings = new AppSettingsService(_directory);
+        settings.Load();
+        Assert.Empty(settings.NasConnections);
+    }
+
+    [Fact]
+    public void SharedImageRecord_SourceNasId_default_null_and_init()
+    {
+        var record = new SharedImageRecord
+        {
+            Id = "hash1",
+            FileName = "test.png",
+            SourceNasId = 2,
+        };
+        Assert.Equal(2, record.SourceNasId);
+
+        var legacy = new SharedImageRecord { Id = "hash2", FileName = "old.png" };
+        Assert.Null(legacy.SourceNasId); // 旧 library.json 缺该字段时 null
     }
 }
