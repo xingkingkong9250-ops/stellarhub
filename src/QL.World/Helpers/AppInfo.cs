@@ -19,7 +19,7 @@ public static class AppInfo
     /// U2-F (§4.E.2): milestone identifier shown next to the version number on the shell footer.
     /// Settings/About page keeps the pure semantic version (no suffix).
     /// </summary>
-    public const string MilestoneLabel = "M6 多用户管理";
+    public const string MilestoneLabel = "M6 多用户管理（补全）";
 
     private static readonly Version AssemblyVersion =
         typeof(AppInfo).Assembly.GetName().Version ?? new Version(0, 0, 0);

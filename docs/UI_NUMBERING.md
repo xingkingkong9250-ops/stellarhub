@@ -80,3 +80,12 @@
 | W4/D4 | 工具栏 | 已实现（M5-G） | 全部重试 / 全部取消 / 清空已完成 / 打开根目录 |
 | W3/A7-PRE | ProgressiveImage 三层渐显 | 已实现（M5-F/H） | 详情栏 B3-1 大图预览替换为 ProgressiveImage 控件：PlaceholderLayer（256px thumb，已缓存）→ PreviewLayer（1024px preview，加载完成淡入替代）→ FinalLayer（原图，按需淡入替代）；每层 DoubleAnimation 200ms QuadraticEase；上层淡入完成才折叠下层避免闪烁 |
 | W3/A7-WEAK | 弱网优先策略 | 已实现（M5-H） | NetworkConditionMonitor.IsWeakNetwork=true 时：画廊 Attach 与 Prefetch 跳过远程项请求（仅显示已缓存 thumb）；本地项不受影响；恢复后自动恢复请求。无 UI 控件，行为层实现 |
+| W5 | 登录窗口 | 已实现（M6-B/U6 编号确认） | NAS 连接下拉 + 账号密码登录 + 本地模式入口 + 首次初始化管理员；M6-B 初编 W4 与下载队列撞号，U6 起统一改 W5 |
+| W3/A8 | 用户管理页签 | 已实现（M6-C/U6 编号确认） | 仅管理员可见；账号列表/新建用户/启用禁用/重置密码/删除用户；M6-C 初编 A7 与 NAS 页签撞号，U6 起统一改 A8 |
+| W1/B1-SCOPE | 本地库/共享库分段切换 | 已实现（U6-A） | 画廊上方分段控件；仅 NAS 登录用户可切共享段；切换时详情栏（B3）随作用域换模板，搜索词按作用域重新应用 |
+| W1/B2-SHARED | 共享库画廊 | 已实现（U6-A） | SharedGalleryList：共享 ListBox 复用 B2-3 网格/列表 DataTemplate；缩略图走 SharedThumbnailCache（弱网同样跳过）；SourceBadge=「共享」 |
+| W1/B2-3-SUB | 图卡右键「提交到共享库」 | 已实现（U6-B） | 仅本地项可见；上传原图+缩略图+pending JSON；hash 查重（库内已有/审核中均拒绝）；CanSubmitToShared=false 时置灰 |
+| W1/A1-REV | 「审核队列」入口 + 待审角标 | 已实现（U6-C） | 工具栏「🛡 审核队列」按钮，仅管理员可见；右上角红色圆角角标显示 pending 数，0 时隐藏；关闭 W6 后自动刷新 |
+| W6 | 审核队列窗口 | 已实现（U6-C） | 720×540，最小 600 宽；行：96×72 待审缩略图 + 提交人/时间/尺寸/大小/标签 + ✓通过/✕拒绝；空态「没有待审核的提交」；通过/拒绝后行即时移除 |
+| W1/B3-SHARED | 共享详情模板（只读） | 已实现（U6-D） | 共享作用域 B3：240 高缩略图 + 「保存副本到…」/「复制 NAS 路径」+ 文件名/格式/尺寸/大小/评分/分类/标签/提交者/审核人·时间/NAS 路径；全部只读 |
+| W1/B3-SAVE | 「保存副本到…」 | 已实现（U6-D） | SaveFileDialog 选本地目标 → connector 下载原图；成功/失败经通知中心反馈；取消无副作用 |
