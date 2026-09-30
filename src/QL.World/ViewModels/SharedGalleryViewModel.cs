@@ -16,6 +16,7 @@ public sealed class SharedGalleryViewModel : ObservableObject
 {
     private readonly AppSettingsService _settings;
     private readonly List<GalleryItemViewModel> _allItems = [];
+    private readonly Dictionary<string, SharedImageRecord> _records = new(StringComparer.Ordinal);
     private bool _isGridView;
 
     public SharedGalleryViewModel(
@@ -85,11 +86,13 @@ public sealed class SharedGalleryViewModel : ObservableObject
     public void Load(IReadOnlyList<SharedImageRecord> records)
     {
         _allItems.Clear();
+        _records.Clear();
         Items.Clear();
         int sequence = 0;
         foreach (var record in records)
         {
             sequence++;
+            _records[record.Id] = record;
             var item = new GalleryItemViewModel(new GalleryListItem
             {
                 Id = sequence,
@@ -112,6 +115,10 @@ public sealed class SharedGalleryViewModel : ObservableObject
         Refreshed?.Invoke();
         (Thumbnails as Services.Nas.SharedThumbnailCache)?.Prefetch(Items);
     }
+
+    /// <summary>U6-D: full shared record behind a gallery item hash (null when gone).</summary>
+    public SharedImageRecord? FindRecord(string hash) =>
+        _records.TryGetValue(hash, out var record) ? record : null;
 
     /// <summary>
     /// U6-D hook: re-applies the in-memory text filter. Empty text shows all.

@@ -226,6 +226,12 @@ public sealed class TopBarViewModel : ObservableObject
     /// <summary>Shell wires this to open W3.</summary>
     public event Action? SettingsRequested;
 
+    /// <summary>U6-D: Shell supplies the current scope; when false searches stay out of the local DB.</summary>
+    public Func<bool>? LocalScopeProvider;
+
+    /// <summary>U6-D: fired with the box text while the shared scope is active.</summary>
+    public event Action<string>? SharedSearchCommitted;
+
     public void ClearSearchText()
     {
         _searchTimer.Stop();
@@ -255,6 +261,14 @@ public sealed class TopBarViewModel : ObservableObject
 
     private async Task CommitSearchAsync()
     {
+        // U6-D: in shared-library scope the box is an in-memory name/tag
+        // filter over the loaded shared items, never a local-DB query.
+        if (LocalScopeProvider is not null && !LocalScopeProvider())
+        {
+            SharedSearchCommitted?.Invoke(_searchText);
+            return;
+        }
+
         // Semantic mode: clear text/tag filters; SemanticSearchService resolves the id list.
         if (_searchMode == SearchMode.Semantic)
         {

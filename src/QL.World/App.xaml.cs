@@ -152,6 +152,7 @@ public partial class App : Application
             _shellViewModel.ShowSettingsDialog += ShowSettingsDialog;
             _shellViewModel.ShowDownloadQueueDialog += ShowDownloadQueueDialog;
             _shellViewModel.ShowReviewQueueDialog += ShowReviewQueueDialog;
+            _shellViewModel.RequestSaveCopyDialog += ShowSaveCopyDialog;
             _shellWindow = new ShellWindow(_shellViewModel);
 
             MainWindow = _shellWindow;
@@ -268,6 +269,28 @@ public partial class App : Application
         catch (Exception ex)
         {
             WriteLog($"[INPUT] Dialog failed: {ex}");
+            return null;
+        }
+    }
+
+    /// <summary>U6-D: SaveFileDialog for 「保存副本到…」; null on cancel/failure.</summary>
+    private string? ShowSaveCopyDialog(string defaultName)
+    {
+        if (_shellWindow is null) return null;
+        try
+        {
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                Title = "保存共享库图片副本",
+                FileName = defaultName,
+                Filter = "图片文件 (*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.webp;*.tif;*.tiff)|"
+                         + "*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.webp;*.tif;*.tiff|所有文件 (*.*)|*.*",
+            };
+            return dialog.ShowDialog(_shellWindow) == true ? dialog.FileName : null;
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"[SHARED] Save-copy dialog failed: {ex}");
             return null;
         }
     }

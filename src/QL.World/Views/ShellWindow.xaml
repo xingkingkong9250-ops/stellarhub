@@ -855,6 +855,7 @@
             <Border Grid.Column="4" Background="{DynamicResource SurfaceBrush}"
                     BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1,0,0,0">
                 <Grid>
+                <Grid Visibility="{Binding IsLocalScope, Converter={StaticResource BoolVis}}">
                     <!-- Empty -->
                     <StackPanel VerticalAlignment="Top" Margin="20"
                                 Visibility="{Binding Detail.ShowEmpty, Converter={StaticResource BoolVis}}">
@@ -1131,6 +1132,87 @@
                             </ItemsControl>
                         </StackPanel>
                     </ScrollViewer>
+                </Grid>
+
+                <!-- ─── U6-D：B3 共享库详情（只读） ─── -->
+                <Grid Visibility="{Binding IsSharedScope, Converter={StaticResource BoolVis}}">
+                    <!-- Empty -->
+                    <StackPanel VerticalAlignment="Top" Margin="20"
+                                Visibility="{Binding SharedDetail.ShowEmpty, Converter={StaticResource BoolVis}}">
+                        <TextBlock Text="详情" Style="{StaticResource RegionLabelStyle}" />
+                        <TextBlock Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"
+                                   Text="在共享库中点选图片查看信息；可将原图保存为本地副本。" />
+                    </StackPanel>
+
+                    <!-- Single (read-only) -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  Visibility="{Binding SharedDetail.HasSelection, Converter={StaticResource BoolVis}}">
+                        <StackPanel Margin="16">
+                            <TextBlock Text="共享图片" Style="{StaticResource SectionCaptionStyle}" />
+
+                            <Border Height="240" CornerRadius="8" ClipToBounds="True"
+                                    Background="{DynamicResource SurfaceVariantBrush}">
+                                <Image Source="{Binding SharedDetail.Preview.ThumbnailImage}"
+                                       Stretch="Uniform" Margin="6" />
+                            </Border>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <Button Style="{StaticResource AccentButtonStyle}" Content="保存副本到…"
+                                        Command="{Binding SharedDetail.SaveCopyCommand}" />
+                                <Button Style="{StaticResource SubtleButtonStyle}" Margin="4,0,0,0"
+                                        Content="复制 NAS 路径"
+                                        Command="{Binding SharedDetail.CopyNasPathCommand}" />
+                            </StackPanel>
+
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="72" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="文件名" Foreground="{DynamicResource TextMutedBrush}" Margin="0,2" />
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SharedDetail.FileName}" TextWrapping="Wrap" Margin="0,2" />
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="格式" Foreground="{DynamicResource TextMutedBrush}" Margin="0,2" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SharedDetail.FormatText}" Margin="0,2" />
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="尺寸" Foreground="{DynamicResource TextMutedBrush}" Margin="0,2" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SharedDetail.DimensionsText}" Margin="0,2" />
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="大小" Foreground="{DynamicResource TextMutedBrush}" Margin="0,2" />
+                                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SharedDetail.FileSizeText}" Margin="0,2" />
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="评分" Foreground="{DynamicResource TextMutedBrush}" Margin="0,2" />
+                                <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding SharedDetail.Rating, StringFormat='{}{0} ★'}" Margin="0,2" />
+                                <TextBlock Grid.Row="5" Grid.Column="0" Text="分类" Foreground="{DynamicResource TextMutedBrush}" Margin="0,2" />
+                                <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding SharedDetail.CategoryText}" Margin="0,2" />
+                                <TextBlock Grid.Row="6" Grid.Column="0" Text="标签" Foreground="{DynamicResource TextMutedBrush}" Margin="0,2" />
+                                <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding SharedDetail.TagsSummary}" TextWrapping="Wrap" Margin="0,2" />
+                                <TextBlock Grid.Row="7" Grid.Column="0" Text="提交者" Foreground="{DynamicResource TextMutedBrush}" Margin="0,2" />
+                                <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding SharedDetail.SubmittedBy}" Margin="0,2" />
+                                <TextBlock Grid.Row="8" Grid.Column="0" Text="审核信息" Foreground="{DynamicResource TextMutedBrush}" Margin="0,2" />
+                                <TextBlock Grid.Row="8" Grid.Column="1" Margin="0,2" TextWrapping="Wrap">
+                                    <TextBlock.Text>
+                                        <MultiBinding StringFormat="{}{0} · {1}">
+                                            <Binding Path="SharedDetail.ApprovedBy" />
+                                            <Binding Path="SharedDetail.ApprovedAtText" />
+                                        </MultiBinding>
+                                    </TextBlock.Text>
+                                </TextBlock>
+                                <TextBlock Grid.Row="9" Grid.Column="0" Text="NAS 路径" Foreground="{DynamicResource TextMutedBrush}" Margin="0,2" />
+                                <TextBlock Grid.Row="9" Grid.Column="1" Text="{Binding SharedDetail.NasPath}" TextWrapping="Wrap" Margin="0,2" />
+                            </Grid>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
                 </Grid>
             </Border>
         </Grid>

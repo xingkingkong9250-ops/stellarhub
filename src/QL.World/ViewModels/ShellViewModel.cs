@@ -47,6 +47,9 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         Gallery.SelectionChanged += OnSelectionChanged;
         TagTree.ClearFiltersRequested += ClearFilters;
         TopBar.SettingsRequested += () => ShowSettingsDialog?.Invoke();
+        // U6-D: search box in shared scope filters shared items in memory.
+        TopBar.LocalScopeProvider = () => IsLocalScope;
+        TopBar.SharedSearchCommitted += text => SharedGallery?.ApplyFilter(text);
         // U2-C: clicking a related-asset thumbnail in B3-9 dives into its similarity neighborhood.
         Detail.FindSimilarRequested += relatedId => _ = FindSimilarAsync(relatedId);
 
@@ -106,7 +109,11 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
                 Path.Combine(_services.Settings.DataRoot, "shared-thumbs"),
                 _services.NetworkMonitor);
             SharedGallery = new SharedGalleryViewModel(_services.Settings, SharedThumbnails);
-            SharedGallery.SelectionChanged += OnSharedSelectionChanged;
+            SharedDetail = new SharedDetailViewModel(SharedGallery, sharedStorage.Connector);
+            SharedDetail.RequestSaveFile += defaultName =>
+                RequestSaveCopyDialog?.Invoke(defaultName);
+            SharedDetail.SaveCompleted += (kind, title, message) =>
+                _services.Notifications.Publish(kind, title, message);
         }
         SwitchToLocalCommand = new RelayCommand(() => IsLocalScope = true);
         SwitchToSharedCommand = new RelayCommand(() => IsLocalScope = false,
@@ -161,6 +168,9 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>Gallery VM for the NAS shared library; null in local-only mode.</summary>
     public SharedGalleryViewModel? SharedGallery { get; }
 
+    /// <summary>U6-D: read-only shared detail pane; null in local-only mode.</summary>
+    public SharedDetailViewModel? SharedDetail { get; }
+
     /// <summary>U6-C: NAS thumbnail cache (also feeds the review window).</summary>
     public SharedThumbnailCache? SharedThumbnails { get; }
 
@@ -206,7 +216,14 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         set
         {
             if (SetProperty(ref _isLocalScope, value))
+            {
                 OnPropertyChanged(nameof(IsSharedScope));
+                // U6-D: re-apply the current search text under the new scope.
+                if (value)
+                    _ = Gallery.RefreshCurrentAsync();
+                else
+                    SharedGallery?.ApplyFilter(TopBar.SearchText);
+            }
         }
     }
 
@@ -231,9 +248,6 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
             System.Diagnostics.Debug.WriteLine($"[SHARED] Load failed: {ex.Message}");
         }
     }
-
-    /// <summary>U6-A placeholder; U6-D binds the shared detail pane here.</summary>
-    private void OnSharedSelectionChanged() { }
 
     /// <summary>U6-B: uploads the clicked (or selected) item and reports the outcome.</summary>
     private async Task SubmitToSharedAsync(object? parameter)
@@ -313,6 +327,9 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>App wires this to show InputDialog. Returns null on cancel.</summary>
     public event Func<string, string, string, string?>? RequestInputDialog;
+
+    /// <summary>U6-D: App wires this to show SaveFileDialog for 「保存副本」. Returns null on cancel.</summary>
+    public event Func<string, string?>? RequestSaveCopyDialog;
 
     /// <summary>App wires this to show the W3 settings window.</summary>
     public event Action? ShowSettingsDialog;
