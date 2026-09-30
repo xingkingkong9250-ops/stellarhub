@@ -235,6 +235,18 @@ public partial class App : Application
             WriteLog($"[EXIT] Database cleanup failed: {ex}");
         }
 
+        // M8-B: 释放 NasConnectionRegistry（含主+副所有 connector 的 HttpClient 池）。
+        // 旧 SharedStorage/Accounts/SharedLibrary/Submissions 字段是主 NAS 视图别名，
+        // 其 connector 由 NasRegistry 统一持有，这里一次性释放。
+        try
+        {
+            _services?.NasRegistry?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"[EXIT] NAS registry cleanup failed: {ex}");
+        }
+
         try
         {
             _singleInstanceMutex?.ReleaseMutex();
@@ -443,6 +455,10 @@ public partial class App : Application
             return null;
 
         // Build NAS connector + shared services for the user's NAS connection.
+        // M8-B: 不再只为主 NAS 单独构造 connector——先 EnsureAll 同步全部
+        // NAS（主+副），再让旧字段 SharedStorage/Accounts/SharedLibrary/Submissions
+        // 引用 NasRegistry.GetPrimary() 实例（向后兼容外部调用点）。副库 connector
+        // 失败仅日志，主库失败抛异常终止登录。
         try
         {
             var spec = services.Settings.NasConnections.FirstOrDefault(c => c.Id == currentUser.NasConnectionId);
@@ -452,20 +468,34 @@ public partial class App : Application
                 return null;
             }
 
-            var connector = services.NasFactory.Create(spec, plaintextPassword: null);
-            var storage = new SharedStorageService(connector);
+            var nasRegistry = new NasConnectionRegistry(services.NasFactory);
+            nasRegistry.EnsureAll(services.Settings.NasConnections);
+
+            var primaryEntry = nasRegistry.GetPrimary();
+            if (primaryEntry is null)
+            {
+                // EnsureAll 未创建主库（配置/凭据错误）——登录链路无法继续
+                nasRegistry.Dispose();
+                WriteLog("[LOGIN] No primary NAS available after EnsureAll.");
+                return null;
+            }
+
+            var storage = primaryEntry.Value.Storage;
             var accounts = new AccountService(storage);
             var sharedLibrary = new SharedLibraryService(storage);
             var submissions = new SubmissionService(storage, sharedLibrary,
                 services.Thumbnails, services.Settings);
 
+            services.NasRegistry = nasRegistry;
             services.SharedStorage = storage;
             services.Accounts = accounts;
             services.SharedLibrary = sharedLibrary;
             services.Submissions = submissions;
             services.Permissions = new PermissionService(currentUser);
 
-            WriteLog($"[LOGIN] User '{currentUser.Username}' ({currentUser.Role}) logged in via NAS '{spec.Name}'.");
+            int secondaryCount = nasRegistry.GetSecondaries().Count;
+            WriteLog($"[LOGIN] User '{currentUser.Username}' ({currentUser.Role}) logged in via NAS '{spec.Name}' " +
+                     $"(primary) + {secondaryCount} secondary NAS connected.");
             return currentUser;
         }
         catch (Exception ex)

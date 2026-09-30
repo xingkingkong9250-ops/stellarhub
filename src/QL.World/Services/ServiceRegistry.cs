@@ -76,6 +76,33 @@ public sealed class ServiceRegistry
     /// <summary>M6-E: submission review service (pending/ on NAS). Null in local-only mode.</summary>
     public SubmissionService? Submissions { get; set; }
 
+    // ─── M8 多 NAS 聚合（登录后由 App.xaml.cs 设置）─────────────────────────
+
+    /// <summary>
+    /// M8-B: 多 NAS 聚合容器，持所有 NAS 的 connector + SharedStorageService 副本，
+    /// 按 <see cref="NasConnectionSpec.Id"/> 缓存。登录后由 App.xaml.cs 调
+    /// <see cref="NasConnectionRegistry.EnsureAll"/> 同步。旧字段 SharedStorage/
+    /// Accounts/SharedLibrary/Submissions 仍指向主 NAS 实例（向后兼容外部调用点）。
+    /// Null in local-only mode.
+    /// </summary>
+    public NasConnectionRegistry? NasRegistry { get; set; }
+
+    /// <summary>
+    /// M8-B: 当前所有副库（Role != Primary）的 SharedStorageService 快照。
+    /// 主库不包含在内。聚合视图（M8-C AggregatedSharedLibraryService）遍历此列表
+    /// 并发加载每库 library。NasRegistry 未初始化（local-only）时返回空数组。
+    /// 每次访问都从 NasRegistry 现算以保持与配置同步。
+    /// </summary>
+    public IReadOnlyList<SharedStorageService> SecondaryStorages
+    {
+        get
+        {
+            var registry = NasRegistry;
+            if (registry is null) return Array.Empty<SharedStorageService>();
+            return registry.GetSecondaries().Select(e => e.Storage).ToList();
+        }
+    }
+
     /// <summary>M6-F: permission checks based on the current user.</summary>
     public PermissionService Permissions { get; set; } = new(null);
 

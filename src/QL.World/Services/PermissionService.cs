@@ -40,4 +40,19 @@ public sealed class PermissionService
 
     /// <summary>Any logged-in user can view the shared library.</summary>
     public bool CanViewSharedLibrary => IsLoggedIn;
+
+    // ─── M8 副库权限分级 ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// M8-B: 管理员可对副库（Secondary/ShareLink）执行写操作（上传/删除/搬运）。
+    /// 普通用户对副库只读可下载。主库写权限仍由 <see cref="CanSubmitToLibrary"/>
+    /// 决定（IsLoggedIn，行为不变）。
+    /// </summary>
+    public bool CanWriteToSecondaryNas => IsAdmin;
+
+    /// <summary>
+    /// M8-B: 任意登录用户可从副库下载数据（扩充存储的语义即"可读可下载"）。
+    /// 主库下载同样允许（<see cref="CanViewSharedLibrary"/> 已覆盖）。
+    /// </summary>
+    public bool CanDownloadFromSecondaryNas => IsLoggedIn;
 }
