@@ -361,9 +361,11 @@ public partial class App : Application
             var connector = services.NasFactory.Create(spec, plaintextPassword: null);
             var storage = new SharedStorageService(connector);
             var accounts = new AccountService(storage);
+            var sharedLibrary = new SharedLibraryService(storage);
 
             services.SharedStorage = storage;
             services.Accounts = accounts;
+            services.SharedLibrary = sharedLibrary;
 
             WriteLog($"[LOGIN] User '{currentUser.Username}' ({currentUser.Role}) logged in via NAS '{spec.Name}'.");
             return currentUser;

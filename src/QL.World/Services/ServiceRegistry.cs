@@ -70,6 +70,9 @@ public sealed class ServiceRegistry
     /// <summary>M6: account management service. Null in local-only mode.</summary>
     public AccountService? Accounts { get; set; }
 
+    /// <summary>M6-D: shared library service (library.json on NAS). Null in local-only mode.</summary>
+    public SharedLibraryService? SharedLibrary { get; set; }
+
     public ServiceRegistry(
         AppSettingsService settings,
         DatabaseService database,

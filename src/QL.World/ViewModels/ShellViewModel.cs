@@ -1,4 +1,5 @@
 using System.IO;
+using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Threading;
 using QL.World.Helpers;
@@ -95,6 +96,14 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         DeleteCollectionCommand = new RelayCommand(DeleteCollection);
         SetCollectionCoverCommand = new RelayCommand(SetCollectionCover);
         AddSelectedToCollectionCommand = new RelayCommand(AddSelectedToCollection);
+
+        // M6-D: shared library (NAS). Available only when logged in with NAS account.
+        IsSharedLibraryAvailable = _services.SharedLibrary is not null;
+        LoadSharedLibraryCommand = new AsyncRelayCommand(
+            LoadSharedLibraryAsync,
+            () => IsSharedLibraryAvailable);
+        if (IsSharedLibraryAvailable)
+            _ = LoadSharedLibraryAsync();
     }
 
     public AppSettingsService Settings => _services.Settings;
@@ -123,6 +132,31 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public AttributeFilterViewModel AttributeFilter { get; }
     public DetailViewModel Detail { get; }
     public StatusBarViewModel StatusBar { get; }
+
+    // ─── M6-D: shared library ─────────────────────────────────────────────
+
+    /// <summary>True when the user logged in with a NAS account (shared library available).</summary>
+    public bool IsSharedLibraryAvailable { get; }
+
+    public ObservableCollection<SharedImageRecord> SharedImages { get; } = new();
+
+    public AsyncRelayCommand LoadSharedLibraryCommand { get; }
+
+    private async Task LoadSharedLibraryAsync()
+    {
+        if (_services.SharedLibrary is null) return;
+        try
+        {
+            var images = await _services.SharedLibrary.LoadAsync(CancellationToken.None);
+            SharedImages.Clear();
+            foreach (var img in images)
+                SharedImages.Add(img);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[SHARED] Load failed: {ex.Message}");
+        }
+    }
 
     public RelayCommand FocusSearchCommand { get; }
     public RelayCommand ClearFiltersCommand { get; }
