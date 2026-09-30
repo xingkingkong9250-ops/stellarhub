@@ -9,6 +9,55 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-09-30 M7 NAS SMB 协议扩展
+
+v0.1.1 已支持 WebDAV NAS 协议，但用户使用绿联成品 NAS（UGOS）——UGOS 默认开启 SMB 文件服务，WebDAV 需额外配置，对成品 NAS 用户不友好。M7 在现有 `INasConnector` 抽象上加 SMB 协议驱动（仅 SMB；SFTP 推到 M8 单独里程碑）。选型与 enum 注释一致——Win32 `mpr.dll` P/Invoke（zero new NuGet），与项目「零依赖」风格统一。
+
+### M7-A：多协议路由工厂 + SFTP 占位
+
+- 新增 `NasConnectorFactory`：按 `spec.Protocol` 路由分派给对应子工厂
+- 新增 `UnsupportedProtocolFactory`：通用占位（`Create` 抛 `NotSupportedException`，含协议名 + 目标里程碑）
+- App.xaml.cs 注入点替换为 `NasConnectorFactory(webDav, smb, sftp)`；M7-A 阶段 SMB/SFTP 均为占位
+- 测试 482 → 488
+
+### M7-B：SMB Connector（Win32 mpr.dll P/Invoke）
+
+- 新增 `SmbNative`：`WNetAddConnection2`（CONNECT_TEMPORARY=4，不写凭据管理器）/ `WNetCancelConnection2`（force=true）+ NETRESOURCE + 错误码常量（1326/86/5 Auth、53/67 Bad netpath、2/3 File/Path not found、1219 session expired）
+- 新增 `SmbNasConnector`：实现 `INasConnector` 10 方法。`ResolveUncPath` 拼接 uncRoot+remotePath（>260 加 `\\?\UNC\` 长前缀绕过 MAX_PATH）；`MoveAsync` 跨卷失败降级 download → upload → delete；dispose 调 `WNetCancelConnection2(force=true)` 释放会话
+- 新增 `SmbConnectorFactory`：RootPath 拆 share/subPath；username 非空时 WNet 握手，username 为空走集成认证；DPAPI 解密密码与 WebDav 一致
+- App.xaml.cs SMB 占位替换为 `new SmbConnectorFactory()`（SFTP 仍占位）
+- 新增 `SmbNasConnectorContractTests` 14 项契约测试：用本地临时目录当 UNC 替身，`ownsConnection:false` 绕过 WNet 握手
+- 测试 488 → 502
+
+### M7-C：UI 协议联动
+
+- `NasProtocolOptions` 由 `[WebDav]` 扩展为 `[WebDav, Smb]`（Sftp 留待 M8）
+- `SettingsViewModel` 加派生属性 `IsWebDavSelected` / `IsSmbSelected` / `IsTlsApplicable` / `IsTrustSelfSignedApplicable` / `NasPortHintText` / `NasRootPathHint` / `NasTlsLabelText`
+- 协议 ComboBox `SelectionChanged` 转发到 ViewModel（spec 是 POCO 无 INPC，借由 View 事件桥接避免改造持久化 schema）；切换协议若 Port 为前一默认（443/445）或 null 自动填新协议默认，非默认值保留
+- xaml N3 端口提示绑 `NasPortHintText`；N5 根路径提示绑 `NasRootPathHint`；UseTls 标签绑 `NasTlsLabelText`、Visibility 绑 `IsTlsApplicable`；TrustSelfSigned Visibility 绑 `IsTrustSelfSignedApplicable`（仅 WebDav）
+- 用现有 `BoolToVisibilityConverter`，不新增 Converter
+
+### M7-D：契约测试参数化
+
+- `INasConnectorContractTests` 8 个 [Fact] → 9 个 [Theory]+[MemberData]，TestConnection 拆成 returns_true 与 throws_with_kind 两个独立断言单元
+- 新增 `ConnectorCase` 上下文类（封装 connector factory + 已知远端文件 + 期望失败 Kind + 期望 List 数量）；Stub 与 Smb-localTemp 走同一份断言
+- 保留 `SmbNasConnectorContractTests` 作为 SMB 专属边界行为测试（RangeNotSatisfiable / idempotent Delete / Move cross-volume fallback / GetMetadata NotFound），避免参数化把分支塞进断言
+- WebDav 不参与参数化（依赖 HttpMessageHandler 难以与本地文件 sandbox 统一），保留独立 14 项
+- 测试 502 → 512
+
+### 部署说明（绿联 UGOS）
+
+- 控制面板 → 文件服务 → SMB 服务：默认开启（无需额外配置）
+- 共享文件夹设置：建议建 `StellarHubShared` 顶级共享，子目录由 StellarHub 自行管理
+- RootPath 填 `StellarHubShared/` 或 `StellarHubShared/子目录`（前导/可省略，工厂自动拆 share/subPath）
+- 凭据：DPAPI CurrentUser 加密落 config.json，与 WebDav 一致；明文密码从不落盘
+
+### 变更
+
+- 版本号 0.1.1 → 0.2.0（次版本号 +0.1.0，修订号归零；新功能里程碑）
+- `AppInfo.MilestoneLabel` → "M7 NAS SMB 协议扩展"
+- 全量测试 512 项全绿，0 警告 0 错误
+
 ## [0.1.1] — 2026-09-30 M6 多用户管理（补全，代号 U6）
 
 M6 服务层已完整但 UI 未接通的补丁版本：共享库画廊、本地图片一键提交、管理员审核队列、共享库只读详情与保存副本全部接通。不立大里程碑，修订号 +0.0.1。
