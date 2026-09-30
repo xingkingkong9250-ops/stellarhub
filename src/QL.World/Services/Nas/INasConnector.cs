@@ -12,7 +12,7 @@ namespace QL.World.Services.Nas;
 /// Implementations must be safe to call from a background thread; never
 /// invoke them on the UI thread (WebDAV I/O is blocking at the HTTP layer).
 /// </summary>
-public interface INasConnector
+public interface INasConnector : IDisposable
 {
     /// <summary>Connection spec this instance was built from.</summary>
     NasConnectionSpec Spec { get; }

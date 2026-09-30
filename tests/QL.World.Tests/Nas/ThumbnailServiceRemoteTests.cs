@@ -119,5 +119,7 @@ public sealed class ThumbnailServiceRemoteTests : IDisposable
             throw new NotSupportedException();
         public Task DeleteAsync(string p, CancellationToken ct) =>
             throw new NotSupportedException();
+
+        public void Dispose() { }
     }
 }

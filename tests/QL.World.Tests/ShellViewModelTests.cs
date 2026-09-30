@@ -60,7 +60,7 @@ public sealed class ShellViewModelTests : IDisposable
             tags, collections, notifications, watcher, legacyImporter, ai, aiAnalysis,
             colors, semanticSearch, pbrGrouping, new StubNasConnectorFactory(),
             new ThumbnailCacheService(_directory, settings), downloadQueue,
-            new NetworkConditionMonitor());
+            new NetworkConditionMonitor(), userIdentity);
         _viewModel = new ShellViewModel(services);
     }
 

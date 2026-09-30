@@ -1,4 +1,6 @@
 using QL.World.Data;
+using QL.World.Helpers;
+using QL.World.Models;
 using QL.World.Services.Ai;
 using QL.World.Services.Colors;
 using QL.World.Services.Nas;
@@ -54,6 +56,20 @@ public sealed class ServiceRegistry
     /// </summary>
     public NetworkConditionMonitor NetworkMonitor { get; }
 
+    // ─── M6 多用户（登录后由 App.xaml.cs 设置）────────────────────────────
+
+    /// <summary>M5 stub / M6 real: OS user identity (username@device).</summary>
+    public IUserIdentity UserIdentity { get; }
+
+    /// <summary>M6: currently logged-in application account; null in local-only mode.</summary>
+    public CurrentUser? CurrentUser { get; set; }
+
+    /// <summary>M6: NAS shared storage (accounts.json / library.json / pending). Null in local-only mode.</summary>
+    public SharedStorageService? SharedStorage { get; set; }
+
+    /// <summary>M6: account management service. Null in local-only mode.</summary>
+    public AccountService? Accounts { get; set; }
+
     public ServiceRegistry(
         AppSettingsService settings,
         DatabaseService database,
@@ -74,7 +90,8 @@ public sealed class ServiceRegistry
         INasConnectorFactory nasFactory,
         ThumbnailCacheService thumbnailCache,
         DownloadQueueService downloadQueue,
-        NetworkConditionMonitor networkMonitor)
+        NetworkConditionMonitor networkMonitor,
+        IUserIdentity userIdentity)
     {
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
         Database = database ?? throw new ArgumentNullException(nameof(database));
@@ -96,5 +113,6 @@ public sealed class ServiceRegistry
         ThumbnailCache = thumbnailCache ?? throw new ArgumentNullException(nameof(thumbnailCache));
         DownloadQueue = downloadQueue ?? throw new ArgumentNullException(nameof(downloadQueue));
         NetworkMonitor = networkMonitor ?? throw new ArgumentNullException(nameof(networkMonitor));
+        UserIdentity = userIdentity ?? throw new ArgumentNullException(nameof(userIdentity));
     }
 }

@@ -469,4 +469,9 @@ public sealed class WebDavNasConnector : INasConnector
             base.Dispose(disposing);
         }
     }
+
+    public void Dispose()
+    {
+        _http.Dispose();
+    }
 }

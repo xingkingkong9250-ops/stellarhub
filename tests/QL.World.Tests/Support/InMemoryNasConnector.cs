@@ -111,4 +111,6 @@ internal sealed class InMemoryNasConnector : INasConnector
             ? Encoding.UTF8.GetString(bytes)
             : string.Empty;
     }
+
+    public void Dispose() { }
 }

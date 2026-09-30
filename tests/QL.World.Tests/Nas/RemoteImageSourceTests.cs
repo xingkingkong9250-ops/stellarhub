@@ -102,5 +102,7 @@ public sealed class RemoteImageSourceTests
             throw new NotSupportedException();
         public Task DeleteAsync(string p, CancellationToken ct) =>
             throw new NotSupportedException();
+
+        public void Dispose() { }
     }
 }

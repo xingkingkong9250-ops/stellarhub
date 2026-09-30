@@ -7,6 +7,7 @@ using QL.World.Services.Ai;
 using QL.World.Services.Colors;
 using QL.World.Services.Nas;
 using QL.World.Services.Pbr;
+using QL.World.Models;
 using QL.World.ViewModels;
 using QL.World.Views;
 
@@ -134,8 +135,14 @@ public partial class App : Application
                 new WebDavConnectorFactory(),
                 _thumbnailCache,
                 downloadQueue,
-                networkMonitor);
+                networkMonitor,
+                userIdentity);
             _services = services;
+
+            // ─── M6-B: login gate ─────────────────────────────────────
+            CurrentUser? currentUser = ShowLoginGate(services);
+            // currentUser is null when the user chose local-only mode.
+            services.CurrentUser = currentUser;
 
             SetTheme(settings.Theme);
 
@@ -312,6 +319,57 @@ public partial class App : Application
         catch (Exception ex)
         {
             WriteLog($"[DOWNLOAD] Dialog failed: {ex}");
+        }
+    }
+
+    /// <summary>
+    /// M6-B: shows the login window and wires multi-user services on success.
+    /// Returns the authenticated CurrentUser, or null when the user chose
+    /// local-only mode (shared library unavailable).
+    /// </summary>
+    private CurrentUser? ShowLoginGate(ServiceRegistry services)
+    {
+        var loginVm = new LoginViewModel(services.Settings, services.NasFactory);
+        var loginWindow = new LoginWindow(loginVm);
+
+        bool? result = loginWindow.ShowDialog();
+        if (result != true)
+        {
+            // Local-only mode: no NAS account, shared library disabled.
+            WriteLog("[LOGIN] User chose local-only mode.");
+            return null;
+        }
+
+        var currentUser = loginWindow.AuthenticatedUser;
+        if (currentUser is null)
+            return null;
+
+        // Build NAS connector + shared services for the selected connection.
+        try
+        {
+            var spec = services.Settings.NasConnections.FirstOrDefault(c => c.Id == currentUser.NasConnectionId);
+            if (spec is null)
+            {
+                WriteLog($"[LOGIN] NAS connection {currentUser.NasConnectionId} not found.");
+                return null;
+            }
+
+            // Re-authenticate to get the account (the window already verified).
+            // Here we just set up the services for the session.
+            var connector = services.NasFactory.Create(spec, plaintextPassword: null);
+            var storage = new SharedStorageService(connector);
+            var accounts = new AccountService(storage);
+
+            services.SharedStorage = storage;
+            services.Accounts = accounts;
+
+            WriteLog($"[LOGIN] User '{currentUser.Username}' ({currentUser.Role}) logged in via NAS '{spec.Name}'.");
+            return currentUser;
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"[LOGIN] Failed to initialize shared services: {ex}");
+            return null;
         }
     }
 
