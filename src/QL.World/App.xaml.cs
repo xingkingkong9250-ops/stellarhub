@@ -362,10 +362,12 @@ public partial class App : Application
             var storage = new SharedStorageService(connector);
             var accounts = new AccountService(storage);
             var sharedLibrary = new SharedLibraryService(storage);
+            var submissions = new SubmissionService(storage, sharedLibrary);
 
             services.SharedStorage = storage;
             services.Accounts = accounts;
             services.SharedLibrary = sharedLibrary;
+            services.Submissions = submissions;
 
             WriteLog($"[LOGIN] User '{currentUser.Username}' ({currentUser.Role}) logged in via NAS '{spec.Name}'.");
             return currentUser;
