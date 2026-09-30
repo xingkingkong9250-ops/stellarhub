@@ -76,6 +76,9 @@ public sealed class ServiceRegistry
     /// <summary>M6-E: submission review service (pending/ on NAS). Null in local-only mode.</summary>
     public SubmissionService? Submissions { get; set; }
 
+    /// <summary>M6-F: permission checks based on the current user.</summary>
+    public PermissionService Permissions { get; set; } = new(null);
+
     public ServiceRegistry(
         AppSettingsService settings,
         DatabaseService database,

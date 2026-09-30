@@ -368,6 +368,7 @@ public partial class App : Application
             services.Accounts = accounts;
             services.SharedLibrary = sharedLibrary;
             services.Submissions = submissions;
+            services.Permissions = new PermissionService(currentUser);
 
             WriteLog($"[LOGIN] User '{currentUser.Username}' ({currentUser.Role}) logged in via NAS '{spec.Name}'.");
             return currentUser;
