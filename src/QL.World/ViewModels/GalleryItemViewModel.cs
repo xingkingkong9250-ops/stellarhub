@@ -10,6 +10,7 @@ public sealed class GalleryItemViewModel : ObservableObject
     private BitmapSource? _thumbnailImage;
     private BitmapSource? _previewImage;
     private int _rating;
+    private bool _canSubmitToShared;
 
     public GalleryItemViewModel(GalleryListItem item)
     {
@@ -63,6 +64,16 @@ public sealed class GalleryItemViewModel : ObservableObject
     /// <see cref="INasConnector"/>.
     /// </summary>
     public int? NasConnectionId { get; }
+
+    /// <summary>
+    /// U6-B: true when the shared library is online and this row is a local
+    /// file eligible for 「提交到共享库」. Drives the context-menu item.
+    /// </summary>
+    public bool CanSubmitToShared
+    {
+        get => _canSubmitToShared;
+        set => SetProperty(ref _canSubmitToShared, value);
+    }
 
     public int Rating
     {

@@ -14,6 +14,7 @@ public enum NotificationKind
     ColorAnalysisCompleted,
     LocalModelDownloadCompleted,
     SemanticSearchUnavailable,
+    SharedSubmission,
 }
 
 /// <summary>A single session-scoped notification entry.</summary>

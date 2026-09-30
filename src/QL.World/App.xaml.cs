@@ -362,7 +362,8 @@ public partial class App : Application
             var storage = new SharedStorageService(connector);
             var accounts = new AccountService(storage);
             var sharedLibrary = new SharedLibraryService(storage);
-            var submissions = new SubmissionService(storage, sharedLibrary);
+            var submissions = new SubmissionService(storage, sharedLibrary,
+                services.Thumbnails, services.Settings);
 
             services.SharedStorage = storage;
             services.Accounts = accounts;

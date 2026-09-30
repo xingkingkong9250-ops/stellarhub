@@ -42,6 +42,10 @@ public sealed record PendingSubmission
     [JsonPropertyName("submitted_at")]
     public DateTimeOffset SubmittedAt { get; init; } = DateTimeOffset.UtcNow;
 
+    /// <summary>U6-B: NAS path of the uploaded original (pending/files/&lt;id&gt;/...).</summary>
+    [JsonPropertyName("original_nas_path")]
+    public string? OriginalNasPath { get; init; }
+
     /// <summary>NAS path of the submission thumbnail (pending/{submit_id}_thumb.webp).</summary>
     [JsonPropertyName("thumbnail_nas_path")]
     public string? ThumbnailNasPath { get; init; }

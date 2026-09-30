@@ -111,6 +111,9 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         SwitchToLocalCommand = new RelayCommand(() => IsLocalScope = true);
         SwitchToSharedCommand = new RelayCommand(() => IsLocalScope = false,
             () => IsSharedLibraryAvailable);
+        SubmitToSharedCommand = new AsyncRelayCommand<object?>(
+            SubmitToSharedAsync,
+            p => (p as GalleryItemViewModel)?.CanSubmitToShared == true);
         if (IsSharedLibraryAvailable)
             _ = LoadSharedGalleryAsync();
     }
@@ -167,6 +170,9 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public RelayCommand SwitchToLocalCommand { get; }
     public RelayCommand SwitchToSharedCommand { get; }
 
+    /// <summary>U6-B: 「提交到共享库」context-menu command; parameter is the clicked item.</summary>
+    public AsyncRelayCommand<object?> SubmitToSharedCommand { get; }
+
     private async Task LoadSharedGalleryAsync()
     {
         if (_services.SharedLibrary is null || SharedGallery is null) return;
@@ -183,6 +189,47 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>U6-A placeholder; U6-D binds the shared detail pane here.</summary>
     private void OnSharedSelectionChanged() { }
+
+    /// <summary>U6-B: uploads the clicked (or selected) item and reports the outcome.</summary>
+    private async Task SubmitToSharedAsync(object? parameter)
+    {
+        var item = parameter as GalleryItemViewModel ?? Gallery.PrimarySelected;
+        if (item is null ||
+            _services.Submissions is not { } submissions ||
+            _services.CurrentUser is not { } user)
+        {
+            return;
+        }
+
+        var result = await submissions
+            .SubmitFromLocalAsync(item, user.Username, CancellationToken.None)
+            .ConfigureAwait(true);
+
+        switch (result.Outcome)
+        {
+            case SubmissionOutcome.Submitted:
+                item.CanSubmitToShared = false;
+                _services.Notifications.Publish(NotificationKind.SharedSubmission,
+                    "已提交到共享库",
+                    $"「{item.FileName}」已上传，等待管理员审核");
+                break;
+            case SubmissionOutcome.DuplicateInLibrary:
+                _services.Notifications.Publish(NotificationKind.SharedSubmission,
+                    "无需重复提交",
+                    $"「{item.FileName}」已存在于共享库");
+                break;
+            case SubmissionOutcome.DuplicatePending:
+                _services.Notifications.Publish(NotificationKind.SharedSubmission,
+                    "正在审核中",
+                    $"「{item.FileName}」已提交，正在等待管理员审核");
+                break;
+            case SubmissionOutcome.MissingLocalFile:
+                _services.Notifications.Publish(NotificationKind.SharedSubmission,
+                    "提交失败",
+                    $"「{item.FileName}」的本地原文件不存在或不可访问");
+                break;
+        }
+    }
 
     public RelayCommand FocusSearchCommand { get; }
     public RelayCommand ClearFiltersCommand { get; }
@@ -643,9 +690,27 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     {
         StatusBar.PublishCounts(Gallery.TotalCount, Gallery.FilteredCount);
         StatusBar.UpdateShortcutHint(Gallery.SelectedItems.Count, Gallery.TotalCount);
+        UpdateSubmitFlags();
         _ = TagTree.RefreshCountsAsync();
         _ = CollectionTree.RefreshAsync();
         _ = PbrGroupTree.RefreshAsync();
+    }
+
+    /// <summary>
+    /// U6-B: marks local-file rows eligible for 「提交到共享库」. Runs after
+    /// every gallery refresh (initial load, import, re-filter).
+    /// </summary>
+    private void UpdateSubmitFlags()
+    {
+        bool available = IsSharedLibraryAvailable;
+        foreach (var item in Gallery.Items)
+        {
+            item.CanSubmitToShared =
+                available &&
+                item.Source == ImageSource.Local &&
+                !string.IsNullOrEmpty(item.FilePath) &&
+                File.Exists(item.FilePath);
+        }
     }
 
     private void OnSelectionChanged()

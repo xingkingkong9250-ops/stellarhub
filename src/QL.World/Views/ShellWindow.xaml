@@ -720,6 +720,11 @@
                                     <MenuItem Header="打开（系统默认程序）" Command="{Binding OpenCommand}" />
                                     <MenuItem Header="在资源管理器中定位" Command="{Binding RevealCommand}" />
                                     <MenuItem Header="复制文件路径" Command="{Binding CopyPathCommand}" />
+                                    <!-- U6-B：提交到共享库（仅符合条件的本地文件可见） -->
+                                    <MenuItem Header="提交到共享库"
+                                              Visibility="{Binding CanSubmitToShared, Converter={StaticResource BoolVis}}"
+                                              Command="{Binding DataContext.SubmitToSharedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                              CommandParameter="{Binding}" />
                                     <Separator Style="{StaticResource MenuSeparatorStyle}" />
                                     <MenuItem Header="评分">
                                         <MenuItem.ItemsSource>
