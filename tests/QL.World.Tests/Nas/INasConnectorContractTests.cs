@@ -1,122 +1,264 @@
 using System.IO;
 using QL.World.Services.Nas;
+using QL.World.Services.Nas.Smb;
 
 namespace QL.World.Tests.Nas;
 
 /// <summary>
-/// M5-A: contract smoke tests for <see cref="INasConnector"/>. A stub
-/// implementation exercises every member of the interface so a signature
-/// regression (return type change, missing member) surfaces here instead of
-/// at M5-B <c>WebDavNasConnector</c> implementation time.
+/// M5-A 起接口契约 smoke 测试；M7-D 参数化为多 connector 共跑。
+///
+/// 每个 <see cref="ConnectorCase"/> 暴露一组同名上下文（已知文件路径 /
+/// 大小 / 期望失败 Kind / 期望 List 数量），让 stub 与 Smb-localTemp 走同
+/// 一份断言；具体的边界行为（RangeNotSatisfiable / idempotent Delete /
+/// Move cross-volume fallback）留在 <c>SmbNasConnectorContractTests</c>
+/// 与 <c>WebDavNasConnectorTests</c> 各自的专属套件里，避免在参数化里
+/// 把分支塞进断言。
+///
+/// WebDav 不参与参数化——它依赖 HttpMessageHandler 难以与本地文件 sandbox
+/// 统一，保留在 <c>WebDavNasConnectorTests</c> 独立 14 项。
 /// </summary>
 public sealed class INasConnectorContractTests
 {
-    [Fact]
-    public void Stub_implements_every_interface_member()
+    public static IEnumerable<object[]> ConnectorCases()
     {
-        INasConnector connector = new StubNasConnector(new NasConnectionSpec
+        yield return new object[] { ConnectorCase.Stub() };
+        yield return new object[] { ConnectorCase.SmbLocalTemp() };
+    }
+
+    [Theory]
+    [MemberData(nameof(ConnectorCases))]
+    public void Spec_round_trips(ConnectorCase ctx)
+    {
+        using (ctx)
+        using (var c = ctx.CreateConnector())
         {
-            Id = 1,
-            Name = "stub",
-            Host = "nas.local",
-            RootPath = "/",
-        });
-
-        Assert.Equal("stub", connector.Spec.Name);
-        Assert.Equal("nas.local", connector.Spec.Host);
-        Assert.Equal("/", connector.Spec.RootPath);
-        Assert.Equal(NasConnectionProtocol.WebDav, connector.Spec.Protocol);
+            Assert.Equal("contract-test", c.Spec.Name);
+            Assert.Equal(ctx.ExpectedProtocol, c.Spec.Protocol);
+            Assert.Equal("nas.local", c.Spec.Host);
+            Assert.Equal("/", c.Spec.RootPath);
+        }
     }
 
-    [Fact]
-    public async Task TestConnectionAsync_returns_bool_and_propagates_exception()
+    [Theory]
+    [MemberData(nameof(ConnectorCases))]
+    public async Task TestConnectionAsync_returns_true_for_existing_root(ConnectorCase ctx)
     {
-        INasConnector ok = new StubNasConnector(new());
-        Assert.True(await ok.TestConnectionAsync(CancellationToken.None));
-
-        INasConnector failing = new StubNasConnector(new(), failConnection: true);
-        var ex = await Assert.ThrowsAsync<NasConnectionException>(
-            () => failing.TestConnectionAsync(CancellationToken.None));
-        Assert.Equal(NasConnectionKind.AuthenticationFailed, ex.Kind);
+        using (ctx)
+        using (var c = ctx.CreateConnector())
+        {
+            Assert.True(await c.TestConnectionAsync(CancellationToken.None));
+        }
     }
 
-    [Fact]
-    public async Task ListFilesAsync_returns_NasFileInfo_readonly_list()
+    [Theory]
+    [MemberData(nameof(ConnectorCases))]
+    public async Task TestConnectionAsync_throws_NasConnectionException_with_kind(ConnectorCase ctx)
     {
-        INasConnector connector = new StubNasConnector(new());
-        IReadOnlyList<NasFileInfo> result = await connector.ListFilesAsync("/", CancellationToken.None);
-        Assert.IsAssignableFrom<IReadOnlyList<NasFileInfo>>(result);
-        Assert.Equal(2, result.Count);
-        Assert.True(result.All(f => !string.IsNullOrEmpty(f.Path) && !string.IsNullOrEmpty(f.Name)));
+        using (ctx)
+        using (var c = ctx.CreateFailingConnector())
+        {
+            var ex = await Assert.ThrowsAsync<NasConnectionException>(
+                () => c.TestConnectionAsync(CancellationToken.None));
+            Assert.Equal(ctx.ExpectedFailureKind, ex.Kind);
+        }
     }
 
-    [Fact]
-    public async Task GetMetadataAsync_returns_single_NasFileInfo()
+    [Theory]
+    [MemberData(nameof(ConnectorCases))]
+    public async Task ListFilesAsync_returns_expected_count_with_nonempty_entries(ConnectorCase ctx)
     {
-        INasConnector connector = new StubNasConnector(new());
-        NasFileInfo info = await connector.GetMetadataAsync("/photo.jpg", CancellationToken.None);
-        Assert.False(info.IsDirectory);
-        Assert.True(info.Size > 0);
-        Assert.Equal("photo.jpg", info.Name);
+        using (ctx)
+        using (var c = ctx.CreateConnector())
+        {
+            IReadOnlyList<NasFileInfo> list = await c.ListFilesAsync("/", CancellationToken.None);
+            Assert.IsAssignableFrom<IReadOnlyList<NasFileInfo>>(list);
+            Assert.Equal(ctx.ExpectedListCount, list.Count);
+            Assert.True(list.All(f => !string.IsNullOrEmpty(f.Path) && !string.IsNullOrEmpty(f.Name)));
+        }
     }
 
-    [Fact]
-    public async Task OpenReadAsync_returns_disposable_stream()
+    [Theory]
+    [MemberData(nameof(ConnectorCases))]
+    public async Task GetMetadataAsync_returns_file_info(ConnectorCase ctx)
     {
-        INasConnector connector = new StubNasConnector(new());
-        await using (Stream stream = await connector.OpenReadAsync("/photo.jpg", CancellationToken.None))
+        using (ctx)
+        using (var c = ctx.CreateConnector())
+        {
+            NasFileInfo info = await c.GetMetadataAsync(ctx.KnownFilePath, CancellationToken.None);
+            Assert.False(info.IsDirectory);
+            Assert.Equal(ctx.KnownFileName, info.Name);
+            Assert.Equal(ctx.KnownFileSize, info.Size);
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(ConnectorCases))]
+    public async Task OpenReadAsync_returns_readable_stream(ConnectorCase ctx)
+    {
+        using (ctx)
+        using (var c = ctx.CreateConnector())
+        await using (Stream stream = await c.OpenReadAsync(ctx.KnownFilePath, CancellationToken.None))
         {
             Assert.NotNull(stream);
             Assert.True(stream.CanRead);
         }
     }
 
-    [Fact]
-    public async Task DownloadFileAsync_writes_destination_bytes()
+    [Theory]
+    [MemberData(nameof(ConnectorCases))]
+    public async Task DownloadFileAsync_writes_destination_bytes(ConnectorCase ctx)
     {
-        string tempPath = Path.GetTempFileName();
-        try
+        using (ctx)
+        using (var c = ctx.CreateConnector())
         {
-            INasConnector connector = new StubNasConnector(new());
-            await connector.DownloadFileAsync("/photo.jpg", tempPath, CancellationToken.None);
-            Assert.True(File.Exists(tempPath));
-            Assert.True(new FileInfo(tempPath).Length > 0);
-        }
-        finally
-        {
-            if (File.Exists(tempPath)) File.Delete(tempPath);
+            string tempPath = Path.GetTempFileName();
+            try
+            {
+                await c.DownloadFileAsync(ctx.KnownFilePath, tempPath, CancellationToken.None);
+                Assert.True(File.Exists(tempPath));
+                Assert.Equal(ctx.KnownFileSize, new FileInfo(tempPath).Length);
+            }
+            finally
+            {
+                if (File.Exists(tempPath)) File.Delete(tempPath);
+            }
         }
     }
 
-    [Fact]
-    public async Task DownloadRangeAsync_returns_byte_array_of_requested_length()
+    [Theory]
+    [MemberData(nameof(ConnectorCases))]
+    public async Task DownloadRangeAsync_returns_byte_array_of_requested_length(ConnectorCase ctx)
     {
-        INasConnector connector = new StubNasConnector(new());
-        byte[] chunk = await connector.DownloadRangeAsync("/photo.jpg", offset: 0, length: 16, CancellationToken.None);
-        Assert.Equal(16, chunk.Length);
+        using (ctx)
+        using (var c = ctx.CreateConnector())
+        {
+            byte[] chunk = await c.DownloadRangeAsync(ctx.KnownFilePath, offset: 0, length: 16, CancellationToken.None);
+            Assert.Equal(16, chunk.Length);
+        }
     }
 
-    [Fact]
-    public async Task UploadFileAsync_MakeDirectoryAsync_DeleteAsync_are_callable()
+    [Theory]
+    [MemberData(nameof(ConnectorCases))]
+    public async Task UploadFileAsync_MakeDirectoryAsync_DeleteAsync_are_callable(ConnectorCase ctx)
     {
-        string tempPath = Path.GetTempFileName();
-        try
+        using (ctx)
+        using (var c = ctx.CreateConnector())
         {
-            INasConnector connector = new StubNasConnector(new());
-            await connector.UploadFileAsync(tempPath, "/remote.bin", CancellationToken.None);
-            await connector.MakeDirectoryAsync("/newdir", CancellationToken.None);
-            await connector.DeleteAsync("/remote.bin", CancellationToken.None);
-        }
-        finally
-        {
-            if (File.Exists(tempPath)) File.Delete(tempPath);
+            string localPath = Path.GetTempFileName();
+            try
+            {
+                File.WriteAllBytes(localPath, new byte[] { 1, 2, 3 });
+                await c.UploadFileAsync(localPath, "/up.bin", CancellationToken.None);
+                await c.MakeDirectoryAsync("/newdir", CancellationToken.None);
+                await c.DeleteAsync("/up.bin", CancellationToken.None);
+            }
+            finally
+            {
+                if (File.Exists(localPath)) File.Delete(localPath);
+            }
         }
     }
 
     /// <summary>
+    /// 单 case 上下文。封装 connector 工厂 + 已知远端文件 + 期望失败 Kind
+    /// 等参数化字段，让 stub 与 smb-localTemp 走同一份断言。持有临时目录的
+    /// 资源时实现 <see cref="IDisposable"/>，由测试方法的 using 块清理。
+    /// </summary>
+    public sealed class ConnectorCase : IDisposable
+    {
+        public string DisplayName { get; init; } = string.Empty;
+        public NasConnectionProtocol ExpectedProtocol { get; init; }
+        public Func<INasConnector> CreateConnector { get; init; } = () => throw new InvalidOperationException();
+        public Func<INasConnector> CreateFailingConnector { get; init; } = () => throw new InvalidOperationException();
+        public NasConnectionKind ExpectedFailureKind { get; init; }
+        public string KnownFilePath { get; init; } = "/photo.jpg";
+        public long KnownFileSize { get; init; } = 1024;
+        public string KnownFileName { get; init; } = "photo.jpg";
+        public int ExpectedListCount { get; init; } = 1;
+
+        private readonly string? _tempRoot;
+        private readonly string? _ghostRoot;
+
+        private ConnectorCase(string? tempRoot, string? ghostRoot)
+        {
+            _tempRoot = tempRoot;
+            _ghostRoot = ghostRoot;
+        }
+
+        public static ConnectorCase Stub()
+        {
+            var spec = new NasConnectionSpec
+            {
+                Id = 1,
+                Name = "contract-test",
+                Protocol = NasConnectionProtocol.WebDav,
+                Host = "nas.local",
+                RootPath = "/",
+            };
+            return new ConnectorCase(tempRoot: null, ghostRoot: null)
+            {
+                DisplayName = "Stub",
+                ExpectedProtocol = NasConnectionProtocol.WebDav,
+                CreateConnector = () => new StubNasConnector(spec),
+                CreateFailingConnector = () => new StubNasConnector(spec, failConnection: true),
+                ExpectedFailureKind = NasConnectionKind.AuthenticationFailed,
+                KnownFilePath = "/photo.jpg",
+                KnownFileSize = 1024,
+                KnownFileName = "photo.jpg",
+                ExpectedListCount = 2,
+            };
+        }
+
+        public static ConnectorCase SmbLocalTemp()
+        {
+            string tempRoot = Directory.CreateTempSubdirectory("stellarhub-contract-smb-").FullName;
+            // 预置已知文件 photo.jpg (1024 bytes)；ListFiles(/) 返回 1 项
+            File.WriteAllBytes(Path.Combine(tempRoot, "photo.jpg"), new byte[1024]);
+
+            string ghostRoot = Path.Combine(Path.GetTempPath(), "stellarhub-contract-ghost-" + Guid.NewGuid().ToString("N"));
+
+            var spec = new NasConnectionSpec
+            {
+                Id = 2,
+                Name = "contract-test",
+                Protocol = NasConnectionProtocol.Smb,
+                Host = "nas.local",
+                RootPath = "/",
+            };
+            return new ConnectorCase(tempRoot, ghostRoot)
+            {
+                DisplayName = "Smb-localTemp",
+                ExpectedProtocol = NasConnectionProtocol.Smb,
+                CreateConnector = () => new SmbNasConnector(spec, uncRoot: tempRoot, remoteName: null, ownsConnection: false),
+                CreateFailingConnector = () => new SmbNasConnector(spec, uncRoot: ghostRoot, remoteName: null, ownsConnection: false),
+                ExpectedFailureKind = NasConnectionKind.NetworkUnreachable,
+                KnownFilePath = "/photo.jpg",
+                KnownFileSize = 1024,
+                KnownFileName = "photo.jpg",
+                ExpectedListCount = 1,
+            };
+        }
+
+        public void Dispose()
+        {
+            if (_tempRoot is not null)
+            {
+                try { if (Directory.Exists(_tempRoot)) Directory.Delete(_tempRoot, recursive: true); } catch { }
+            }
+            if (_ghostRoot is not null)
+            {
+                try { if (Directory.Exists(_ghostRoot)) Directory.Delete(_ghostRoot, recursive: true); } catch { }
+            }
+        }
+
+        public override string ToString() => DisplayName; // xUnit 测试名显示用
+    }
+
+    /// <summary>
     /// Stub <see cref="INasConnector"/> used only to exercise the interface
-    /// contract. M5-B replaces it with <c>WebDavNasConnector</c> + a
-    /// <c>StubHttpMessageHandler</c> for real HTTP-semantics tests.
+    /// contract baseline. M5-B / M7-B 各自的专属行为测试在
+    /// <c>WebDavNasConnectorTests</c> / <c>SmbNasConnectorContractTests</c>
+    /// 中独立维护。
     /// </summary>
     private sealed class StubNasConnector : INasConnector
     {
@@ -162,7 +304,7 @@ public sealed class INasConnectorContractTests
 
         public Task DownloadFileAsync(string remotePath, string destinationPath, CancellationToken cancellationToken)
         {
-            File.WriteAllBytes(destinationPath, new byte[] { 1, 2, 3, 4 });
+            File.WriteAllBytes(destinationPath, new byte[1024]);
             return Task.CompletedTask;
         }
 

@@ -4,12 +4,16 @@ using QL.World.Services.Nas;
 namespace QL.World.Tests.Nas.Smb;
 
 /// <summary>
-/// M7-B: contract tests for <see cref="SmbNasConnector"/>. Uses a local
-/// temp directory as the UNC root (File/Directory APIs behave identically
-/// against local and UNC paths) — the WNet auth handshake is bypassed by
-/// passing <c>ownsConnection:false</c>, so tests run on any machine without
-/// a real SMB share. M7-D integrates these into <c>INasConnectorContractTests</c>
-/// as a parameterized case alongside the Stub connector.
+/// M7-B: SMB 专属行为测试。用本地临时目录当 UNC root（File/Directory API
+/// 对本地路径与 UNC 行为完全一致），<c>ownsConnection:false</c> 绕过 WNet
+/// 握手，无真实 SMB share 也能跑。
+///
+/// 与 <c>INasConnectorContractTests</c> 参数化套件分工：本套件覆盖 SMB
+/// 专属的边界行为（RangeNotSatisfiable / idempotent Delete / Move 跨卷
+/// fallback / GetMetadata NotFound）；接口契约最小集（Spec round-trip /
+/// TestConnection returns true / ListFiles 非空等）由参数化套件联合 stub
+/// 与 smb-localTemp 共跑。WebDav 因依赖 HttpMessageHandler 不参与参数化，
+/// 独立维护在 <c>WebDavNasConnectorTests</c>。
 /// </summary>
 public sealed class SmbNasConnectorContractTests
 {
