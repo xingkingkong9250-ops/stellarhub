@@ -333,7 +333,8 @@ public partial class App : Application
                 _services.PbrGrouping,
                 _services.NasFactory,
                 _services.Accounts,
-                _services.CurrentUser);
+                _services.CurrentUser,
+                _services.NasRegistry);
             settingsViewModel.ThemeChanged += theme =>
             {
                 SetTheme(theme);

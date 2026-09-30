@@ -383,20 +383,48 @@
                                       Visibility="{Binding IsTrustSelfSignedApplicable, Converter={StaticResource BoolVis}}"
                                       AutomationProperties.Name="NAS 信任自签" />
 
-                            <!-- N6 测试连接 + 设为主 NAS + 保存 -->
+                            <!-- N6 测试连接 + 设为主 NAS（仅切标记）+ 保存 -->
                             <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
                                 <Button Content="测试连接" Style="{StaticResource SubtleButtonStyle}"
                                         Command="{Binding TestNasConnectionCommand}"
                                         AutomationProperties.Name="测试 NAS 连接" />
-                                <Button Content="设为主 NAS" Margin="8,0,0,0"
+                                <Button Content="设为主 NAS（仅切标记）" Margin="8,0,0,0"
                                         Style="{StaticResource SubtleButtonStyle}"
                                         Command="{Binding SetPrimaryCommand}"
-                                        AutomationProperties.Name="设为主 NAS" />
+                                        AutomationProperties.Name="设为主 NAS 仅切标记" />
                                 <Button Content="保存" Margin="8,0,0,0"
                                         Style="{StaticResource AccentButtonStyle}"
                                         Command="{Binding SaveNasConnectionCommand}"
                                         AutomationProperties.Name="保存 NAS 连接" />
                             </StackPanel>
+
+                            <!-- M8-E: 主 NAS 迁移 + 搬运到此处（仅管理员可见） -->
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0"
+                                        Visibility="{Binding IsAdmin, Converter={StaticResource BoolVis}}">
+                                <Button Content="设为主 NAS 并迁移数据" Margin="8,0,0,0"
+                                        Style="{StaticResource SubtleButtonStyle}"
+                                        Command="{Binding SetPrimaryWithMigrationCommand}"
+                                        ToolTip="把当前主库的全部数据复制到选中副库，复制成功后切换主库角色。失败可重试（幂等）。"
+                                        AutomationProperties.Name="设为主 NAS 并迁移数据" />
+                                <Button Content="搬运到此处..." Margin="8,0,0,0"
+                                        Style="{StaticResource SubtleButtonStyle}"
+                                        Command="{Binding TransferToHereCommand}"
+                                        ToolTip="数据搬运流程入口（在共享画廊选中图片后右键搬运到副库）"
+                                        AutomationProperties.Name="搬运到此处" />
+                            </StackPanel>
+
+                            <!-- M8-E: 迁移进度文案 -->
+                            <TextBlock Text="{Binding MigrationStatusText}" Margin="0,8,0,0" FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Visibility="{Binding MigrationStatusText, Converter={StaticResource NullVis}}" />
+
+                            <!-- M8-E: 显示数据来源徽章开关 -->
+                            <CheckBox Content="在共享画廊显示数据来源徽章（nas://{id}）" Margin="0,14,0,0"
+                                      IsChecked="{Binding ShowSourceBadge}"
+                                      ToolTip="开启后每张共享图带 nas:// 来源标识，便于管理员区分主副库数据"
+                                      AutomationProperties.Name="显示数据来源徽章" />
+
                             <TextBlock Text="{Binding NasStatusText}" Margin="0,8,0,0" FontSize="12"
                                        TextWrapping="Wrap"
                                        Foreground="{DynamicResource TextSecondaryBrush}"

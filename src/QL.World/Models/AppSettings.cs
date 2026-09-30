@@ -96,4 +96,10 @@ public sealed class AppSettings
     /// Default 1024. Clamped to [256, 16384] on load.
     /// </summary>
     public int ThumbnailCacheLimitMb { get; set; } = 1024;
+
+    /// <summary>
+    /// M8-E: 是否在共享画廊显示数据来源徽章（nas://{id}）。默认 false。
+    /// 管理员可在 A7 设置开关；开启后每张共享图带 nas:// 来源标识。
+    /// </summary>
+    public bool ShowSourceBadge { get; set; } = false;
 }

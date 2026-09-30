@@ -113,7 +113,11 @@ public sealed class SharedGalleryViewModel : ObservableObject
                 TagsCsv = string.Join(',', record.Tags),
                 Source = ImageSource.Remote,
                 NasConnectionId = record.SourceNasId,
-                SourceBadge = "共享",
+                // M8-E: ShowSourceBadge=true + 有 SourceNasId → 显示 nas://{id} 来源徽章；
+                // 否则回退"共享"静态值（兼容 M8 前行为，徽章不隐藏）。
+                SourceBadge = (record.SourceNasId is int nid && _settings.ShowSourceBadge)
+                    ? $"nas://{nid}"
+                    : "共享",
                 CreatedAt = record.ApprovedAt.DateTime,
             });
             _allItems.Add(item);

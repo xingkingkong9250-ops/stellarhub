@@ -103,6 +103,18 @@ public sealed class AppSettingsService
             next => _settings.ThumbnailCacheLimitMb = next);
     }
 
+    /// <summary>
+    /// M8-E: 是否在共享画廊显示数据来源徽章（nas://{id}）。默认 false。
+    /// 管理员可在 A7 设置开关；开启后每张共享图带 nas:// 来源标识。
+    /// </summary>
+    public bool ShowSourceBadge
+    {
+        get => _settings.ShowSourceBadge;
+        set => SetAndSave(value,
+            () => _settings.ShowSourceBadge,
+            next => _settings.ShowSourceBadge = next);
+    }
+
     public string GalleryViewMode
     {
         get => _settings.GalleryViewMode;

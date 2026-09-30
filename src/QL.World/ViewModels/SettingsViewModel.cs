@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Windows;
 using Microsoft.Win32;
 using QL.World.Helpers;
 using QL.World.Models;
@@ -29,6 +30,13 @@ public sealed class SettingsViewModel : ObservableObject
     private readonly INasConnectorFactory _nasConnectorFactory;
     private readonly AccountService? _accounts;
     private readonly CurrentUser? _currentUser;
+    /// <summary>
+    /// M8-E: 登录后的多 NAS 注册中心。null 表示未登录或 local-only 模式，
+    /// 此时「设为主 NAS 并迁移」按钮不可用（仅保留旧「仅切标记」入口）。
+    /// </summary>
+    private readonly NasConnectionRegistry? _nasRegistry;
+    private bool _isMigrating;
+    private string _migrationStatusText = string.Empty;
 
     private string _selectedTheme;
     private string? _selectedWatcherDirectory;
@@ -56,7 +64,8 @@ public sealed class SettingsViewModel : ObservableObject
         PbrGroupingService pbrGrouping,
         INasConnectorFactory nasConnectorFactory,
         AccountService? accounts,
-        CurrentUser? currentUser)
+        CurrentUser? currentUser,
+        NasConnectionRegistry? nasRegistry = null)
     {
         _settings = settings;
         _thumbnails = thumbnails;
@@ -69,6 +78,7 @@ public sealed class SettingsViewModel : ObservableObject
         _nasConnectorFactory = nasConnectorFactory;
         _accounts = accounts;
         _currentUser = currentUser;
+        _nasRegistry = nasRegistry;
         PbrRules = new PbrRulesViewModel(settings, pbrGrouping);
 
         _selectedTheme = settings.Theme;
@@ -113,10 +123,29 @@ public sealed class SettingsViewModel : ObservableObject
         SaveNasConnectionCommand = new RelayCommand(
             SaveNasConnection, () => SelectedNasConnection is not null);
         SetPrimaryCommand = new RelayCommand(
-            SetPrimary, () => SelectedNasConnection is not null && !SelectedNasConnection.IsPrimary);
+            SetPrimary, () => SelectedNasConnection is not null && !SelectedNasConnection.IsPrimary && !IsMigrating);
+        /// <summary>
+        /// M8-E: 「设为主 NAS 并迁移数据」命令。仅管理员 + 已登录 + 选中副库时可用。
+        /// 实际迁移由 <see cref="PrimaryMigrationService.MigrateAsync"/> 执行；
+        /// 命令体先弹确认框（含源主库文件数预览），用户确认后才执行。
+        /// </summary>
+        SetPrimaryWithMigrationCommand = new AsyncRelayCommand(
+            SetPrimaryWithMigrationAsync,
+            () => _nasRegistry is not null
+                && SelectedNasConnection is not null
+                && !SelectedNasConnection.IsPrimary
+                && !SelectedNasConnection.IsShareLink
+                && !IsMigrating);
         TestNasConnectionCommand = new AsyncRelayCommand(
             TestNasConnectionAsync,
             () => SelectedNasConnection is not null && !IsTestingNasConnection);
+        /// <summary>M8-E: 「搬运到此处」引导命令（管理员 + 选中副库时可用）。</summary>
+        TransferToHereCommand = new RelayCommand(
+            ShowTransferToHereGuidance,
+            () => IsAdmin
+                && SelectedNasConnection is not null
+                && !SelectedNasConnection.IsPrimary
+                && !SelectedNasConnection.IsShareLink);
 
         // M6-C: user management (admin only)
         AddUserCommand = new AsyncRelayCommand(AddUserAsync, () => IsUserManagementEnabled);
@@ -576,6 +605,10 @@ public sealed class SettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(NasPortHintText));
         OnPropertyChanged(nameof(NasRootPathHint));
         OnPropertyChanged(nameof(NasTlsLabelText));
+        // M8-E: 选中项变化时刷新「设为主 NAS」类命令的可用态
+        SetPrimaryCommand.RaiseCanExecuteChanged();
+        SetPrimaryWithMigrationCommand.RaiseCanExecuteChanged();
+        TransferToHereCommand.RaiseCanExecuteChanged();
     }
 
     private string _nasStatusText = string.Empty;
@@ -602,7 +635,33 @@ public sealed class SettingsViewModel : ObservableObject
     public RelayCommand DeleteNasConnectionCommand { get; }
     public RelayCommand SaveNasConnectionCommand { get; }
     public RelayCommand SetPrimaryCommand { get; }
+    /// <summary>M8-E: 「设为主 NAS 并迁移数据」命令。</summary>
+    public AsyncRelayCommand SetPrimaryWithMigrationCommand { get; }
     public AsyncRelayCommand TestNasConnectionCommand { get; }
+
+    /// <summary>
+    /// M8-E: 主 NAS 迁移进行中。True 时禁用「仅切标记」「设为主 NAS 并迁移」
+    /// 命令，UI 显示进度文案；False 时恢复命令可用态。
+    /// </summary>
+    public bool IsMigrating
+    {
+        get => _isMigrating;
+        private set
+        {
+            if (SetProperty(ref _isMigrating, value))
+            {
+                SetPrimaryCommand.RaiseCanExecuteChanged();
+                SetPrimaryWithMigrationCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    /// <summary>M8-E: 迁移过程文案（"复制文件 12/100 — originals/ab/..."）。UI 顶部显示。</summary>
+    public string MigrationStatusText
+    {
+        get => _migrationStatusText;
+        private set => SetProperty(ref _migrationStatusText, value);
+    }
 
     /// <summary>
     /// v0.2.1: A7 NAS 页签管理员门禁。未登录（首次配置场景）或当前用户为
@@ -611,6 +670,29 @@ public sealed class SettingsViewModel : ObservableObject
     /// 配置 NAS。
     /// </summary>
     public bool IsNasManagementEnabled => _currentUser is null || _currentUser.IsAdmin;
+
+    /// <summary>
+    /// M8-E: 当前用户是否为管理员。仅登录后 + admin 角色才返回 true。
+    /// 用于「设为主 NAS 并迁移」「搬运到此处」等管理员专属按钮的可见性绑定。
+    /// </summary>
+    public bool IsAdmin => _currentUser?.IsAdmin == true;
+
+    /// <summary>
+    /// M8-E: 是否在共享画廊显示数据来源徽章（nas://{id}）。默认 false。
+    /// 持久化于 config.json，绑定 A7 的 CheckBox。
+    /// </summary>
+    public bool ShowSourceBadge
+    {
+        get => _settings.ShowSourceBadge;
+        set => _settings.ShowSourceBadge = value;
+    }
+
+    /// <summary>
+    /// M8-E: 「搬运到此处」引导命令。当前为引导提示——实际数据搬运流程
+    /// 在共享画廊右键菜单（管理员选中 N 张图片 → 搬运到副库 → 选目标）。
+    /// 数据搬运服务 <see cref="DataTransferService"/> 已就绪可被调用。
+    /// </summary>
+    public RelayCommand TransferToHereCommand { get; }
 
     private void AddNasConnection()
     {
@@ -685,6 +767,148 @@ public sealed class SettingsViewModel : ObservableObject
         RefreshNasConnections();
         SelectedNasConnection = NasConnections.FirstOrDefault(c => c.Id == primaryId);
         SetPrimaryCommand.RaiseCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// M8-E: 「设为主 NAS 并迁移数据」——弹确认框（含源主库文件数预览）后调
+    /// <see cref="PrimaryMigrationService.MigrateAsync"/>。失败时旧主库 Role
+    /// 不切换、共享库仍可读，已复制文件保留（幂等，下次重试跳过）。
+    /// 成功后刷新列表 + 重选当前项以触发 UI「主」徽标更新。
+    /// </summary>
+    private async Task SetPrimaryWithMigrationAsync()
+    {
+        if (SelectedNasConnection is null || _nasRegistry is null) return;
+        if (SelectedNasConnection.IsPrimary || SelectedNasConnection.IsShareLink) return;
+
+        var sourceEntry = _nasRegistry.GetPrimary();
+        if (sourceEntry is null)
+        {
+            MigrationStatusText = "无当前主 NAS，无法迁移。";
+            return;
+        }
+        int newPrimaryId = SelectedNasConnection.Id;
+
+        // 预览源主库文件数 + 总字节数（递归 originals/ + thumbnails/ + pending/）
+        MigrationStatusText = "正在统计源主库文件…";
+        int fileCount;
+        long totalBytes;
+        try
+        {
+            (fileCount, totalBytes) = await CountSharedFilesAsync(
+                sourceEntry.Value.Connector, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            MigrationStatusText = $"统计失败：{ex.Message}";
+            return;
+        }
+
+        // 确认框
+        var result = MessageBox.Show(
+            $"将迁移约 {fileCount} 个文件（约 {totalBytes / 1024.0 / 1024.0:F1} MB）到「{SelectedNasConnection.Name}」。\n" +
+            "迁移期间共享库不可用；失败可重试（幂等，已复制文件跳过）。\n" +
+            "是否继续？",
+            "设为主 NAS 并迁移数据",
+            MessageBoxButton.OKCancel,
+            MessageBoxImage.Question,
+            MessageBoxResult.Cancel);
+        if (result != MessageBoxResult.OK)
+        {
+            MigrationStatusText = string.Empty;
+            return;
+        }
+
+        // 执行迁移
+        IsMigrating = true;
+        MigrationStatusText = "迁移中…";
+        var progress = new Progress<MigrationProgress>(p =>
+            MigrationStatusText = $"[{p.Phase}] {p.DoneFiles}/{p.TotalFiles} — {p.CurrentPath}");
+        try
+        {
+            var migrationService = new PrimaryMigrationService(_nasRegistry, _settings);
+            await migrationService.MigrateAsync(newPrimaryId, progress, CancellationToken.None);
+            MigrationStatusText = "迁移完成，已切换主 NAS。";
+            NasStatusText = "已设为主 NAS（含迁移）。";
+            RefreshNasConnections();
+            SelectedNasConnection = NasConnections.FirstOrDefault(c => c.Id == newPrimaryId);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            MigrationStatusText = $"迁移失败：{ex.Message}（旧主库仍可用，可重试）";
+        }
+        finally
+        {
+            IsMigrating = false;
+        }
+    }
+
+    /// <summary>
+    /// 递归统计源 NAS 共享目录的文件总数 + 总字节数。覆盖 originals/ + thumbnails/ + pending/。
+    /// 用于迁移确认框的文件数预览（不需要精确大小，PROPFIND 一次即可拿到 Size）。
+    /// </summary>
+    private static async Task<(int count, long bytes)> CountSharedFilesAsync(
+        INasConnector conn, CancellationToken ct)
+    {
+        var originals = await CountDirAsync(conn,
+            $"{SharedPaths.Root}/{SharedPaths.OriginalsDir}", ct).ConfigureAwait(false);
+        var thumbnails = await CountDirAsync(conn,
+            $"{SharedPaths.Root}/{SharedPaths.ThumbnailsDir}", ct).ConfigureAwait(false);
+        var pending = await CountDirAsync(conn,
+            $"{SharedPaths.Root}/{SharedPaths.PendingDir}", ct).ConfigureAwait(false);
+        return (originals.count + thumbnails.count + pending.count,
+            originals.bytes + thumbnails.bytes + pending.bytes);
+    }
+
+    private static async Task<(int count, long bytes)> CountDirAsync(
+        INasConnector conn, string dir, CancellationToken ct)
+    {
+        IReadOnlyList<NasFileInfo> entries;
+        try
+        {
+            entries = await conn.ListFilesAsync(dir, ct).ConfigureAwait(false);
+        }
+        catch (NasConnectionException ex) when (ex.Kind == NasConnectionKind.NotFound)
+        {
+            return (0, 0);
+        }
+        int count = 0;
+        long bytes = 0;
+        foreach (var e in entries)
+        {
+            if (e.IsDirectory)
+            {
+                var sub = await CountDirAsync(conn, $"{dir}/{e.Name}", ct).ConfigureAwait(false);
+                count += sub.count;
+                bytes += sub.bytes;
+            }
+            else
+            {
+                count++;
+                bytes += e.Size;
+            }
+        }
+        return (count, bytes);
+    }
+
+    /// <summary>
+    /// M8-E: 「搬运到此处」按钮引导文案。当前数据搬运流程的入口在共享画廊
+    /// 右键菜单（管理员选中 N 张图片 → 搬运到副库 → 选目标副库），
+    /// A7 设置面板的按钮作为提示入口避免管理员找不到流程。
+    /// </summary>
+    private void ShowTransferToHereGuidance()
+    {
+        if (SelectedNasConnection is null) return;
+        MessageBox.Show(
+            $"数据搬运流程：\n" +
+            "1. 在主窗口「共享画廊」选中 N 张图片\n" +
+            "2. 右键 → 搬运到副库...\n" +
+            $"3. 选择目标副库「{SelectedNasConnection.Name}」\n\n" +
+            "搬运将逐张 download→upload 至目标副库，" +
+            "目标 library.json AddOrUpdate + 源 library.json Remove。" +
+            "源 NAS 文件在上传成功后删除（失败不删源）。",
+            $"搬运到「{SelectedNasConnection.Name}」",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
     }
 
     private async Task TestNasConnectionAsync()
