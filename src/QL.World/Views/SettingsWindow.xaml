@@ -336,11 +336,12 @@
                             <ComboBox Width="160" HorizontalAlignment="Left"
                                       ItemsSource="{Binding NasProtocolOptions}"
                                       SelectedItem="{Binding SelectedNasConnection.Protocol}"
+                                      SelectionChanged="OnNasProtocolChanged"
                                       AutomationProperties.Name="NAS 协议" />
                             <TextBlock Text="主机（IP 或域名，不含 scheme/port）" Margin="0,10,0,2" />
                             <TextBox Text="{Binding SelectedNasConnection.Host, UpdateSourceTrigger=PropertyChanged}"
                                      AutomationProperties.Name="NAS 主机" />
-                            <TextBlock Text="端口（留空=默认 443/80）" Margin="0,10,0,2" />
+                            <TextBlock Text="{Binding NasPortHintText}" Margin="0,10,0,2" />
                             <TextBox Text="{Binding SelectedNasConnection.Port, TargetNullValue='', UpdateSourceTrigger=PropertyChanged}"
                                      AutomationProperties.Name="NAS 端口" />
 
@@ -354,14 +355,16 @@
                                          AutomationProperties.Name="NAS 密码" />
 
                             <!-- N5 根路径 + TLS + 自签 -->
-                            <TextBlock Text="根路径（如 /photos/）" Margin="0,10,0,2" />
+                            <TextBlock Text="{Binding NasRootPathHint}" Margin="0,10,0,2" />
                             <TextBox Text="{Binding SelectedNasConnection.RootPath, UpdateSourceTrigger=PropertyChanged}"
                                      AutomationProperties.Name="NAS 根路径" />
-                            <CheckBox Content="使用 HTTPS/TLS（推荐）" Margin="0,10,0,0"
+                            <CheckBox Content="{Binding NasTlsLabelText}" Margin="0,10,0,0"
                                       IsChecked="{Binding SelectedNasConnection.UseTls}"
+                                      Visibility="{Binding IsTlsApplicable, Converter={StaticResource BoolVis}}"
                                       AutomationProperties.Name="NAS 启用 TLS" />
                             <CheckBox Content="信任自签名证书（仅限受信任内网）" Margin="0,4,0,0"
                                       IsChecked="{Binding SelectedNasConnection.TrustSelfSigned}"
+                                      Visibility="{Binding IsTrustSelfSignedApplicable, Converter={StaticResource BoolVis}}"
                                       AutomationProperties.Name="NAS 信任自签" />
 
                             <!-- N6 测试连接 + 保存 -->

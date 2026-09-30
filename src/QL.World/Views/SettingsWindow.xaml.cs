@@ -1,8 +1,10 @@
 using System.Windows;
 using System.Windows.Controls;
+using QL.World.Services.Nas;
 using QL.World.ViewModels;
 
 namespace QL.World.Views;
+
 
 /// <summary>
 /// W3 settings window (A1 常规 / A2 缩略图 / A3 AI / A4 监控 / A5 关于 /
@@ -51,5 +53,19 @@ public partial class SettingsWindow : Window
     {
         if (sender is PasswordBox pb && _viewModel.SelectedNasConnection is { } spec)
             _viewModel.SetNasPasswordInput(spec.Id, pb.Password);
+    }
+
+    /// <summary>
+    /// 协议 ComboBox SelectionChanged 转发到 ViewModel，让 ViewModel 联动
+    /// 端口默认值 + 触发 IsWebDavSelected / IsSmbSelected / IsTlsApplicable
+    /// 等派生属性通知。spec 是 POCO 无 INPC，必须借由 View 事件桥接，避免
+    /// 改造持久化 schema。直接从 ComboBox.SelectedItem 取协议值传入，不依
+    /// 赖 SelectedItem 双向绑定 push 到 source 的时序。
+    /// </summary>
+    private void OnNasProtocolChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (e.RemovedItems.Count == 0) return; // 初始化触发，无前一协议
+        if (sender is ComboBox cb && cb.SelectedItem is NasConnectionProtocol p)
+            _viewModel.OnNasProtocolChanged(p);
     }
 }

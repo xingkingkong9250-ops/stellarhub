@@ -507,13 +507,72 @@ public sealed class SettingsViewModel : ObservableObject
 
     public ObservableCollection<NasConnectionSpec> NasConnections { get; } = [];
 
-    public IReadOnlyList<NasConnectionProtocol> NasProtocolOptions { get; } = [NasConnectionProtocol.WebDav];
+    public IReadOnlyList<NasConnectionProtocol> NasProtocolOptions { get; } = [NasConnectionProtocol.WebDav, NasConnectionProtocol.Smb];
 
     private NasConnectionSpec? _selectedNasConnection;
     public NasConnectionSpec? SelectedNasConnection
     {
         get => _selectedNasConnection;
-        set => SetProperty(ref _selectedNasConnection, value);
+        set
+        {
+            if (SetProperty(ref _selectedNasConnection, value))
+                RaiseNasProtocolDerived();
+        }
+    }
+
+    // 派生属性：协议联动 UI 显隐 + 提示文案。N3/N5 各自按协议呈现。
+    public bool IsWebDavSelected => SelectedNasConnection?.Protocol == NasConnectionProtocol.WebDav;
+    public bool IsSmbSelected => SelectedNasConnection?.Protocol == NasConnectionProtocol.Smb;
+    public bool IsTlsApplicable => IsWebDavSelected || IsSmbSelected;
+    public bool IsTrustSelfSignedApplicable => IsWebDavSelected;
+
+    public string NasPortHintText =>
+        SelectedNasConnection?.Protocol switch
+        {
+            NasConnectionProtocol.Smb => "端口（留空=默认 445）",
+            _ => "端口（留空=默认 443/80）",
+        };
+
+    public string NasRootPathHint =>
+        SelectedNasConnection?.Protocol switch
+        {
+            NasConnectionProtocol.Smb => "根路径（如 StellarHubShared/）",
+            _ => "根路径（如 /photos/）",
+        };
+
+    public string NasTlsLabelText =>
+        SelectedNasConnection?.Protocol == NasConnectionProtocol.Smb
+            ? "SMB3 加密协商"
+            : "使用 HTTPS/TLS（推荐）";
+
+    /// <summary>
+    /// View 在协议 ComboBox SelectionChanged 时调用。显式传入新协议（从
+    /// ComboBox.SelectedItem 读取，不依赖双向绑定 push 时序），写回 spec
+    /// 并检测 Port 是否为前一协议默认值（443/445）或 null——是则填新协议
+    /// 默认；非默认值保留。spec 是 POCO 无 INPC，借由 View 事件桥接避免
+    /// 改造持久化 schema。
+    /// </summary>
+    public void OnNasProtocolChanged(NasConnectionProtocol newProtocol)
+    {
+        if (SelectedNasConnection is not { } spec) return;
+        spec.Protocol = newProtocol;
+        int? port = spec.Port;
+        int next = newProtocol == NasConnectionProtocol.Smb ? 445 : 443;
+        int prev = newProtocol == NasConnectionProtocol.Smb ? 443 : 445;
+        if (port is null || port == prev)
+            spec.Port = next;
+        RaiseNasProtocolDerived();
+    }
+
+    private void RaiseNasProtocolDerived()
+    {
+        OnPropertyChanged(nameof(IsWebDavSelected));
+        OnPropertyChanged(nameof(IsSmbSelected));
+        OnPropertyChanged(nameof(IsTlsApplicable));
+        OnPropertyChanged(nameof(IsTrustSelfSignedApplicable));
+        OnPropertyChanged(nameof(NasPortHintText));
+        OnPropertyChanged(nameof(NasRootPathHint));
+        OnPropertyChanged(nameof(NasTlsLabelText));
     }
 
     private string _nasStatusText = string.Empty;
