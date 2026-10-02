@@ -1,6 +1,8 @@
 using System.IO;
 using QL.World.Services.Nas;
 using QL.World.Services.Nas.Smb;
+using QL.World.Services.Nas.Sftp;
+using QL.World.Tests.Nas.Sftp;
 
 namespace QL.World.Tests.Nas;
 
@@ -23,6 +25,7 @@ public sealed class INasConnectorContractTests
     {
         yield return new object[] { ConnectorCase.Stub() };
         yield return new object[] { ConnectorCase.SmbLocalTemp() };
+        yield return new object[] { ConnectorCase.SftpLocalFake() };
     }
 
     [Theory]
@@ -232,6 +235,38 @@ public sealed class INasConnectorContractTests
                 CreateConnector = () => new SmbNasConnector(spec, uncRoot: tempRoot, remoteName: null, ownsConnection: false),
                 CreateFailingConnector = () => new SmbNasConnector(spec, uncRoot: ghostRoot, remoteName: null, ownsConnection: false),
                 ExpectedFailureKind = NasConnectionKind.NetworkUnreachable,
+                KnownFilePath = "/photo.jpg",
+                KnownFileSize = 1024,
+                KnownFileName = "photo.jpg",
+                ExpectedListCount = 1,
+            };
+        }
+
+        public static ConnectorCase SftpLocalFake()
+        {
+            string tempRoot = Directory.CreateTempSubdirectory("stellarhub-contract-sftp-").FullName;
+            // 预置已知文件 photo.jpg (1024 bytes)；ListFiles(/) 返回 1 项
+            File.WriteAllBytes(Path.Combine(tempRoot, "photo.jpg"), new byte[1024]);
+
+            string ghostRoot = Path.Combine(Path.GetTempPath(), "stellarhub-contract-ghost-sftp-" + Guid.NewGuid().ToString("N"));
+
+            var spec = new NasConnectionSpec
+            {
+                Id = 4,
+                Name = "contract-test",
+                Protocol = NasConnectionProtocol.Sftp,
+                Host = "nas.local",
+                Port = 22,
+                RootPath = "/",
+                Username = "contract-user",
+            };
+            return new ConnectorCase(tempRoot, ghostRoot)
+            {
+                DisplayName = "Sftp-localFake",
+                ExpectedProtocol = NasConnectionProtocol.Sftp,
+                CreateConnector = () => new SftpNasConnector(spec, new FakeSftpSession("/", tempRoot)),
+                CreateFailingConnector = () => new SftpNasConnector(spec, new FakeSftpSession("/", ghostRoot)),
+                ExpectedFailureKind = NasConnectionKind.NotFound,
                 KnownFilePath = "/photo.jpg",
                 KnownFileSize = 1024,
                 KnownFileName = "photo.jpg",
