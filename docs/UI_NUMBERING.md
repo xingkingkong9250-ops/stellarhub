@@ -63,12 +63,12 @@
 | W3/A4 | 监控目录页签 | 已实现（M2） | 目录列表/添加/移除/自动导入开关，即时生效 |
 | W3/A5 | 关于页签 | 已实现（M2） | 版本/统计/旧版 Python 库导入/打开日志文件夹 |
 | W3/A6 | 贴图组规则页签 | 已实现（M4） | 尾缀→角色规则行（模式/角色下拉/启用/删除）+ 添加规则/保存并重建/仅重建/恢复默认 + 状态文本 |
-| W3/A7 | NAS 连接页签 | 已实现（M5 WebDav + M7 Smb + v0.2.1 主 NAS/门禁 + M8 ShareLink/聚合/迁移） | 连接列表（N1）/ 详情表单 N2-N5 / 测试连接 + 设为主 NAS + 保存（N6）；M8-D 加「🔗 分享链接」入口 + 列表 🔗 图标区分 ShareLink 副库；M8-E 加「设为主 NAS 并迁移数据」+「搬运到此处...」（管理员可见）+ 迁移进度文案 +「显示数据来源徽章」CheckBox；v0.2.1 加管理员门禁（IsNasManagementEnabled：未登录或管理员可见，普通用户隐藏） |
+| W3/A7 | NAS 连接页签 | 已实现（M5 WebDav + M7 Smb + v0.2.1 主 NAS/门禁 + M8 ShareLink/聚合/迁移 + M9 Sftp） | 连接列表（N1）/ 详情表单 N2-N5 / 测试连接 + 设为主 NAS + 保存（N6）；M9 起协议下拉三选项齐备（N3-N5 联动）；M8-D 加「🔗 分享链接」入口 + 列表 🔗 图标区分 ShareLink 副库；M8-E 加「设为主 NAS 并迁移数据」+「搬运到此处...」（管理员可见）+ 迁移进度文案 +「显示数据来源徽章」CheckBox；v0.2.1 加管理员门禁（IsNasManagementEnabled：未登录或管理员可见，普通用户隐藏） |
 | W3/A7-N1 | NAS 连接列表 + 新建/删除 + 主 NAS 标记 + 分享链接 | 已实现（M5-C + v0.2.1 + M8-D） | ObservableCollection 绑定；新建按钮分配单调递增 id（不复用已删除）；M8-D 加「🔗 分享链接」按钮（Role=ShareLink，匿名访问，无密码框）；删除按钮清除选中连接（含密码）；v0.2.1 列表项「★ 主」徽标（IsPrimary=true 显示），M8-D 加「🔗」图标（IsShareLink=true 显示） |
 | W3/A7-N2 | 名称 | 已实现（M5-C） | 唯一显示名；绑定 SelectedNasConnection.Name |
-| W3/A7-N3 | 协议 + 主机 + 端口 | 已实现（M5-C + M7-C） | 协议下拉 WebDav + Smb（M7；Sftp 留 M8）；主机文本（IP/域名，不含 scheme）；端口提示按协议显隐（WebDav 443/80 / Smb 445）；切换协议若 Port 为前一默认或 null 自动填新协议默认（非默认值保留） |
-| W3/A7-N4 | 用户名 + 密码 | 已实现（M5-C） | 用户名留空=匿名；PasswordBox 永不回填（安全），DPAPI(CurrentUser) 加密落 config.json |
-| W3/A7-N5 | 根路径 + TLS + 自签 | 已实现（M5-C + M7-C） | 根路径提示按协议显隐（WebDav `/photos/` / Smb `StellarHubShared/`）；UseTls 标签随协议切换（WebDav「使用 HTTPS/TLS（推荐）」/ Smb「SMB3 加密协商」），Visibility 绑 IsTlsApplicable；TrustSelfSigned 仅 WebDav 显（绑 IsTrustSelfSignedApplicable） |
+| W3/A7-N3 | 协议 + 主机 + 端口 | 已实现（M5-C + M7-C + M9-C） | 协议下拉 WebDav + Smb + Sftp（M9）；主机文本（IP/域名，不含 scheme）；端口提示按协议显隐（WebDav 443/80 / Smb 445 / Sftp 22）；切换协议若 Port 为 null 或任一已知默认（443/445/22）自动填新协议默认（自定义端口保留） |
+| W3/A7-N4 | 用户名 + 密码 | 已实现（M5-C + M9-C） | 用户名标签动态（WebDav/Smb 留空=匿名；Sftp 必填不支持匿名）；PasswordBox 永不回填（安全），DPAPI(CurrentUser) 加密落 config.json |
+| W3/A7-N5 | 根路径 + TLS + 自签 | 已实现（M5-C + M7-C + M9-C） | 根路径提示按协议显隐（WebDav `/photos/` / Smb `StellarHubShared/` / Sftp `/volume1/StellarHubShared`）；UseTls 标签随协议切换（WebDav「使用 HTTPS/TLS（推荐）」/ Smb「SMB3 加密协商」），Visibility 绑 IsTlsApplicable（Sftp 走 SSH 隐藏）；TrustSelfSigned 标签绑 NasTrustLabelText（WebDav 信任自签证书 / Sftp 信任未知 SSH 主机密钥），Visibility 绑 IsTrustSelfSignedApplicable（WebDav+Sftp 显，Smb 隐） |
 | W3/A7-N6 | 测试连接 + 设为主 NAS（仅切标记）+ 保存 | 已实现（M5-C + v0.2.1 + M8-E 改名） | 测试：INasConnectorFactory.Create + TestConnectionAsync；设为主 NAS（仅切标记，v0.2.1）：SetPrimaryCommand 选中项 IsPrimary=true + 其他全部 false + 逐个 UpdateNasConnection 持久化（选中项已为主时禁用；M8-E 起亦在 IsMigrating 时禁用）；保存：UpdateNasConnection（保留 EncryptedPassword/CreatedAt） |
 | W3/A7-N6-MIG | 设为主 NAS 并迁移数据 | 已实现（M8-E） | 管理员可见（IsAdmin）；SetPrimaryWithMigrationCommand 选中副库时可用；SetPrimaryWithMigrationAsync 递归统计源主库 originals+thumbnails+pending 文件数+字节数 → 弹确认框「将迁移约 N 个文件（约 X MB）」→ 调 PrimaryMigrationService.MigrateAsync 4 阶段（元数据/文件树/accounts 最后覆盖/Role 切换）；进度回调实时刷新 MigrationStatusText；失败不切 Role 保留旧主可重试（幂等） |
 | W3/A7-N6-XFER | 搬运到此处... | 已实现（M8-E） | 管理员 + 选中副库（非 Primary/非 ShareLink）时可用；TransferToHereCommand 弹引导 MessageBox「请在共享画廊选中 N 张图片 → 右键 → 搬运到副库」（实际搬运流程入口在画廊右键菜单，DataTransferService 已就绪） |

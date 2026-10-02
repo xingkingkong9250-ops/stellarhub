@@ -1,9 +1,9 @@
-﻿# QL World M5-C UIA 冒烟测试 — W3/A7 NAS 连接页签（列表 + 新建/删除 + 详情表单 + 测试/保存按钮）
+# QL World M5-C UIA 冒烟测试 — W3/A7 NAS 连接页签（列表 + 新建/删除 + 详情表单 + 测试/保存按钮）
 # 用法: powershell -ExecutionPolicy Bypass -File tools\smoke\UiSmokeNas.ps1
 # 前置: .NET 10 SDK；脚本自建 Debug 构建并用隔离数据根，不影响真实数据。
 # 退出码: 0 = 全部通过；非 0 = 存在失败步骤。
 # 覆盖：W3/A7 NAS 连接页签 — 列表（N1）/ 详情表单 N2-N5 / 测试连接 + 保存（N6）
-#       M5 仅 WebDAV；SMB/SFTP 预留（下拉只有 WebDav 一项）。
+#       M9 起协议下拉三选项齐备（WebDav / Smb / Sftp）。
 
 $ErrorActionPreference = 'Stop'
 
@@ -162,6 +162,21 @@ try {
             $cbCert = Find-FirstByName $settingsWin 'NAS 信任自签' ([System.Windows.Automation.ControlType]::CheckBox)
             Assert-Step 'A7-N2：名称输入框存在' ($null -ne $eName) '未找到 Name="NAS 连接名称"'
             Assert-Step 'A7-N3：协议下拉存在' ($null -ne $eProto) '未找到 Name="NAS 协议"'
+            if ($null -ne $eProto) {
+                # M9：展开下拉核对 WebDav/Smb/Sftp 三选项，随后收起
+                $protoItems = $null
+                try {
+                    $expand = $eProto.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern)
+                    $expand.Expand()
+                    Start-Sleep -Milliseconds 300
+                    $protoItems = $eProto.FindAll([System.Windows.Automation.TreeScope]::Descendants, (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::ListItem)))
+                    $expand.Collapse()
+                } catch { $protoItems = $null }
+                $protoNames = @()
+                if ($null -ne $protoItems) { foreach ($it in $protoItems) { $protoNames += $it.Current.Name } }
+                $hasAllThree = ($protoNames -contains 'WebDav') -and ($protoNames -contains 'Smb') -and ($protoNames -contains 'Sftp')
+                Assert-Step 'A7-N3：协议下拉含 WebDav/Smb/Sftp 三项（M9）' $hasAllThree ("实际选项: " + ($protoNames -join '/'))
+            }
             Assert-Step 'A7-N3：主机输入框存在' ($null -ne $eHost) '未找到 Name="NAS 主机"'
             Assert-Step 'A7-N3：端口输入框存在' ($null -ne $ePort) '未找到 Name="NAS 端口"'
             Assert-Step 'A7-N4：用户名输入框存在' ($null -ne $eUser) '未找到 Name="NAS 用户名"'

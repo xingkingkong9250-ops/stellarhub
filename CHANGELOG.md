@@ -9,6 +9,38 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-09-30 M9 NAS SFTP 协议扩展
+
+v0.3.0 NAS 接入支持 WebDAV 与 SMB，但绿联等成品 NAS 的 SFTP（SSH）通道
+长期缺位——部分用户环境只开放 22 端口或按 Linux 用户体系管理共享目录。
+M9 在多协议抽象上补齐第三个协议驱动，扩展路线唯一功能缺口闭合；设置界面、
+下载队列、聚合画廊、主 NAS 迁移等上层链路零改动复用。
+
+### M9-A · SFTP 连接器 + SSH.NET 接入
+
+- 引入 SSH.NET 2026.0.0（纯托管，传递 BouncyCastle 2.7.0 / Logging.Abstractions 8.0.3），唯一新增 NuGet 依赖
+- `ISftpSession` 窄接口 + `RenciSftpSession` 生产实现封装 `SftpClient`；`SftpExceptionMap` 集中映射 Renci/Socket 异常到 `NasConnectionKind`（认证失败、超时、NotFound、网络不可达、协议错误），上层只见 `NasConnectionException`
+- `SftpNasConnector` 实现 `INasConnector` 10 方法：POSIX rename 优先、失败降级 download→upload→delete 搬运；Range 分段下载（越界报 RangeNotSatisfiable）；上传自动创建父目录；幂等 Mkdir/Delete；RootPath 相对路径输出与 WebDAV/SMB 语义一致
+
+### M9-B · 工厂装配 + 热切连接 + 主机密钥策略
+
+- `SftpConnectorFactory`：密码优先取明文入参、否则 DPAPI 解密；空用户名在连接前拒绝（ProtocolError，SFTP 不支持匿名/ShareLink）；默认端口 22、30s 连接超时
+- 工厂热切 SSH+SFTP（对齐 SMB fail-fast），失败即分类抛出；`App.xaml.cs` 替换占位工厂，三协议路由全部接通
+- 主机密钥复用 `TrustSelfSigned` 字段（不改 schema）：关闭时拒绝未知密钥并在异常中携带 `SHA256:` 指纹供带外核对；`SftpHostKeyPolicy` 纯函数承载决策与指纹格式化
+
+### M9-C · 设置界面 SFTP 联动
+
+- 协议下拉新增 SFTP；切换协议端口按 443/445/22 联动（null 或任一已知默认值才覆盖，自定义端口保留）
+- SFTP 隐藏独立 TLS 开关（SSH 自带加密），信任复选框显示「信任未知 SSH 主机密钥」文案；用户名提示「SFTP 必填」、根路径提示 `/volume1/StellarHubShared`
+- 清理 M5/M7 时期「SFTP 留待 M8/预留」过时注释；`UnsupportedProtocolFactory` 收紧为拒绝为任何已发货协议构造
+
+### 变更
+
+- 版本号 0.3.0 → 0.4.0（NO.M 功能里程碑，次版本号 +0.1.0，修订号归零）
+- 全量测试 613 项全绿（553 → 613，+60：连接器沙盒 20、异常映射 12、契约 SFTP case 9、工厂 8、UI 联动 10，及路由测试调整）
+- 3 个子阶段独立提交（9a6aa2a M9-A / 01f837c M9-B / e350882 M9-C / M9-Z 本次）
+- 无真实 SFTP 服务器环境，测试全部基于本地目录 Fake 沙盒；真实绿联 NAS SFTP 实测列为人工验收项
+
 ## [0.3.0] — 2026-09-30 M8 多 NAS 聚合 + 主 NAS 迁移
 
 v0.2.1 单实例假设限制：登录后只能访问主 NAS，副库需重新登录；画廊无主副
