@@ -302,7 +302,7 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="NAS 连接（WebDav + Smb；Sftp 留待 M8）"
+                        <TextBlock Grid.Column="0" Text="NAS 连接（WebDav + Smb + Sftp）"
                                    Style="{StaticResource SectionCaptionStyle}" VerticalAlignment="Center" />
                         <Button Grid.Column="1" Content="＋ 新建" Margin="8,0,0,0"
                                 Style="{StaticResource SubtleButtonStyle}"
@@ -362,7 +362,7 @@
                                      AutomationProperties.Name="NAS 端口" />
 
                             <!-- N4 用户名 + 密码 -->
-                            <TextBlock Text="用户名（留空=匿名）" Margin="0,10,0,2" />
+                            <TextBlock Text="{Binding NasUsernameHintText}" Margin="0,10,0,2" />
                             <TextBox Text="{Binding SelectedNasConnection.Username, UpdateSourceTrigger=PropertyChanged}"
                                      AutomationProperties.Name="NAS 用户名" />
                             <TextBlock Text="密码（留空=不修改已保存密码）" Margin="0,10,0,2" />
@@ -378,7 +378,7 @@
                                       IsChecked="{Binding SelectedNasConnection.UseTls}"
                                       Visibility="{Binding IsTlsApplicable, Converter={StaticResource BoolVis}}"
                                       AutomationProperties.Name="NAS 启用 TLS" />
-                            <CheckBox Content="信任自签名证书（仅限受信任内网）" Margin="0,4,0,0"
+                            <CheckBox Content="{Binding NasTrustLabelText}" Margin="0,4,0,0"
                                       IsChecked="{Binding SelectedNasConnection.TrustSelfSigned}"
                                       Visibility="{Binding IsTrustSelfSignedApplicable, Converter={StaticResource BoolVis}}"
                                       AutomationProperties.Name="NAS 信任自签" />

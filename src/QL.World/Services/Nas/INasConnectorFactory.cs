@@ -3,9 +3,9 @@ namespace QL.World.Services.Nas;
 /// <summary>
 /// Builds a configured <see cref="INasConnector"/> from a persisted
 /// <see cref="NasConnectionSpec"/>. The factory is the single place that
-/// knows how to turn a spec + password into a live connector (WebDAV today,
-/// SMB/SFTP in later milestones). The returned connector is owned by the
-/// caller and should be disposed when the owning scope ends.
+/// knows how to turn a spec + password into a live connector
+/// (WebDAV/SMB/SFTP). The returned connector is owned by the caller and
+/// should be disposed when the owning scope ends.
 /// </summary>
 public interface INasConnectorFactory
 {

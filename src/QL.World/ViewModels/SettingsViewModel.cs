@@ -539,7 +539,8 @@ public sealed class SettingsViewModel : ObservableObject
 
     public ObservableCollection<NasConnectionSpec> NasConnections { get; } = [];
 
-    public IReadOnlyList<NasConnectionProtocol> NasProtocolOptions { get; } = [NasConnectionProtocol.WebDav, NasConnectionProtocol.Smb];
+    // M9: 三协议齐备（WebDav / SMB / SFTP）。
+    public IReadOnlyList<NasConnectionProtocol> NasProtocolOptions { get; } = [NasConnectionProtocol.WebDav, NasConnectionProtocol.Smb, NasConnectionProtocol.Sftp];
 
     private NasConnectionSpec? _selectedNasConnection;
     public NasConnectionSpec? SelectedNasConnection
@@ -555,13 +556,18 @@ public sealed class SettingsViewModel : ObservableObject
     // 派生属性：协议联动 UI 显隐 + 提示文案。N3/N5 各自按协议呈现。
     public bool IsWebDavSelected => SelectedNasConnection?.Protocol == NasConnectionProtocol.WebDav;
     public bool IsSmbSelected => SelectedNasConnection?.Protocol == NasConnectionProtocol.Smb;
+    public bool IsSftpSelected => SelectedNasConnection?.Protocol == NasConnectionProtocol.Sftp;
+    // SFTP 跑在 SSH 之上、传输始终加密，没有独立 TLS 开关，故仅 WebDAV/SMB 显示。
     public bool IsTlsApplicable => IsWebDavSelected || IsSmbSelected;
-    public bool IsTrustSelfSignedApplicable => IsWebDavSelected;
+    // TrustSelfSigned 对 WebDAV 是自签证书开关，对 SFTP 复用为未知主机密钥
+    // 信任开关（见 SftpConnectorFactory）；SMB 无此概念。
+    public bool IsTrustSelfSignedApplicable => IsWebDavSelected || IsSftpSelected;
 
     public string NasPortHintText =>
         SelectedNasConnection?.Protocol switch
         {
             NasConnectionProtocol.Smb => "端口（留空=默认 445）",
+            NasConnectionProtocol.Sftp => "端口（留空=默认 22）",
             _ => "端口（留空=默认 443/80）",
         };
 
@@ -569,42 +575,62 @@ public sealed class SettingsViewModel : ObservableObject
         SelectedNasConnection?.Protocol switch
         {
             NasConnectionProtocol.Smb => "根路径（如 StellarHubShared/）",
+            NasConnectionProtocol.Sftp => "根路径（如 /volume1/StellarHubShared）",
             _ => "根路径（如 /photos/）",
         };
+
+    public string NasUsernameHintText =>
+        SelectedNasConnection?.Protocol == NasConnectionProtocol.Sftp
+            ? "用户名（SFTP 必填，不支持匿名）"
+            : "用户名（留空=匿名）";
 
     public string NasTlsLabelText =>
         SelectedNasConnection?.Protocol == NasConnectionProtocol.Smb
             ? "SMB3 加密协商"
             : "使用 HTTPS/TLS（推荐）";
 
+    public string NasTrustLabelText =>
+        SelectedNasConnection?.Protocol == NasConnectionProtocol.Sftp
+            ? "信任未知 SSH 主机密钥（自签名/首次连接，仅限受信任内网）"
+            : "信任自签名证书（仅限受信任内网）";
+
     /// <summary>
     /// View 在协议 ComboBox SelectionChanged 时调用。显式传入新协议（从
     /// ComboBox.SelectedItem 读取，不依赖双向绑定 push 时序），写回 spec
-    /// 并检测 Port 是否为前一协议默认值（443/445）或 null——是则填新协议
-    /// 默认；非默认值保留。spec 是 POCO 无 INPC，借由 View 事件桥接避免
-    /// 改造持久化 schema。
+    /// 并检测 Port：null 或任一已知协议默认值（443/445/22）时填新协议
+    /// 默认；用户自定义端口保留。spec 是 POCO 无 INPC，借由 View 事件
+    /// 桥接避免改造持久化 schema。
     /// </summary>
     public void OnNasProtocolChanged(NasConnectionProtocol newProtocol)
     {
         if (SelectedNasConnection is not { } spec) return;
         spec.Protocol = newProtocol;
         int? port = spec.Port;
-        int next = newProtocol == NasConnectionProtocol.Smb ? 445 : 443;
-        int prev = newProtocol == NasConnectionProtocol.Smb ? 443 : 445;
-        if (port is null || port == prev)
+        int next = DefaultPortFor(newProtocol);
+        if (port is null || port == 443 || port == 445 || port == 22)
             spec.Port = next;
         RaiseNasProtocolDerived();
     }
+
+    internal static int DefaultPortFor(NasConnectionProtocol protocol) => protocol switch
+    {
+        NasConnectionProtocol.Smb => 445,
+        NasConnectionProtocol.Sftp => 22,
+        _ => 443,
+    };
 
     private void RaiseNasProtocolDerived()
     {
         OnPropertyChanged(nameof(IsWebDavSelected));
         OnPropertyChanged(nameof(IsSmbSelected));
+        OnPropertyChanged(nameof(IsSftpSelected));
         OnPropertyChanged(nameof(IsTlsApplicable));
         OnPropertyChanged(nameof(IsTrustSelfSignedApplicable));
         OnPropertyChanged(nameof(NasPortHintText));
         OnPropertyChanged(nameof(NasRootPathHint));
+        OnPropertyChanged(nameof(NasUsernameHintText));
         OnPropertyChanged(nameof(NasTlsLabelText));
+        OnPropertyChanged(nameof(NasTrustLabelText));
         // M8-E: 选中项变化时刷新「设为主 NAS」类命令的可用态
         SetPrimaryCommand.RaiseCanExecuteChanged();
         SetPrimaryWithMigrationCommand.RaiseCanExecuteChanged();

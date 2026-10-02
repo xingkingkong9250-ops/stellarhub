@@ -3,11 +3,11 @@ using System.IO;
 namespace QL.World.Services.Nas;
 
 /// <summary>
-/// Abstraction over a NAS connection. M5-B ships the WebDAV implementation
-/// (<c>WebDavNasConnector</c>); SMB/SFTP drivers are reserved for later
-/// milestones — the signatures below are protocol-agnostic so the same
-/// <see cref="IFileSystemAccessor"/> / <see cref="RemoteLibraryScanner"/>
-/// (M5-D) code paths work against any driver.
+/// Abstraction over a NAS connection. Three protocol drivers implement this
+/// interface: <c>WebDavNasConnector</c> (M5-B), <c>SmbNasConnector</c>
+/// (M7-B) and <c>SftpNasConnector</c> (M9). The signatures are
+/// protocol-agnostic so the same <see cref="IFileSystemAccessor"/> /
+/// <see cref="RemoteLibraryScanner"/> code paths work against any driver.
 ///
 /// Implementations must be safe to call from a background thread; never
 /// invoke them on the UI thread (WebDAV I/O is blocking at the HTTP layer).

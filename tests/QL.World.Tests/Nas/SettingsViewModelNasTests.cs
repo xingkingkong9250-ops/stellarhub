@@ -192,6 +192,104 @@ public sealed class SettingsViewModelNasTests : IDisposable
         Assert.True(c.IsPrimary);
     }
 
+    // ─── M9-C: SFTP 协议联动（选项/显隐/默认端口/文案） ──────────────────
+
+    [Fact]
+    public void NasProtocolOptions_lists_all_three_protocols()
+    {
+        Assert.Equal(
+            new[]
+            {
+                NasConnectionProtocol.WebDav,
+                NasConnectionProtocol.Smb,
+                NasConnectionProtocol.Sftp,
+            },
+            _viewModel.NasProtocolOptions);
+    }
+
+    [Fact]
+    public void Sftp_selected_hides_TLS_but_shows_trust_checkbox()
+    {
+        SelectFreshConnection(NasConnectionProtocol.Sftp);
+
+        Assert.True(_viewModel.IsSftpSelected);
+        Assert.False(_viewModel.IsTlsApplicable, "SFTP 走 SSH，无独立 TLS 开关");
+        Assert.True(_viewModel.IsTrustSelfSignedApplicable, "SFTP 复用信任开关做主机密钥");
+    }
+
+    [Fact]
+    public void WebDav_selected_shows_TLS_and_trust()
+    {
+        SelectFreshConnection(NasConnectionProtocol.WebDav);
+
+        Assert.True(_viewModel.IsTlsApplicable);
+        Assert.True(_viewModel.IsTrustSelfSignedApplicable);
+    }
+
+    [Fact]
+    public void Smb_selected_shows_TLS_but_hides_trust()
+    {
+        SelectFreshConnection(NasConnectionProtocol.Smb);
+
+        Assert.True(_viewModel.IsTlsApplicable);
+        Assert.False(_viewModel.IsTrustSelfSignedApplicable);
+    }
+
+    [Fact]
+    public void Sftp_hints_mention_port_22_volume_root_and_required_username()
+    {
+        SelectFreshConnection(NasConnectionProtocol.Sftp);
+
+        Assert.Contains("22", _viewModel.NasPortHintText);
+        Assert.Contains("/volume1", _viewModel.NasRootPathHint);
+        Assert.Contains("必填", _viewModel.NasUsernameHintText);
+        Assert.Contains("SSH 主机密钥", _viewModel.NasTrustLabelText);
+    }
+
+    [Theory]
+    [InlineData(NasConnectionProtocol.WebDav, 443)]
+    [InlineData(NasConnectionProtocol.Smb, 445)]
+    [InlineData(NasConnectionProtocol.Sftp, 22)]
+    public void Protocol_change_from_null_port_fills_default(NasConnectionProtocol protocol, int expectedPort)
+    {
+        _viewModel.AddNasConnectionCommand.Execute(null);
+        Assert.Null(_viewModel.SelectedNasConnection!.Port);
+
+        _viewModel.OnNasProtocolChanged(protocol);
+
+        Assert.Equal(expectedPort, _viewModel.SelectedNasConnection.Port);
+    }
+
+    [Fact]
+    public void Protocol_change_between_known_defaults_overwrites_port()
+    {
+        SelectFreshConnection(NasConnectionProtocol.WebDav);
+        _viewModel.SelectedNasConnection!.Port = 443;
+
+        _viewModel.OnNasProtocolChanged(NasConnectionProtocol.Sftp);
+        Assert.Equal(22, _viewModel.SelectedNasConnection.Port);
+
+        _viewModel.OnNasProtocolChanged(NasConnectionProtocol.Smb);
+        Assert.Equal(445, _viewModel.SelectedNasConnection.Port);
+    }
+
+    [Fact]
+    public void Protocol_change_keeps_custom_port()
+    {
+        SelectFreshConnection(NasConnectionProtocol.WebDav);
+        _viewModel.SelectedNasConnection!.Port = 8022;
+
+        _viewModel.OnNasProtocolChanged(NasConnectionProtocol.Sftp);
+
+        Assert.Equal(8022, _viewModel.SelectedNasConnection.Port);
+    }
+
+    private void SelectFreshConnection(NasConnectionProtocol protocol)
+    {
+        _viewModel.AddNasConnectionCommand.Execute(null);
+        _viewModel.OnNasProtocolChanged(protocol);
+    }
+
     public void Dispose()
     {
         _thumbnails.Dispose();

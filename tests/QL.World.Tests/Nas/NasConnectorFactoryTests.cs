@@ -62,25 +62,16 @@ public sealed class NasConnectorFactoryTests
     }
 
     [Theory]
-    [InlineData(NasConnectionProtocol.Smb, "Smb")]
-    [InlineData(NasConnectionProtocol.Sftp, "Sftp")]
-    public void UnsupportedProtocolFactory_still_names_protocol_and_milestone(
-        NasConnectionProtocol protocol, string protocolName)
+    [InlineData(NasConnectionProtocol.WebDav)]
+    [InlineData(NasConnectionProtocol.Smb)]
+    [InlineData(NasConnectionProtocol.Sftp)]
+    public void UnsupportedProtocolFactory_rejects_every_shipped_protocol(
+        NasConnectionProtocol protocol)
     {
-        var placeholder = new UnsupportedProtocolFactory(protocol);
-        var spec = new NasConnectionSpec
-        {
-            Id = 3,
-            Name = "p",
-            Protocol = protocol,
-            Host = "nas.local",
-            RootPath = "/",
-            Username = "u",
-        };
-
-        var ex = Assert.Throws<NotSupportedException>(
-            () => placeholder.Create(spec, plaintextPassword: "p"));
-        Assert.Contains(protocolName, ex.Message);
+        // M9 起三协议均有真实驱动；占位工厂不得再为任何已发货协议构造，
+        // 防止装配笔误把真驱动悄悄换回抛异常的占位。
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new UnsupportedProtocolFactory(protocol));
     }
 
     [Fact]
@@ -103,14 +94,5 @@ public sealed class NasConnectorFactoryTests
             new WebDavConnectorFactory(), null!, new SftpConnectorFactory()));
         Assert.Throws<ArgumentNullException>(() => new NasConnectorFactory(
             new WebDavConnectorFactory(), new SmbConnectorFactory(), null!));
-    }
-
-    [Fact]
-    public void Constructor_rejects_WebDav_as_unsupported()
-    {
-        // WebDav has a real driver; passing it to UnsupportedProtocolFactory
-        // would silently mask a wiring mistake. Constructor must catch it.
-        Assert.Throws<ArgumentOutOfRangeException>(
-            () => new UnsupportedProtocolFactory(NasConnectionProtocol.WebDav));
     }
 }

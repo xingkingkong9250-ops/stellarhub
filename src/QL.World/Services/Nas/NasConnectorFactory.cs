@@ -6,15 +6,12 @@ namespace QL.World.Services.Nas;
 /// based on <see cref="NasConnectionSpec.Protocol"/>. Sub-factories are
 /// injected at construction so each driver owns its own concerns (WebDAV
 /// <c>HttpClient</c> setup, SMB <c>WNetAddConnection2</c> P/Invoke, SFTP
-/// <c>SftpClient</c> connect). The dispatcher itself stays stateless beyond
-/// holding the three sub-factories.
+/// SSH.NET eager connect + host-key policy). The dispatcher itself stays
+/// stateless beyond holding the three sub-factories.
 ///
-/// M7-A ships with the WebDAV sub-factory (real) and SMB/SFTP sub-factories
-/// as <see cref="UnsupportedProtocolFactory"/> placeholders that throw
-/// <see cref="NotSupportedException"/>. M7-B replaces the SMB placeholder
-/// with <c>SmbConnectorFactory</c>; M8 replaces the SFTP placeholder.
-/// This keeps <c>App.xaml.cs</c> wiring stable across milestones — only
-/// the injected sub-factory swaps.
+/// As of M9 all three sub-factories are real implementations;
+/// <see cref="UnsupportedProtocolFactory"/> remains available for any
+/// future protocol added before its driver lands.
 /// </summary>
 public sealed class NasConnectorFactory : INasConnectorFactory
 {

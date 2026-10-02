@@ -2,11 +2,12 @@ namespace QL.World.Services.Nas;
 
 /// <summary>
 /// Placeholder <see cref="INasConnectorFactory"/> for a protocol driver that
-/// has not landed yet (SMB lands in M7-B; SFTP is reserved for M8). Create
-/// throws <see cref="NotSupportedException"/> with a message naming the
-/// protocol so callers see a clear root-cause instead of a null-ref or
-/// silent fallback. Returned by <see cref="NasConnectorFactory"/> for any
-/// <see cref="NasConnectionProtocol"/> whose real driver is still pending.
+/// has not landed yet. Create throws <see cref="NotSupportedException"/>
+/// with a message naming the protocol so callers see a clear root-cause
+/// instead of a null-ref or silent fallback. As of M9 all shipped protocols
+/// (WebDAV/SMB/SFTP) have real drivers; this remains for any future protocol
+/// enum value wired into <see cref="NasConnectorFactory"/> before its
+/// driver is implemented.
 /// </summary>
 public sealed class UnsupportedProtocolFactory : INasConnectorFactory
 {
@@ -14,23 +15,19 @@ public sealed class UnsupportedProtocolFactory : INasConnectorFactory
 
     public UnsupportedProtocolFactory(NasConnectionProtocol protocol)
     {
-        if (protocol == NasConnectionProtocol.WebDav)
+        if (protocol is NasConnectionProtocol.WebDav
+            or NasConnectionProtocol.Smb
+            or NasConnectionProtocol.Sftp)
             throw new ArgumentOutOfRangeException(
                 nameof(protocol),
-                "WebDav has a real driver; do not mark it unsupported.");
+                $"{protocol} has a real driver; do not mark it unsupported.");
         _protocol = protocol;
     }
 
     public INasConnector Create(NasConnectionSpec spec, string? plaintextPassword)
     {
         ArgumentNullException.ThrowIfNull(spec);
-        string milestone = _protocol switch
-        {
-            NasConnectionProtocol.Smb => "M7-B",
-            NasConnectionProtocol.Sftp => "M8",
-            _ => "a later milestone",
-        };
         throw new NotSupportedException(
-            $"{_protocol} driver lands in {milestone}; not implemented yet.");
+            $"{_protocol} driver is not implemented yet.");
     }
 }
