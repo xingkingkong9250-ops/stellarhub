@@ -108,14 +108,13 @@ public partial class App : Application
             // M5-G: persistent download queue (NAS→local with resume + retry).
             var userIdentity = new UserIdentityService();
 
-            // 多协议路由工厂。WebDav + SMB 子工厂为真实实现；SFTP 子工厂用
-            // UnsupportedProtocolFactory 占位（Create 抛 NotSupportedException）。
-            // M8 将替换 SFTP 占位为 SftpConnectorFactory。
+            // 多协议路由工厂。WebDav + SMB + SFTP 三个子工厂均为真实实现
+            // （M9-B 起 SFTP 走 SSH.NET，热切 + 主机密钥校验）。
             // DownloadQueueService 与 ServiceRegistry 共享同一无状态工厂实例。
             var nasFactory = new NasConnectorFactory(
                 new WebDavConnectorFactory(),
                 new SmbConnectorFactory(),
-                new UnsupportedProtocolFactory(NasConnectionProtocol.Sftp));
+                new SftpConnectorFactory());
             var downloadQueue = new DownloadQueueService(
                 _database, nasFactory, settings,
                 userIdentity, imageQuery, WriteLog);
