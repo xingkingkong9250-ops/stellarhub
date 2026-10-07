@@ -115,6 +115,52 @@ public sealed class AppSettingsService
             next => _settings.ShowSourceBadge = next);
     }
 
+    // ─── Login credentials (W5) ───────────────────────────────────────────
+
+    /// <summary>W5-4: 记住的登录用户名（明文，用户名本身非敏感）；null=未记住。</summary>
+    public string? RememberedLoginUsername
+    {
+        get => _settings.RememberedLoginUsername;
+        set => SetAndSave(value,
+            () => _settings.RememberedLoginUsername,
+            next => _settings.RememberedLoginUsername = next);
+    }
+
+    /// <summary>
+    /// W5-5: 加密并持久化记住的登录密码。null/空串清除记录；DPAPI 失败时
+    /// 不写入并记日志。明文不出现在 config.json 或日志中。
+    /// </summary>
+    public void SetRememberedLoginPassword(string? plaintext)
+    {
+        if (string.IsNullOrEmpty(plaintext))
+        {
+            SetAndSave<string?>(null,
+                () => _settings.RememberedLoginPassword,
+                next => _settings.RememberedLoginPassword = next);
+            return;
+        }
+        string? encrypted = DpApiProtector.Protect(plaintext);
+        if (encrypted is null)
+        {
+            _log("[SETTINGS] DPAPI protect failed; remembered login password not saved.");
+            return;
+        }
+        SetAndSave(encrypted,
+            () => _settings.RememberedLoginPassword,
+            next => _settings.RememberedLoginPassword = next);
+    }
+
+    /// <summary>
+    /// W5-5: 解密返回记住的登录密码明文，未记录或解密失败返回 null。
+    /// 调用方绝不能记录返回值。
+    /// </summary>
+    public string? GetRememberedLoginPassword()
+        => DpApiProtector.Unprotect(_settings.RememberedLoginPassword);
+
+    /// <summary>W5-5: 是否存在已记录（加密）的登录密码。</summary>
+    public bool HasRememberedLoginPassword
+        => !string.IsNullOrEmpty(_settings.RememberedLoginPassword);
+
     public string GalleryViewMode
     {
         get => _settings.GalleryViewMode;

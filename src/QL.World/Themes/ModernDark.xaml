@@ -19,6 +19,7 @@
     <Color x:Key="TextPrimary">#FFFFFF</Color>
     <Color x:Key="TextSecondary">#A8A8B3</Color> <!-- Re-using from Dark.xaml for now -->
     <Color x:Key="TextMuted">#8A8B90</Color>
+    <Color x:Key="TextOnAccent">#FFFFFF</Color>
 
     <!-- Accent -->
     <Color x:Key="Accent">#7C5CFF</Color>
@@ -27,7 +28,14 @@
 
     <!-- Status -->
     <Color x:Key="Danger">#FF5A52</Color>
+    <Color x:Key="DangerBg">#3B1410</Color>
     <Color x:Key="Warning">#FFB020</Color>
+    <Color x:Key="WarningBg">#3B2A05</Color>
+    <Color x:Key="TextOnWarning">#2A1D00</Color>
+
+    <!-- Overlay (aligned with Dark.xaml keys so all theme dictionaries are interchangeable) -->
+    <Color x:Key="Overlay">#CC17171C</Color>
+    <Color x:Key="TextOnOverlay">#E6E6EC</Color>
 
     <!-- Brushes -->
     <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource Background}" />
@@ -40,11 +48,17 @@
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimary}" />
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondary}" />
     <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMuted}" />
+    <SolidColorBrush x:Key="TextOnAccentBrush" Color="{StaticResource TextOnAccent}" />
     <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource Accent}" />
     <SolidColorBrush x:Key="AccentDimBrush" Color="{StaticResource AccentDim}" />
     <SolidColorBrush x:Key="AccentBgBrush" Color="{StaticResource AccentBg}" />
     <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource Danger}" />
+    <SolidColorBrush x:Key="DangerBgBrush" Color="{StaticResource DangerBg}" />
     <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource Warning}" />
+    <SolidColorBrush x:Key="WarningBgBrush" Color="{StaticResource WarningBg}" />
+    <SolidColorBrush x:Key="TextOnWarningBrush" Color="{StaticResource TextOnWarning}" />
+    <SolidColorBrush x:Key="OverlayBrush" Color="{StaticResource Overlay}" />
+    <SolidColorBrush x:Key="TextOnOverlayBrush" Color="{StaticResource TextOnOverlay}" />
 
     <!-- Gradient Accent Brush -->
     <LinearGradientBrush x:Key="AccentGradientBrush" StartPoint="0,0" EndPoint="1,1">

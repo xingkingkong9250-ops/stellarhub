@@ -162,10 +162,10 @@ public sealed class AiAnalysisService
         // Tags (manual rows are protected by TagService).
         if (result.Tags.Count > 0)
         {
-            var tagList = result.Tags.Select(t => t.Tag).ToList();
-            _tags.AddTags([imageId], tagList, TagSource.Ai);
-            // TODO: confidence storage — image_tags.confidence column exists;
-            // current AddTags applies a single confidence. Store per-tag in M3-C refinement.
+            var tagInputs = result.Tags
+                .Select(tag => (tag.Tag, (double?)tag.Confidence))
+                .ToList();
+            _tags.AddTags([imageId], tagInputs, TagSource.Ai);
         }
 
         // Primary category (only when NULL).

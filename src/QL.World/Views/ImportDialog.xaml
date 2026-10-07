@@ -8,6 +8,8 @@
         Width="520" Height="480"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize" MinWidth="460" MinHeight="420"
+        Background="{DynamicResource SurfaceBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
         Title="导入图片到素材库">
 
     <Window.Resources>

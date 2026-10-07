@@ -1,4 +1,5 @@
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using QL.World.Data;
 using QL.World.Helpers;
@@ -35,9 +36,27 @@ public partial class App : Application
     private EventWaitHandle? _gracefulShutdownEvent;
     private RegisteredWaitHandle? _gracefulShutdownRegistration;
 
+    // F-05: current title-bar (DWM) theme; flips together with the resource theme.
+    private bool _isDarkTheme = true;
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int pvAttribute, int cbAttribute);
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // F-05: apply the DWM title-bar theme to every window (existing and future).
+        // Window.SourceInitialized is a CLR event (no RoutedEvent field); Loaded fires
+        // after it, so the HWND already exists here.
+        EventManager.RegisterClassHandler(
+            typeof(Window), FrameworkElement.LoadedEvent,
+            new RoutedEventHandler(OnAnyWindowLoaded));
+
+        // 登录窗是首个显示的窗口，会被 WPF 自动设为 MainWindow；登录成功关闭它时
+        // ShutdownMode=OnMainWindowClose 会连带关闭刚 Show 的 ShellWindow。
+        // 启动期间改为显式关闭，主窗口显示后再恢复。
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         string dataRoot = AppDataRootResolver.ResolveDefault();
         _logDirectory = Path.Combine(dataRoot, AppDataRootResolver.LogsFolderName);
@@ -153,18 +172,24 @@ public partial class App : Application
             services.CurrentUser = currentUser;
 
             SetTheme(settings.Theme);
-
+            WriteLog("[STARTUP] Creating ShellViewModel...");
             _shellViewModel = new ShellViewModel(services);
+            WriteLog("[STARTUP] ShellViewModel created.");
             _shellViewModel.ShowImportDialog += ShowImportDialog;
             _shellViewModel.RequestInputDialog += ShowInputDialog;
             _shellViewModel.ShowSettingsDialog += ShowSettingsDialog;
             _shellViewModel.ShowDownloadQueueDialog += ShowDownloadQueueDialog;
             _shellViewModel.ShowReviewQueueDialog += ShowReviewQueueDialog;
             _shellViewModel.RequestSaveCopyDialog += ShowSaveCopyDialog;
+            WriteLog("[STARTUP] Creating ShellWindow...");
             _shellWindow = new ShellWindow(_shellViewModel);
+            WriteLog("[STARTUP] ShellWindow created. Showing...");
 
             MainWindow = _shellWindow;
             _shellWindow.Show();
+            // 主窗口已显示，恢复「关主窗口即退出」语义。
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
+            WriteLog("[STARTUP] ShellWindow shown.");
         }
         catch (Exception ex)
         {
@@ -398,12 +423,13 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// M6-B + v0.2.1 + v0.3.0 M8-A: 启动登录窗口。系统自动取主 NAS
+    /// M6-B + v0.2.1 + v0.3.0 M8-A + v0.5.0: 启动登录窗口。系统自动取主 NAS
     /// （<see cref="NasConnectionSpec.IsPrimary"/>==<see cref="NasRole.Primary"/>）；
     /// M8-A 起 AppSettingsService.ValidateNasRoles 保证非空列表必含 1 个 Primary，
     /// 因此 FirstOrDefault(IsPrimary) 必中。首次启动检测 accounts.json 为空时
-    /// 自动创建预置管理员 XingKongKong/zzh18254359250 并预填用户名。NAS 配置入口
-    /// 在登录窗口的「打开 NAS 设置」按钮，便于未配置 NAS 时直接进入 A7 页签。
+    /// 自动创建预置管理员 XingKongKong/zzh18254359250 并预填用户名。v0.5.0 起
+    /// NAS 配置入口收敛到登录窗右上角齿轮（W5-6），打开 W3 设置窗口（默认
+    /// A1 常规页，用户可切到 A7 NAS 连接页签）。
     /// </summary>
     private CurrentUser? ShowLoginGate(ServiceRegistry services)
     {
@@ -421,13 +447,16 @@ public partial class App : Application
                 using var probeConnector = services.NasFactory.Create(primarySpec, plaintextPassword: null);
                 var probeStorage = new SharedStorageService(probeConnector);
                 var probeAccounts = new AccountService(probeStorage);
-                var existing = probeStorage.LoadAccountsAsync(CancellationToken.None).GetAwaiter().GetResult();
+                // Task.Run 把 NAS 探测放到线程池线程，避免 UI 线程同步等待
+                // 异步 WebDAV 操作时因 await 未配 ConfigureAwait(false) 而死锁。
+                var existing = Task.Run(() => probeStorage.LoadAccountsAsync(CancellationToken.None))
+                    .GetAwaiter().GetResult();
                 if (existing.Count == 0)
                 {
-                    probeAccounts.InitializeAdminAsync(
+                    Task.Run(() => probeAccounts.InitializeAdminAsync(
                         username: "XingKongKong",
                         defaultPassword: "zzh18254359250",
-                        CancellationToken.None).GetAwaiter().GetResult();
+                        CancellationToken.None)).GetAwaiter().GetResult();
                     WriteLog("[LOGIN] Bootstrap admin 'XingKongKong' created on primary NAS.");
                     presetUsername = "XingKongKong";
                 }
@@ -439,14 +468,14 @@ public partial class App : Application
         }
 
         var loginVm = new LoginViewModel(services.Settings, services.NasFactory, presetUsername);
-        loginVm.NasSettingsRequested += () => OpenNasSettings(services, loginVm);
+        loginVm.SettingsRequested += () => OpenLoginSettings(services, loginVm);
         var loginWindow = new LoginWindow(loginVm);
 
         bool? result = loginWindow.ShowDialog();
         if (result != true)
         {
-            // Local-only mode: no NAS account, shared library disabled.
-            WriteLog("[LOGIN] User chose local-only mode.");
+            // v0.5.0: 登录窗不再有「仅本地模式」按钮——用户直接关窗即本地模式。
+            WriteLog("[LOGIN] User closed login window; entering local-only mode.");
             return null;
         }
 
@@ -507,13 +536,14 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// v0.2.1: 登录窗口「打开 NAS 设置」按钮回调。构造 SettingsViewModel
-    /// （accounts=null / currentUser=null，因未登录；A8 用户管理页签自动隐藏
-    /// 因 IsUserManagementEnabled=false，A7 NAS 页签可见因 IsNasManagementEnabled
-    /// 允许 null currentUser）+ SettingsWindow + SelectNasTab + ShowDialog。
-    /// 关闭后调 loginVm.RefreshNasState() 让登录窗口立即生效新配置。
+    /// v0.5.0: 登录窗角落齿轮（W5-6）回调——打开 W3「基础设置」界面，
+    /// 默认停在 A1 常规页（需配 NAS 时用户自行切到 A7 页签）。仍以未登录
+    /// 身份构造 SettingsViewModel（accounts=null / currentUser=null；A8
+    /// 用户管理页签隐藏因 IsUserManagementEnabled=false，A7 NAS 页签可见
+    /// 因 IsNasManagementEnabled 允许 null currentUser）。关闭后调
+    /// loginVm.RefreshNasState() 让登录窗口立即生效新配置。
     /// </summary>
-    private void OpenNasSettings(ServiceRegistry services, ViewModels.LoginViewModel loginVm)
+    private void OpenLoginSettings(ServiceRegistry services, ViewModels.LoginViewModel loginVm)
     {
         var settingsVm = new ViewModels.SettingsViewModel(
             services.Settings,
@@ -533,7 +563,6 @@ public partial class App : Application
             Owner = null,
             WindowStartupLocation = WindowStartupLocation.CenterScreen
         };
-        window.SelectNasTab();
         window.ShowDialog();
         loginVm.RefreshNasState();
     }
@@ -599,9 +628,8 @@ public partial class App : Application
     /// </summary>
     public void SetTheme(string themeName)
     {
-        string sourcePath = themeName.Equals("Light", StringComparison.OrdinalIgnoreCase)
-            ? "Themes/Light.xaml"
-            : "Themes/Dark.xaml";
+        _isDarkTheme = !themeName.Equals("Light", StringComparison.OrdinalIgnoreCase);
+        string sourcePath = _isDarkTheme ? "Themes/Dark.xaml" : "Themes/Light.xaml";
 
         try
         {
@@ -620,6 +648,38 @@ public partial class App : Application
         {
             System.Diagnostics.Debug.WriteLine(
                 $"[Theme] Failed to load theme {themeName}: {ex.Message}");
+        }
+
+        // F-05: restyle the OS title bar of every currently open window.
+        foreach (Window window in Windows)
+            ApplyTitleBarTheme(window, _isDarkTheme);
+    }
+
+    private void OnAnyWindowLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is Window window)
+            ApplyTitleBarTheme(window, _isDarkTheme);
+    }
+
+    /// <summary>
+    /// F-05: tells DWM to render the window's caption in dark (or light) mode.
+    /// Attribute 20 is used on Windows 11 (build 22000+); 19 on earlier Windows 10/11 builds.
+    /// Cosmetic only — failures are ignored on systems without support.
+    /// </summary>
+    private static void ApplyTitleBarTheme(Window window, bool dark)
+    {
+        try
+        {
+            IntPtr hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+            if (hwnd == IntPtr.Zero) return;
+
+            int attribute = Environment.OSVersion.Version.Build >= 22000 ? 20 : 19;
+            int value = dark ? 1 : 0;
+            DwmSetWindowAttribute(hwnd, attribute, ref value, sizeof(int));
+        }
+        catch
+        {
+            // DWM dark title bar is best-effort.
         }
     }
 

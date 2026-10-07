@@ -9,6 +9,8 @@
         MinWidth="520" MinHeight="300"
         ResizeMode="CanResize"
         WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource SurfaceBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
         Title="下载队列 — 千星汇图">
 
     <Window.Resources>

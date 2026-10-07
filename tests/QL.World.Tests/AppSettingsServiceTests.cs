@@ -124,4 +124,48 @@ public sealed class AppSettingsServiceTests : IDisposable
             "{ broken json",
             File.ReadAllText(Path.Combine(_directory, "config.json")));
     }
+
+    [Fact]
+    public void Remembered_login_username_round_trips_and_clears()
+    {
+        // W5-4: 记住账户用户名明文持久化（用户名本身非敏感）
+        var first = new AppSettingsService(_directory);
+        first.Load();
+        first.RememberedLoginUsername = "XingKongKong";
+
+        var second = new AppSettingsService(_directory);
+        second.Load();
+        Assert.Equal("XingKongKong", second.RememberedLoginUsername);
+
+        second.RememberedLoginUsername = null;
+        var third = new AppSettingsService(_directory);
+        third.Load();
+        Assert.Null(third.RememberedLoginUsername);
+    }
+
+    [Fact]
+    public void Remembered_login_password_is_encrypted_and_round_trips()
+    {
+        // W5-5: 记录密码必须 DPAPI 加密落盘，且可跨实例解密回填
+        var first = new AppSettingsService(_directory);
+        first.Load();
+        first.SetRememberedLoginPassword("s3cret-pass");
+        Assert.True(first.HasRememberedLoginPassword);
+
+        string rawJson = File.ReadAllText(Path.Combine(_directory, "config.json"));
+        Assert.DoesNotContain("s3cret-pass", rawJson);
+        Assert.Contains("rememberedLoginPassword", rawJson);
+
+        var second = new AppSettingsService(_directory);
+        second.Load();
+        Assert.True(second.HasRememberedLoginPassword);
+        Assert.Equal("s3cret-pass", second.GetRememberedLoginPassword());
+
+        second.SetRememberedLoginPassword(null);
+        Assert.False(second.HasRememberedLoginPassword);
+        Assert.Null(second.GetRememberedLoginPassword());
+        var third = new AppSettingsService(_directory);
+        third.Load();
+        Assert.False(third.HasRememberedLoginPassword);
+    }
 }

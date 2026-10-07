@@ -35,10 +35,13 @@ public sealed class AiAnalysisServiceTests : IDisposable
 
         Assert.Equal(1, count);
 
-        // Tags stored with source='ai'.
+        // Tags stored with source='ai' and per-tag confidence.
         var imageTags = tags.GetTagsForImage(id);
         Assert.Equal(2, imageTags.Count);
         Assert.All(imageTags, t => Assert.Equal(TagSource.Ai, t.Source));
+        var tagConfidences = imageTags.ToDictionary(t => t.Tag, t => t.Confidence);
+        Assert.Equal(0.9, tagConfidences["硬表面"]);
+        Assert.Equal(0.8, tagConfidences["机械"]);
 
         // Embedding stored.
         bool hasEmbedding = _lib.Db.Run(conn =>

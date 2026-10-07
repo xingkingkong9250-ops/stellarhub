@@ -76,6 +76,9 @@ public sealed class SubmissionService
         if (!File.Exists(item.FilePath))
             return new SubmissionResult(SubmissionOutcome.MissingLocalFile, string.Empty);
 
+        // 上传前确保共享目录结构存在（WebDAV 不会自动建父目录）
+        await _storage.EnsureSharedStructureAsync(ct).ConfigureAwait(false);
+
         var library = await _library.LoadAsync(ct).ConfigureAwait(false);
         if (library.Any(r => r.Id == item.FileHash))
             return new SubmissionResult(SubmissionOutcome.DuplicateInLibrary, string.Empty);
@@ -190,6 +193,9 @@ public sealed class SubmissionService
     /// </summary>
     public async Task<SharedImageRecord> ApproveAsync(PendingSubmission sub, string approvedBy, CancellationToken ct)
     {
+        // 审核入库前确保共享目录结构存在（originals/ thumbnails/ 父目录）
+        await _storage.EnsureSharedStructureAsync(ct).ConfigureAwait(false);
+
         INasConnector connector = _storage.Connector;
         string prefix = SharedPaths.Prefix(sub.FileHash);
         await connector.MakeDirectoryAsync(

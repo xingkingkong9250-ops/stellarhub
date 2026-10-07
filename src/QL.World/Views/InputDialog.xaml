@@ -7,6 +7,8 @@
         Width="400" SizeToContent="Height"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource SurfaceBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
         Title="{Binding Title, RelativeSource={RelativeSource Self}}">
     <DockPanel Margin="18">
         <Grid DockPanel.Dock="Bottom" Margin="0,12,0,0">

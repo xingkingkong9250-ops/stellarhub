@@ -27,6 +27,9 @@ public sealed class AccountService
     /// </summary>
     public async Task<UserAccount> InitializeAdminAsync(string username, string defaultPassword, CancellationToken ct)
     {
+        // 首次初始化前确保共享目录结构存在（WebDAV PUT 不会自动建父目录）
+        await _storage.EnsureSharedStructureAsync(ct).ConfigureAwait(false);
+
         var accounts = (await _storage.LoadAccountsAsync(ct).ConfigureAwait(false)).ToList();
         if (accounts.Count > 0)
             throw new InvalidOperationException("Accounts already initialized; cannot create bootstrap admin.");

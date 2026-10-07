@@ -12,6 +12,8 @@
         Width="1400" Height="850"
         MinWidth="1100" MinHeight="700"
         WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource BackgroundBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
         Title="{Binding Title}">
 
     <Window.Resources>
@@ -26,8 +28,127 @@
         <conv:BoolToVisibilityConverter x:Key="BoolVis" />
         <conv:NullToVisibilityConverter x:Key="NullVis" />
         <conv:ZeroToVisibilityConverter x:Key="ZeroVis" />
+        <conv:NumericThresholdConverter x:Key="Threshold" />
         <conv:RatingStarBrushConverter x:Key="StarBrush" />
         <conv:HexBrushConverter x:Key="HexBrush" />
+
+        <!-- F-04: responsive top bar — icon-only / shrunken controls under 1500 logical px -->
+        <Style x:Key="CompactScanButton" TargetType="Button" BasedOn="{StaticResource SubtleButtonStyle}">
+            <Setter Property="Content" Value="📡 扫描 NAS" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Window},
+                                               Converter={StaticResource Threshold}, ConverterParameter=1500}" Value="True">
+                    <Setter Property="Content" Value="📡" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="CompactDownloadButton" TargetType="Button" BasedOn="{StaticResource SubtleButtonStyle}">
+            <Setter Property="Content" Value="📥 下载队列" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Window},
+                                               Converter={StaticResource Threshold}, ConverterParameter=1500}" Value="True">
+                    <Setter Property="Content" Value="📥" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="CompactReviewButton" TargetType="Button" BasedOn="{StaticResource SubtleButtonStyle}">
+            <Setter Property="Content" Value="🛡 审核队列" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Window},
+                                               Converter={StaticResource Threshold}, ConverterParameter=1500}" Value="True">
+                    <Setter Property="Content" Value="🛡" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <!-- F-04 (extended): the remaining text buttons on the left also
+             collapse to icons so the two sides never overlap. -->
+        <Style x:Key="CompactImportButton" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+            <Setter Property="Content" Value="＋ 导入图片" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Window},
+                                               Converter={StaticResource Threshold}, ConverterParameter=1500}" Value="True">
+                    <Setter Property="Content" Value="＋" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="CompactAiButton" TargetType="Button" BasedOn="{StaticResource AiButtonStyle}">
+            <Setter Property="Content" Value="AI 分析" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Window},
+                                               Converter={StaticResource Threshold}, ConverterParameter=1500}" Value="True">
+                    <Setter Property="Content" Value="🤖" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="CompactColorButton" TargetType="Button" BasedOn="{StaticResource SubtleButtonStyle}">
+            <Setter Property="Content" Value="分析颜色" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Window},
+                                               Converter={StaticResource Threshold}, ConverterParameter=1500}" Value="True">
+                    <Setter Property="Content" Value="🎨" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <!-- Local/shared scope toggles: text → single glyph.
+             A Setter.Value cannot be a Binding, so swap the ContentTemplate
+             (a DataTemplate is allowed inside a setter) and bind it to Tag. -->
+        <Style x:Key="CompactScopeToggle" TargetType="ToggleButton" BasedOn="{StaticResource ToggleButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Window},
+                                               Converter={StaticResource Threshold}, ConverterParameter=1500}" Value="True">
+                    <Setter Property="ContentTemplate">
+                        <Setter.Value>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </DataTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <!-- Grid/list view toggles: drop the Chinese word, keep the glyph from Tag. -->
+        <Style x:Key="CompactViewToggle" TargetType="ToggleButton" BasedOn="{StaticResource ToggleButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Window},
+                                               Converter={StaticResource Threshold}, ConverterParameter=1500}" Value="True">
+                    <Setter Property="ContentTemplate">
+                        <Setter.Value>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </DataTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <!-- Build/version annotation is non-essential chrome. -->
+        <Style x:Key="CompactVersionText" TargetType="TextBlock">
+            <Setter Property="Visibility" Value="Visible" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Window},
+                                               Converter={StaticResource Threshold}, ConverterParameter=1500}" Value="True">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="CompactHidePanel" TargetType="StackPanel">
+            <Setter Property="Visibility" Value="Visible" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Window},
+                                               Converter={StaticResource Threshold}, ConverterParameter=1500}" Value="True">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="CompactSearchBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Width" Value="240" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Window},
+                                               Converter={StaticResource Threshold}, ConverterParameter=1500}" Value="True">
+                    <Setter Property="Width" Value="140" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
 
         <!-- U3-A (§4.B.2): B1-5 attribute filter chip — accent when active -->
         <Style x:Key="FilterChipStyle" TargetType="Button" BasedOn="{StaticResource ChipButtonStyle}">
@@ -272,64 +393,56 @@
                                Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                     <TextBlock Text="素材库" Margin="10,2,0,0" FontSize="11"
                                Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
-                    <Button Margin="16,0,0,0" Style="{StaticResource AccentButtonStyle}"
-                            Content="＋ 导入图片" Command="{Binding TopBar.ImportCommand}" />
+                    <Button Margin="16,0,0,0" Style="{StaticResource CompactImportButton}"
+                            Command="{Binding TopBar.ImportCommand}" />
                     <!-- M5-D N7: scan a NAS library (remote import). -->
-                    <Button Margin="8,0,0,0" Style="{StaticResource SubtleButtonStyle}"
-                            Content="📡 扫描 NAS" ToolTip="扫描已配置的 NAS 连接目录，索引为远程图片"
+                    <Button Margin="8,0,0,0" Style="{StaticResource CompactScanButton}"
+                            ToolTip="扫描已配置的 NAS 连接目录，索引为远程图片"
                             AutomationProperties.Name="扫描NAS"
                             Command="{Binding ScanNasLibraryCommand}" />
-                    <Button Margin="8,0,0,0" Style="{StaticResource AiButtonStyle}"
-                            Content="AI 分析" ToolTip="{Binding TopBar.AiDisabledReason}"
+                    <Button Margin="8,0,0,0" Style="{StaticResource CompactAiButton}"
+                            ToolTip="{Binding TopBar.AiDisabledReason}"
                             Command="{Binding TopBar.AiCommand}" />
-                    <Button Margin="8,0,0,0" Style="{StaticResource SubtleButtonStyle}"
-                            Content="分析颜色" ToolTip="为缺失主色调的图片批量回填 dominant_colors"
+                    <Button Margin="8,0,0,0" Style="{StaticResource CompactColorButton}"
+                            ToolTip="为缺失主色调的图片批量回填 dominant_colors"
                             Command="{Binding TopBar.ColorCommand}" />
                     <!-- M5-G: open the persistent download queue window. -->
-                    <Button Margin="8,0,0,0" Style="{StaticResource SubtleButtonStyle}"
-                            Content="📥 下载队列" ToolTip="打开下载队列（NAS→本地，支持续传/重试）"
+                    <Button Margin="8,0,0,0" Style="{StaticResource CompactDownloadButton}"
+                            ToolTip="打开下载队列（NAS→本地，支持续传/重试）"
                             AutomationProperties.Name="下载队列"
                             Command="{Binding ShowDownloadQueueCommand}" />
                     <!-- U6-C: 管理员审核队列入口（含 pending 角标） -->
                     <Grid Margin="8,0,0,0"
                           Visibility="{Binding IsReviewAvailable, Converter={StaticResource BoolVis}}">
-                        <Button x:Name="ReviewQueueButton" Style="{StaticResource SubtleButtonStyle}"
-                                Content="🛡 审核队列" ToolTip="审核用户提交到共享库的图片"
+                        <Button x:Name="ReviewQueueButton" Style="{StaticResource CompactReviewButton}"
+                                ToolTip="审核用户提交到共享库的图片"
                                 AutomationProperties.Name="审核队列"
                                 Command="{Binding ShowReviewQueueCommand}" />
                         <Border MinWidth="16" Height="16" Padding="4,0"
                                 HorizontalAlignment="Right" VerticalAlignment="Top"
                                 Margin="0,-4,-6,0" CornerRadius="8"
-                                Background="{DynamicResource WarningBrush}">
-                            <TextBlock FontSize="10" FontWeight="Bold" Foreground="White"
+                                Background="{DynamicResource WarningBrush}"
+                                Visibility="{Binding PendingCount, Converter={StaticResource ZeroVis}, ConverterParameter=Invert}">
+                            <TextBlock FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextOnWarningBrush}"
                                        Text="{Binding PendingCount}"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding PendingCount}" Value="0">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                     </Grid>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
                             VerticalAlignment="Center">
-                    <!-- U2-B (§4.B.1): 最近入库 dropdown -->
-                    <ComboBox Width="118"
-                              ItemsSource="{Binding TopBar.RecentImportOptions}"
-                              DisplayMemberPath="Display"
-                              SelectedValuePath="Days"
-                              SelectedValue="{Binding TopBar.SelectedRecentImport}" />
-                    <Border Width="1" Height="24" Margin="12,0"
-                            Background="{DynamicResource BorderSubtleBrush}" />
-                    <TextBox x:Name="SearchTextBox" Width="240" Height="32"
+                    <!-- U2-B (§4.B.1): 最近入库 dropdown (hidden in compact mode) -->
+                    <StackPanel Style="{StaticResource CompactHidePanel}" Orientation="Horizontal">
+                        <ComboBox Width="118"
+                                  ItemsSource="{Binding TopBar.RecentImportOptions}"
+                                  DisplayMemberPath="Display"
+                                  SelectedValuePath="Days"
+                                  SelectedValue="{Binding TopBar.SelectedRecentImport}" />
+                        <Border Width="1" Height="24" Margin="12,0"
+                                Background="{DynamicResource BorderSubtleBrush}" />
+                    </StackPanel>
+                    <TextBox x:Name="SearchTextBox" Style="{StaticResource CompactSearchBox}" Height="32"
                              AutomationProperties.Name="SearchBox"
                              VerticalContentAlignment="Center"
                              Text="{Binding TopBar.SearchText, UpdateSourceTrigger=PropertyChanged}"
@@ -346,25 +459,25 @@
                     <!-- U6-A B1-SCOPE: 本地库/共享库切换（仅 NAS 登录可见） -->
                     <StackPanel Orientation="Horizontal"
                                 Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}">
-                        <ToggleButton Style="{StaticResource ToggleButtonStyle}"
+                        <ToggleButton Style="{StaticResource CompactScopeToggle}"
                                       IsChecked="{Binding IsLocalScope}"
-                                      Content="本地库" ToolTip="本地图片库" />
-                        <ToggleButton Style="{StaticResource ToggleButtonStyle}" Margin="4,0,0,0"
+                                      Content="本地库" Tag="💻" ToolTip="本地图片库" />
+                        <ToggleButton Style="{StaticResource CompactScopeToggle}" Margin="4,0,0,0"
                                       IsChecked="{Binding IsSharedScope, Mode=OneWay}"
                                       Command="{Binding SwitchToSharedCommand}"
-                                      Content="共享库" ToolTip="NAS 共享图库" />
+                                      Content="共享库" Tag="☁️" ToolTip="NAS 共享图库" />
                     </StackPanel>
 
                     <Border Width="1" Height="24" Margin="12,0"
                             Background="{DynamicResource BorderSubtleBrush}"
                             Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}" />
 
-                    <ToggleButton Style="{StaticResource ToggleButtonStyle}"
+                    <ToggleButton Style="{StaticResource CompactViewToggle}"
                                   IsChecked="{Binding TopBar.IsGridView}"
-                                  Content="▦ 网格" ToolTip="网格视图" />
-                    <ToggleButton Style="{StaticResource ToggleButtonStyle}" Margin="4,0,0,0"
+                                  Content="▦ 网格" Tag="▦" ToolTip="网格视图" />
+                    <ToggleButton Style="{StaticResource CompactViewToggle}" Margin="4,0,0,0"
                                   IsChecked="{Binding Gallery.IsListView}"
-                                  Content="≡ 列表" ToolTip="列表视图" />
+                                  Content="≡ 列表" Tag="≡" ToolTip="列表视图" />
 
                     <Border Width="1" Height="24" Margin="12,0"
                             Background="{DynamicResource BorderSubtleBrush}" />
@@ -436,7 +549,7 @@
                     <Button Style="{StaticResource SubtleButtonStyle}" Content="⚙" Margin="4,0,0,0"
                             ToolTip="设置（M2 开放）"
                             Command="{Binding TopBar.SettingsCommand}" />
-                    <TextBlock Text="{Binding VersionText}" Margin="10,0,0,0"
+                    <TextBlock Text="{Binding VersionText}" Margin="10,0,0,0" Style="{StaticResource CompactVersionText}"
                                Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
                 </StackPanel>
             </Grid>
@@ -726,11 +839,11 @@
                                  VirtualizingPanel.IsVirtualizing="True"
                                  VirtualizingPanel.VirtualizationMode="Recycling"
                                  VirtualizingPanel.ScrollUnit="Pixel"
-                                 Visibility="{Binding DataContext.IsLocalScope, RelativeSource={RelativeSource AncestorType=Window}}"
+                                 Visibility="{Binding DataContext.IsLocalScope, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolVis}}"
                                  SelectionChanged="GalleryList_SelectionChanged"
                                  MouseDoubleClick="GalleryList_MouseDoubleClick">
                             <ListBox.Style>
-                                <Style TargetType="ListBox">
+                                <Style TargetType="ListBox" BasedOn="{StaticResource {x:Type ListBox}}">
                                     <Setter Property="ItemsPanel" Value="{StaticResource GridPanelTemplate}" />
                                     <Setter Property="ItemTemplate" Value="{StaticResource GridCardTemplate}" />
                                     <Style.Triggers>
@@ -806,10 +919,10 @@
                                  VirtualizingPanel.IsVirtualizing="True"
                                  VirtualizingPanel.VirtualizationMode="Recycling"
                                  VirtualizingPanel.ScrollUnit="Pixel"
-                                 Visibility="{Binding DataContext.IsSharedScope, RelativeSource={RelativeSource AncestorType=Window}}"
+                                 Visibility="{Binding DataContext.IsSharedScope, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolVis}}"
                                  SelectionChanged="SharedGalleryList_SelectionChanged">
                             <ListBox.Style>
-                                <Style TargetType="ListBox">
+                                <Style TargetType="ListBox" BasedOn="{StaticResource {x:Type ListBox}}">
                                     <Setter Property="ItemsPanel" Value="{StaticResource GridPanelTemplate}" />
                                     <Setter Property="ItemTemplate" Value="{StaticResource GridCardTemplate}" />
                                     <Style.Triggers>
@@ -823,7 +936,7 @@
                         </ListBox>
 
                         <!-- U6-A: 共享库空提示 -->
-                        <Border Visibility="{Binding DataContext.IsSharedScope, RelativeSource={RelativeSource AncestorType=Window}}">
+                        <Border Visibility="{Binding DataContext.IsSharedScope, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolVis}}">
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
                                         Visibility="{Binding SharedGallery.Items.Count, Converter={StaticResource ZeroVis}}">
                                 <TextBlock Text="共享库中还没有图片" FontSize="18" FontWeight="SemiBold"
@@ -834,7 +947,7 @@
                         </Border>
 
                         <!-- Empty library hint -->
-                        <Border Visibility="{Binding DataContext.IsLocalScope, RelativeSource={RelativeSource AncestorType=Window}}">
+                        <Border Visibility="{Binding DataContext.IsLocalScope, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolVis}}">
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
                                         Visibility="{Binding Gallery.Items.Count, Converter={StaticResource ZeroVis}}">
                                 <TextBlock Text="图库还是空的" FontSize="18" FontWeight="SemiBold"

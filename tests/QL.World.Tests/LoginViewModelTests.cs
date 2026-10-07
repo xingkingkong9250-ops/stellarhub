@@ -8,11 +8,12 @@ using QL.World.ViewModels;
 namespace QL.World.Tests;
 
 /// <summary>
-/// M6-B + v0.2.1: LoginViewModel tests. v0.2.1 起登录窗口不再让用户选
-/// NAS——系统自动取主 NAS（IsPrimary=true 优先，无主取第一个），所以
-/// 测试不再覆盖 SelectedConnection；改成测主 NAS 解析 + 预填用户名 +
-/// CanLogin 联动。FakeNasFactory 接受外部 InMemoryNasConnector 实例，让
-/// 测试可以预置 admin 账号。
+/// M6-B + v0.2.1 + v0.5.0: LoginViewModel tests. v0.2.1 起登录窗口不再让
+/// 用户选 NAS——系统自动取主 NAS（IsPrimary=true 优先，无主取第一个），
+/// 测试覆盖主 NAS 解析 + 预填用户名 + CanLogin 联动。v0.5.0 起增加
+/// W5-4/W5-5 记住账户/记录密码（DPAPI）回填、勾选级联与登录成功落盘/
+/// 清除，以及角落齿轮设置事件。FakeNasFactory 接受外部 InMemoryNasConnector
+/// 实例，让测试可以预置 admin 账号。
 /// </summary>
 public sealed class LoginViewModelTests
 {
@@ -108,28 +109,151 @@ public sealed class LoginViewModelTests
     }
 
     [Fact]
-    public void LocalModeCommand_raises_event()
+    public void OpenSettingsCommand_raises_event()
     {
+        // v0.5.0: 角落齿轮（W5-6）打开设置窗口的事件桥接
         var (vm, _, _) = CreateSut();
         bool raised = false;
-        vm.LocalModeRequested += () => raised = true;
+        vm.SettingsRequested += () => raised = true;
 
-        vm.LocalModeCommand.Execute(null);
+        vm.OpenSettingsCommand.Execute(null);
 
         Assert.True(raised);
     }
 
     [Fact]
-    public void OpenNasSettingsCommand_raises_event()
+    public void Ctor_prefills_remembered_username_and_flags()
     {
-        // v0.2.1: 未登录场景下打开 NAS 设置入口的事件桥接
+        // v0.5.0 W5-4/W5-5: 模拟上一次登录勾选了记住账户 + 记录密码
+        var connector = new InMemoryNasConnector();
+        var settings = new AppSettingsService(Path.Combine(Path.GetTempPath(), $"stellarhub_login_{Guid.NewGuid():N}"));
+        settings.SetNasConnections(new[]
+        {
+            new NasConnectionSpec
+            {
+                Id = 1, Name = "Test NAS", Host = "nas.test",
+                Protocol = NasConnectionProtocol.WebDav, IsPrimary = true,
+            },
+        });
+        settings.RememberedLoginUsername = "stored-user";
+        settings.SetRememberedLoginPassword("stored-pass");
+
+        var vm = new LoginViewModel(settings, new FakeNasFactory(connector));
+
+        Assert.Equal("stored-user", vm.Username);
+        Assert.True(vm.RememberAccount);
+        Assert.True(vm.RememberPassword);
+        Assert.Equal("stored-pass", vm.GetRememberedPasswordForPrefill());
+    }
+
+    [Fact]
+    public void Ctor_without_remembered_credentials_leaves_boxes_clean()
+    {
         var (vm, _, _) = CreateSut();
-        bool raised = false;
-        vm.NasSettingsRequested += () => raised = true;
 
-        vm.OpenNasSettingsCommand.Execute(null);
+        Assert.Equal(string.Empty, vm.Username);
+        Assert.False(vm.RememberAccount);
+        Assert.False(vm.RememberPassword);
+        Assert.Null(vm.GetRememberedPasswordForPrefill());
+    }
 
-        Assert.True(raised);
+    [Fact]
+    public void Checking_remember_password_forces_remember_account()
+    {
+        var (vm, _, _) = CreateSut();
+
+        vm.RememberPassword = true;
+
+        Assert.True(vm.RememberAccount);
+    }
+
+    [Fact]
+    public void Unchecking_remember_account_clears_remember_password()
+    {
+        var (vm, _, _) = CreateSut();
+        vm.RememberPassword = true;
+        Assert.True(vm.RememberAccount);
+
+        vm.RememberAccount = false;
+
+        Assert.False(vm.RememberPassword);
+    }
+
+    [Fact]
+    public async Task Successful_login_persists_credentials_when_both_checked()
+    {
+        var (vm, settings, connector) = CreateSut();
+        var storage = new SharedStorageService(connector);
+        var accounts = new AccountService(storage);
+        await accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None);
+        vm.Username = "admin";
+        vm.RememberAccount = true;
+        vm.RememberPassword = true;
+
+        await vm.LoginAsync("admin123");
+
+        Assert.Equal("admin", settings.RememberedLoginUsername);
+        Assert.True(settings.HasRememberedLoginPassword);
+        Assert.Equal("admin123", settings.GetRememberedLoginPassword());
+
+        // 模拟重启：新 ViewModel 从同一 settings 回填
+        var reopened = new LoginViewModel(settings, new FakeNasFactory(connector));
+        Assert.Equal("admin", reopened.Username);
+        Assert.True(reopened.RememberAccount);
+        Assert.True(reopened.RememberPassword);
+        Assert.Equal("admin123", reopened.GetRememberedPasswordForPrefill());
+    }
+
+    [Fact]
+    public async Task Successful_login_persists_username_only_when_only_account_checked()
+    {
+        var (vm, settings, connector) = CreateSut();
+        var storage = new SharedStorageService(connector);
+        var accounts = new AccountService(storage);
+        await accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None);
+        vm.Username = "admin";
+        vm.RememberAccount = true;
+        Assert.False(vm.RememberPassword);
+
+        await vm.LoginAsync("admin123");
+
+        Assert.Equal("admin", settings.RememberedLoginUsername);
+        Assert.False(settings.HasRememberedLoginPassword);
+    }
+
+    [Fact]
+    public async Task Successful_login_without_remember_clears_previously_stored_credentials()
+    {
+        var (vm, settings, connector) = CreateSut();
+        // 模拟历史上记住过凭据，用户本次取消勾选
+        settings.RememberedLoginUsername = "old-user";
+        settings.SetRememberedLoginPassword("old-pass");
+        vm = new LoginViewModel(settings, new FakeNasFactory(connector));
+        Assert.True(vm.RememberAccount);
+        vm.RememberAccount = false;
+
+        var storage = new SharedStorageService(connector);
+        var accounts = new AccountService(storage);
+        await accounts.InitializeAdminAsync("admin", "admin123", CancellationToken.None);
+        vm.Username = "admin";
+        await vm.LoginAsync("admin123");
+
+        Assert.Null(settings.RememberedLoginUsername);
+        Assert.False(settings.HasRememberedLoginPassword);
+    }
+
+    [Fact]
+    public async Task Failed_login_does_not_persist_credentials()
+    {
+        var (vm, settings, _) = CreateSut();
+        vm.Username = "nobody";
+        vm.RememberAccount = true;
+        vm.RememberPassword = true;
+
+        await vm.LoginAsync("wrong");
+
+        Assert.Null(settings.RememberedLoginUsername);
+        Assert.False(settings.HasRememberedLoginPassword);
     }
 
     [Fact]

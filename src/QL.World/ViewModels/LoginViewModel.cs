@@ -1,4 +1,3 @@
-using System.Windows;
 using QL.World.Helpers;
 using QL.World.Models;
 using QL.World.Services;
@@ -7,33 +6,46 @@ using QL.World.Services.Nas;
 namespace QL.World.ViewModels;
 
 /// <summary>
-/// v0.2.1 起：登录窗口不再让用户选 NAS——系统自动取主 NAS（IsPrimary=true
-/// 的连接，无主则取列表第一个）。NAS 配置入口移到 W3/A7 设置界面，由
-/// 管理员维护。登录窗口新增「打开 NAS 设置」入口，便于首次启动未配 NAS
-/// 时直接进入 A7 页签配置。
+/// 登录窗口（W5）ViewModel。系统自动取主 NAS（IsPrimary=true 的连接，
+/// 无主则取列表第一个）。NAS 配置入口收敛到窗口右上角齿轮（W5-6），
+/// 由 App.xaml.cs 打开 W3 设置窗口。用户直接关窗即进入仅本地模式
+/// （ShowDialog 返回非 true）。
+///
+/// v0.5.0 起支持「记住账户」（W5-4，持久化用户名）与「记录密码」
+/// （W5-5，密码经 DPAPI CurrentUser 加密落 config.json），登录成功后
+/// 按勾选状态写入/清除；启动时自动回填。
 ///
 /// 启动时若检测到主 NAS 可达但 accounts.json 为空，App.xaml.cs 会自动
 /// 创建预置管理员账号（XingKongKong）并把用户名预填到 <see cref="Username"/>。
 /// </summary>
 public sealed class LoginViewModel : ObservableObject
 {
+    private const string NoNasHint = "尚未配置 NAS 连接，请点右上角齿轮在「NAS 连接」页签配置主 NAS。";
+
     private readonly AppSettingsService _settings;
     private readonly INasConnectorFactory _nasFactory;
 
-    private string _username = string.Empty;
+    private string _username;
     private string _errorMessage = string.Empty;
     private bool _isBusy;
     private bool _hasNasConnection;
+    private bool _rememberAccount;
+    private bool _rememberPassword;
 
     public LoginViewModel(AppSettingsService settings, INasConnectorFactory nasFactory, string? presetUsername = null)
     {
         _settings = settings;
         _nasFactory = nasFactory;
-        _username = presetUsername ?? string.Empty;
+
+        // 首次启动预置管理员优先；否则回填记住的用户名。
+        _username = presetUsername ?? _settings.RememberedLoginUsername ?? string.Empty;
+        _rememberAccount = !string.IsNullOrEmpty(_settings.RememberedLoginUsername);
+        _rememberPassword = _settings.HasRememberedLoginPassword;
+
         // 初始 CanLogin 取决于是否有可用 NAS 连接
         _hasNasConnection = ResolvePrimarySpec() is not null;
         if (!_hasNasConnection)
-            _errorMessage = "尚未配置 NAS 连接，请点「打开 NAS 设置」配置并标记主 NAS 后重启。";
+            _errorMessage = NoNasHint;
     }
 
     public string Username
@@ -58,20 +70,50 @@ public sealed class LoginViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// W5-4: 记住账户。取消勾选时连带取消「记录密码」——没有用户名的
+    /// 密码记录没有意义。
+    /// </summary>
+    public bool RememberAccount
+    {
+        get => _rememberAccount;
+        set
+        {
+            if (SetProperty(ref _rememberAccount, value) && !value && _rememberPassword)
+                RememberPassword = false;
+        }
+    }
+
+    /// <summary>
+    /// W5-5: 记录密码。勾选时连带勾选「记住账户」。
+    /// </summary>
+    public bool RememberPassword
+    {
+        get => _rememberPassword;
+        set
+        {
+            if (SetProperty(ref _rememberPassword, value) && value && !_rememberAccount)
+                RememberAccount = true;
+        }
+    }
+
     /// <summary>登录按钮可用条件：已配置 NAS 且未在登录中。</summary>
     public bool CanLogin => _hasNasConnection && !IsBusy;
 
     /// <summary>Raised when authentication succeeds. Carries the new session context.</summary>
     public event Action<CurrentUser>? LoginSucceeded;
 
-    /// <summary>Raised when the user chooses local-only mode (no NAS account).</summary>
-    public event Action? LocalModeRequested;
+    /// <summary>Raised when the user clicks the corner gear (W5-6) to open settings.</summary>
+    public event Action? SettingsRequested;
 
-    /// <summary>Raised when the user clicks「打开 NAS 设置」(未登录也可开 A7 页签)。</summary>
-    public event Action? NasSettingsRequested;
+    public RelayCommand OpenSettingsCommand => new(() => SettingsRequested?.Invoke());
 
-    public RelayCommand LocalModeCommand => new(() => LocalModeRequested?.Invoke());
-    public RelayCommand OpenNasSettingsCommand => new(() => NasSettingsRequested?.Invoke());
+    /// <summary>
+    /// View 启动时调用一次：若勾选了「记录密码」，取回明文供 PasswordBox
+    /// 回填；未记录返回 null。明文只在 View 事件中短暂存在，不做绑定属性。
+    /// </summary>
+    public string? GetRememberedPasswordForPrefill()
+        => _rememberPassword ? _settings.GetRememberedLoginPassword() : null;
 
     /// <summary>
     /// 主 NAS 解析：IsPrimary=true 的优先；无主则取列表第一个；列表空返回 null。
@@ -81,7 +123,7 @@ public sealed class LoginViewModel : ObservableObject
             ?? _settings.NasConnections.FirstOrDefault();
 
     /// <summary>
-    /// v0.2.1: App.xaml.cs 在「打开 NAS 设置」窗口关闭后调用——重读
+    /// v0.2.1: App.xaml.cs 在设置窗口关闭后调用——重读
     /// settings.NasConnections + 更新 CanLogin + 错误提示。让用户配好 NAS
     /// 后无需重启即可直接登录。
     /// </summary>
@@ -89,7 +131,7 @@ public sealed class LoginViewModel : ObservableObject
     {
         _hasNasConnection = ResolvePrimarySpec() is not null;
         if (!_hasNasConnection)
-            ErrorMessage = "尚未配置 NAS 连接，请点「打开 NAS 设置」配置并标记主 NAS 后重启。";
+            ErrorMessage = NoNasHint;
         else if (string.IsNullOrEmpty(ErrorMessage) == false
                  && ErrorMessage.StartsWith("尚未配置 NAS", StringComparison.Ordinal))
             ErrorMessage = string.Empty;
@@ -101,7 +143,7 @@ public sealed class LoginViewModel : ObservableObject
         var spec = ResolvePrimarySpec();
         if (spec is null)
         {
-            ErrorMessage = "尚未配置 NAS 连接，请点「打开 NAS 设置」配置。";
+            ErrorMessage = NoNasHint;
             return;
         }
         if (string.IsNullOrWhiteSpace(Username))
@@ -130,6 +172,7 @@ public sealed class LoginViewModel : ObservableObject
                 return;
             }
 
+            PersistCredentials(Username.Trim(), password);
             LoginSucceeded?.Invoke(new CurrentUser(account.Username, account.Role, spec.Id));
         }
         catch (Exception ex)
@@ -139,6 +182,24 @@ public sealed class LoginViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// W5-4/W5-5: 仅在登录成功后落盘。记住账户→存用户名；记录密码→DPAPI
+    /// 加密存密码；未勾选则清除对应字段（取消账户同时清除密码）。
+    /// </summary>
+    private void PersistCredentials(string username, string password)
+    {
+        if (RememberAccount)
+        {
+            _settings.RememberedLoginUsername = username;
+            _settings.SetRememberedLoginPassword(RememberPassword ? password : null);
+        }
+        else
+        {
+            _settings.SetRememberedLoginPassword(null);
+            _settings.RememberedLoginUsername = null;
         }
     }
 }

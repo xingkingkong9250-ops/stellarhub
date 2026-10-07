@@ -5,9 +5,11 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:conv="clr-namespace:QL.World.Views.Converters"
         mc:Ignorable="d"
-        Width="420" Height="320"
+        Width="400" Height="360"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource SurfaceBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
         Title="登录 — 千星汇图">
 
     <Window.Resources>
@@ -15,13 +17,14 @@
     </Window.Resources>
 
     <Grid Background="{DynamicResource BackgroundBrush}">
-        <Grid Margin="28,24">
+        <Grid Margin="28,22">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
@@ -30,12 +33,12 @@
                        Text="千星汇图" FontSize="20" FontWeight="Bold"
                        Foreground="{DynamicResource AccentBrush}"
                        HorizontalAlignment="Center" />
-            <TextBlock Grid.Row="1" Margin="0,4,0,20"
+            <TextBlock Grid.Row="1" Margin="0,4,0,18"
                        Text="请登录以使用共享图库" FontSize="12"
                        Foreground="{DynamicResource TextMutedBrush}"
                        HorizontalAlignment="Center" />
 
-            <!-- 用户名 -->
+            <!-- W5-1 用户名 -->
             <TextBlock Grid.Row="2" Text="用户名" FontSize="12"
                        Foreground="{DynamicResource TextSecondaryBrush}" />
             <TextBox Grid.Row="2" Margin="0,18,0,0"
@@ -43,12 +46,53 @@
                      Height="28"
                      Foreground="{DynamicResource TextPrimaryBrush}" />
 
-            <!-- 密码 -->
+            <!-- W5-2 密码（末端显隐切换开关） -->
             <TextBlock Grid.Row="3" Margin="0,12,0,0" Text="密码" FontSize="12"
                        Foreground="{DynamicResource TextSecondaryBrush}" />
-            <PasswordBox x:Name="PasswordBox" Grid.Row="3" Margin="0,30,0,0"
-                         Height="28"
-                         Foreground="{DynamicResource TextPrimaryBrush}" />
+            <Grid Grid.Row="3" Margin="0,30,0,0" Height="28">
+                <!-- Padding 只给出右侧 34px 眼睛让位：垂直/左内边距由全局
+                     模板 Border 统一承担（见 Generic.xaml TextBox 样式说明）。 -->
+                <PasswordBox x:Name="PasswordBox"
+                             Padding="0,0,34,0"
+                             PasswordChanged="OnPasswordChanged" />
+                <TextBox x:Name="PasswordPlainBox"
+                         Padding="0,0,34,0"
+                         Visibility="Collapsed"
+                         TextChanged="OnPasswordPlainTextChanged" />
+                <ToggleButton x:Name="PasswordVisibilityToggle"
+                              HorizontalAlignment="Right"
+                              Width="32" Height="28" Padding="0"
+                              Style="{StaticResource ToggleButtonStyle}"
+                              ToolTip="显示密码"
+                              Checked="OnPasswordVisibleChanged"
+                              Unchecked="OnPasswordVisibleChanged">
+                    <Grid Width="15" Height="15">
+                        <Path Stretch="Uniform"
+                              Stroke="{DynamicResource TextSecondaryBrush}"
+                              StrokeThickness="1.6"
+                              Data="M1.5 12 C1.5 12 5.5 5 12 5 C18.5 5 22.5 12 22.5 12 C22.5 12 18.5 19 12 19 C5.5 19 1.5 12 1.5 12 Z" />
+                        <Ellipse Width="4" Height="4"
+                                 Fill="{DynamicResource TextSecondaryBrush}" />
+                        <!-- 勾选（明文态）时叠加斜杠 -->
+                        <Line X1="3" Y1="21" X2="21" Y2="3"
+                              Stroke="{DynamicResource TextSecondaryBrush}"
+                              StrokeThickness="1.6"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round">
+                            <Line.Style>
+                                <Style TargetType="Line">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                                     Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Line.Style>
+                        </Line>
+                    </Grid>
+                </ToggleButton>
+            </Grid>
 
             <!-- 错误消息 -->
             <TextBlock Grid.Row="4" Margin="0,12,0,0"
@@ -58,20 +102,31 @@
                        Visibility="{Binding ErrorMessage, Converter={StaticResource NullVis}}"
                        VerticalAlignment="Top" />
 
-            <!-- 按钮区 -->
-            <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Center">
-                <Button x:Name="LoginButton" Content="登录" Width="96" Height="30" Margin="0,0,8,0"
-                        Click="OnLoginClick"
-                        IsDefault="True"
-                        IsEnabled="{Binding CanLogin}"
-                        Style="{StaticResource AccentButtonStyle}" />
-                <Button Content="打开 NAS 设置" Width="110" Height="30" Margin="8,0,8,0"
-                        Click="OnOpenNasSettingsClick"
-                        Style="{StaticResource SubtleButtonStyle}" />
-                <Button Content="仅本地模式" Width="96" Height="30" Margin="8,0,0,0"
-                        Click="OnLocalModeClick"
-                        Style="{StaticResource SubtleButtonStyle}" />
+            <!-- W5-3 登录按钮 -->
+            <Button x:Name="LoginButton" Grid.Row="5"
+                    Content="登录" Height="32"
+                    Click="OnLoginClick"
+                    IsDefault="True"
+                    IsEnabled="{Binding CanLogin}"
+                    Style="{StaticResource AccentButtonStyle}" />
+
+            <!-- W5-4 记住账户 / W5-5 记录密码 -->
+            <StackPanel Grid.Row="6" Orientation="Horizontal" Margin="0,12,0,0">
+                <CheckBox Content="记住账户" FontSize="12"
+                          IsChecked="{Binding RememberAccount}" />
+                <CheckBox Content="记录密码" FontSize="12" Margin="24,0,0,0"
+                          IsChecked="{Binding RememberPassword}"
+                          ToolTip="密码经 DPAPI 加密后保存在本机 config.json" />
             </StackPanel>
         </Grid>
+
+        <!-- W5-6 角落设置齿轮：打开 W3 基础设置界面 -->
+        <Button x:Name="SettingsGearButton"
+                HorizontalAlignment="Right" VerticalAlignment="Top"
+                Margin="0,6,6,0" Width="30" Height="30" Padding="0"
+                Style="{StaticResource SubtleButtonStyle}"
+                Content="⚙" FontSize="15"
+                ToolTip="设置"
+                Click="OnOpenSettingsClick" />
     </Grid>
 </Window>

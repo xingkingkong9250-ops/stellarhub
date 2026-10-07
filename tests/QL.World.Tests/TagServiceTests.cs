@@ -39,6 +39,27 @@ public sealed class TagServiceTests
     }
 
     [Fact]
+    public void Ai_tag_confidence_is_stored_for_each_tag()
+    {
+        using var library = new TestLibrary();
+        var tags = new TagService(library.Db);
+        long imageId = library.InsertImage();
+
+        tags.AddTags(
+            [imageId],
+            [("metal", (double?)0.91), ("rust", (double?)0.67)],
+            TagSource.Ai);
+
+        var result = tags.GetTagsForImage(imageId);
+        Assert.Equal(2, result.Count);
+        Assert.All(result, tag => Assert.Equal(TagSource.Ai, tag.Source));
+
+        var confidences = result.ToDictionary(tag => tag.Tag, tag => tag.Confidence);
+        Assert.Equal(0.91, confidences["metal"]);
+        Assert.Equal(0.67, confidences["rust"]);
+    }
+
+    [Fact]
     public void Pasted_multi_tag_string_is_split_and_trimmed()
     {
         using var library = new TestLibrary();

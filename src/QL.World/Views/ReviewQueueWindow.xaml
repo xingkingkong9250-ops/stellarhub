@@ -8,6 +8,8 @@
         MinWidth="600" MinHeight="400"
         ResizeMode="CanResize"
         WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource SurfaceBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
         Title="审核队列 — 千星汇图">
 
     <Grid Background="{DynamicResource BackgroundBrush}">

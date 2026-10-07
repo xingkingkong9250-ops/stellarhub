@@ -102,4 +102,17 @@ public sealed class AppSettings
     /// 管理员可在 A7 设置开关；开启后每张共享图带 nas:// 来源标识。
     /// </summary>
     public bool ShowSourceBadge { get; set; } = false;
+
+    // ─── Login (W5) ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// W5-4: 勾选「记住账户」时持久化的登录用户名；未记住为 null。
+    /// </summary>
+    public string? RememberedLoginUsername { get; set; }
+
+    /// <summary>
+    /// W5-5: 勾选「记录密码」时持久化的登录密码（DPAPI CurrentUser 加密的
+    /// Base64）；未记录为 null。明文永不落盘。
+    /// </summary>
+    public string? RememberedLoginPassword { get; set; }
 }

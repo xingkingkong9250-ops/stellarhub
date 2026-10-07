@@ -1,11 +1,36 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="clr-namespace:QL.World.ViewModels">
 
     <!-- ═══════════════════════════════════════════════════════════
          QL World — framework-agnostic base styles (theme independent).
          Theme brushes are consumed via DynamicResource so the theme
          dictionary can be swapped at runtime.
          ═══════════════════════════════════════════════════════════ -->
+
+    <!-- F-03: a ComboBox with only DisplayMemberPath puts the RAW option object
+         into its closed-box content (SelectionBoxItem) with no template, so it
+         fell back to ToString. These implicit per-type templates render the
+         Chinese Display anywhere a ContentPresenter shows these records —
+         including every ComboBox closed box, without touching each control. -->
+    <DataTemplate DataType="{x:Type vm:SearchModeOption}">
+        <TextBlock Text="{Binding Display}" />
+    </DataTemplate>
+    <DataTemplate DataType="{x:Type vm:RecentImportOption}">
+        <TextBlock Text="{Binding Display}" />
+    </DataTemplate>
+    <DataTemplate DataType="{x:Type vm:GallerySortOption}">
+        <TextBlock Text="{Binding Display}" />
+    </DataTemplate>
+    <DataTemplate DataType="{x:Type vm:CategoryOption}">
+        <TextBlock Text="{Binding Display}" />
+    </DataTemplate>
+    <DataTemplate DataType="{x:Type vm:RoleOption}">
+        <TextBlock Text="{Binding Display}" />
+    </DataTemplate>
+    <DataTemplate DataType="{x:Type vm:ThemeOption}">
+        <TextBlock Text="{Binding Display}" />
+    </DataTemplate>
 
     <Style x:Key="RegionLabelStyle" TargetType="TextBlock">
         <Setter Property="FontSize" Value="14" />
@@ -219,7 +244,16 @@
         <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="Padding" Value="8,6" />
+        <!-- NOTE: do NOT set Control.Padding here. Padding is an inheritable
+             property: a value on the TextBox is imposed on the template's
+             ScrollViewer (templated-parent inheritance beats even local
+             values supplied inside the template), and ScrollViewer's own
+             default template applies it AGAIN as its content presenter's
+             Margin — at Height=28 the viewport collapsed to ~2px and glyphs
+             were clipped to an invisible sliver. The visual inset is
+             therefore hard-coded on the wrapping Border below. A control
+             that needs EXTRA room for an overlay may still set Padding with
+             zero vertical components, e.g. Padding="0,0,34,0" (login eye). -->
         <Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
         <Setter Property="SelectionBrush" Value="{DynamicResource AccentBrush}" />
         <Setter Property="Template">
@@ -228,9 +262,42 @@
                     <Border x:Name="border" CornerRadius="6"
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}">
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="8,4">
                         <ScrollViewer x:Name="PART_ContentHost"
-                                      Margin="{TemplateBinding Padding}"
+                                      Focusable="False"
+                                      HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
+                                      VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ─── PasswordBox (same dark chrome as TextBox) ───────────── -->
+
+    <Style TargetType="PasswordBox">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <!-- See the TextBox style above for why Padding must stay unset. -->
+        <Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="SelectionBrush" Value="{DynamicResource AccentBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="PasswordBox">
+                    <Border x:Name="border" CornerRadius="6"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="8,4">
+                        <ScrollViewer x:Name="PART_ContentHost"
                                       Focusable="False"
                                       HorizontalScrollBarVisibility="Hidden"
                                       VerticalScrollBarVisibility="Hidden" />
@@ -238,6 +305,97 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ─── RadioButton ─────────────────────────────────────────── -->
+
+    <Style TargetType="RadioButton">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <StackPanel Orientation="Horizontal" Background="Transparent">
+                        <Border x:Name="circle" Width="16" Height="16" CornerRadius="8"
+                                Background="{DynamicResource SurfaceBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                VerticalAlignment="Center">
+                            <Ellipse x:Name="dot" Width="8" Height="8"
+                                     Fill="{DynamicResource AccentBrush}"
+                                     Visibility="Collapsed" />
+                        </Border>
+                        <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="circle" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            <Setter TargetName="dot" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ─── TabControl / TabItem (dark tabs) ────────────────────── -->
+
+    <Style TargetType="TabControl">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabControl">
+                    <Grid Background="{TemplateBinding Background}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TabPanel Grid.Row="0" IsItemsHost="True"
+                                  Background="Transparent" Margin="0,0,0,6" />
+                        <Border Grid.Row="1" Background="Transparent">
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              ContentSource="SelectedContent" />
+                        </Border>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="TabItem">
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabItem">
+                    <Grid x:Name="root" Background="Transparent" Margin="0,0,2,0">
+                        <Border x:Name="body" CornerRadius="6"
+                                Padding="14,7"
+                                Background="Transparent">
+                            <ContentPresenter ContentSource="Header"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <Border x:Name="underline" Height="2"
+                                VerticalAlignment="Bottom"
+                                Margin="8,0,8,0" CornerRadius="1"
+                                Background="{DynamicResource AccentBrush}"
+                                Visibility="Collapsed" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="body" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                            <Setter TargetName="underline" Property="Visibility" Value="Visible" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

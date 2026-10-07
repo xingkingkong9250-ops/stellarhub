@@ -17,6 +17,9 @@ namespace QL.World.ViewModels;
 /// A5 legacy import & diagnostics, A6 PBR grouping rules, A7 NAS connections.
 /// Every change saves immediately through AppSettingsService.
 /// </summary>
+/// <summary>F-03: A1 theme dropdown item; Value is persisted ("Dark"/"Light"), Display is Chinese.</summary>
+public sealed record ThemeOption(string Value, string Display);
+
 public sealed class SettingsViewModel : ObservableObject
 {
     private readonly AppSettingsService _settings;
@@ -161,7 +164,11 @@ public sealed class SettingsViewModel : ObservableObject
 
     // ─── A1 常规 ────────────────────────────────────────────────────────────
 
-    public IReadOnlyList<string> ThemeOptions { get; } = ["Dark", "Light"];
+    public IReadOnlyList<ThemeOption> ThemeOptions { get; } =
+    [
+        new("Dark", "深色"),
+        new("Light", "浅色"),
+    ];
 
     public string SelectedTheme
     {

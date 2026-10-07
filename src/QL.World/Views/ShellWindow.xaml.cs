@@ -39,6 +39,10 @@ public partial class ShellWindow : Window
         DataContext = viewModel;
 
         Loaded += OnLoaded;
+        Closing += (_, args) =>
+        {
+            App.WriteLog($"[ShellWindow] Closing event. Cancel={args.Cancel}");
+        };
 
         _gridZoomTimer.Tick += (_, _) =>
         {
@@ -65,7 +69,17 @@ public partial class ShellWindow : Window
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         Loaded -= OnLoaded;
-        await _viewModel.InitializeAsync();
+        App.WriteLog("[ShellWindow] OnLoaded, calling InitializeAsync...");
+        try
+        {
+            await _viewModel.InitializeAsync();
+            App.WriteLog("[ShellWindow] InitializeAsync completed.");
+        }
+        catch (Exception ex)
+        {
+            App.WriteLog($"[ShellWindow] InitializeAsync FAILED: {ex}");
+            throw;
+        }
     }
 
     // ─── Gallery endless scroll (M4-D server-side pagination) ─────────────

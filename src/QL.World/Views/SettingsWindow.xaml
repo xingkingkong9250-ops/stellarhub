@@ -9,6 +9,8 @@
         MinWidth="480" MinHeight="560"
         ResizeMode="CanResize"
         WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource SurfaceBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
         Title="设置 — 千星汇图">
 
     <Window.Resources>
@@ -33,7 +35,9 @@
                     <TextBlock Text="主题" Style="{StaticResource SectionCaptionStyle}" />
                     <ComboBox Width="180" HorizontalAlignment="Left" Margin="0,4,0,0"
                               ItemsSource="{Binding ThemeOptions}"
-                              SelectedItem="{Binding SelectedTheme}" />
+                              DisplayMemberPath="Display"
+                              SelectedValuePath="Value"
+                              SelectedValue="{Binding SelectedTheme}" />
                     <TextBlock Text="启动时校验素材库完整性" Margin="0,18,0,0"
                                Foreground="{DynamicResource TextPrimaryBrush}" />
                     <CheckBox Content="每次启动时检查缺失文件与数据库结构"

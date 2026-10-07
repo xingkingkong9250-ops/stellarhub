@@ -9,6 +9,197 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.5.5] — 2026-10-06 v0.5.4 真机验收 7 项缺陷修复（F-01~F-07）
+
+v0.5.4 真机验收（150% 缩放、绿联 NAS 环境）累计登记 6 项缺陷（F-01~F-06），
+回归验证中追加发现第 7 项（F-07）。本版按根因统一修复，7 项全部回归通过。
+
+### 修复
+
+- **F-01 画廊白底（P1）**：ShellWindow 两个画廊 ListBox 的内联 Style 未
+  `BasedOn` 全局 ListBox 样式，Background/Template 回落系统默认白底 + 1px
+  系统边框。修复：补 `BasedOn="{StaticResource {x:Type ListBox}}"`
+- **F-02 空态重叠（P1）**：本地/共享作用域 4 处（两个 ListBox 与两个空态
+  Border）Visibility 绑定 bool 漏 Converter，绑定静默失败恒为 Visible，
+  两套空态文字与列表混显。修复：补 BoolVis 转换器
+- **F-03 ComboBox 闭合框显示 ToString 截断（P2，单点全局修复）**：WPF
+  ComboBox 闭合框的 SelectionBoxItem 放的是原始选项对象，DisplayMemberPath
+  只作用于下拉项容器，闭合框无模板回落 `ToString()`
+  （如 "QL.World.ViewModels.RoleOption"）。ContentTemplate /
+  ContentStringFormat 绑定方案在 .NET 10 实证无效（闭合框
+  SelectionBoxItemTemplate 恒为 null）。最终修法：Generic.xaml 按 DataType
+  为六类选项记录（SearchModeOption / RecentImportOption / GallerySortOption /
+  CategoryOption / RoleOption / ThemeOption）声明隐式 DataTemplate（绑定
+  Display 属性），全部 ComboBox 闭合框统一显示中文，无需逐控件改动
+- **F-04 窄窗顶栏溢出（P2）**：窗口收窄时顶栏右侧 StackPanel 覆盖左侧
+  （总宽超出约 150px），「AI 分析 / 分析颜色 / 搜索模式」被裁切。修复：
+  新增 NumericThresholdConverter，为顶栏 11 类元素定义 <1500 阈值紧凑形态
+  （文字按钮→图标按钮、搜索框 240→140、版本号隐藏等）
+- **F-05 系统标题栏不随主题（P3）**：深色主题下 Windows 系统标题栏仍为
+  白底。修复：App.xaml.cs 全局注册 Window.SourceInitialized 类处理
+  （EventManager.RegisterClassHandler），按当前主题调用 DWM
+  DwmSetWindowAttribute（DWMWA_USE_IMMERSIVE_DARK_MODE，Build≥22000 用
+  属性 20 否则 19）；主题切换时遍历活动窗口即时刷新，深浅双向验证通过
+- **F-06 审核角标空点残留（P2）**：PendingCount=0 时审核角标仍显示为空的
+  琥珀色圆点（Visibility=0 触发器只加在内层 TextBlock，外层 Border 常显）。
+  修复：隐藏逻辑上移到外层 Border（ZeroVis + Invert 参数）
+- **F-07 首次单击详情栏空白（P1，回归验证中新增发现）**：首次单击图片后
+  详情栏仍显示空态，第二次点击才恢复。根因：DetailViewModel.HasSelection
+  setter 漏发 IsSingle 变更通知——首次单选时 IsBatch 恒为 false 不变、其
+  setter 不触发，IsSingle 卡在初始 false，依赖它的绑定与按钮 CanExecute
+  全部失效。修复：HasSelection setter 补 OnPropertyChanged(nameof(IsSingle))
+
+### 变更
+
+- 版本号 0.5.4 → 0.5.5（缺陷修复，修订号 +0.0.1，NO.P 补丁轮次）
+- 7 项修复全部真机回归验证通过（截图证据），问题登记表见
+  docs/release/v0.5.4_真机验收清单.md
+- 无 UI 编号变更；无新增依赖
+
+## [0.5.4] — 2026-10-05 全局窗口撞色修复（基础 UI 文本/背景配色审计）
+
+深色主题下「导入图片到素材库」对话框呈现白色窗口背景 + 深色控件混搭：
+复选框/说明文字（浅色）在白底上不可见。
+
+根因：WPF 隐式样式按**精确类型**查找资源键，`Generic.xaml` 中
+`Style TargetType="{x:Type Window}"` 不会作用于任何 Window 子类
+（ImportDialog/InputDialog/…），故窗口样式从未生效，窗体回落到系统默认白底。
+其中 ImportDialog、InputDialog 的内容根（DockPanel）未自设背景，白底直接外露。
+
+### 修复
+
+- 7 个窗口（Shell/Login/Settings/ReviewQueue/DownloadQueue/ImportDialog/
+  InputDialog）根节点显式绑定 `Background="{DynamicResource SurfaceBrush}"`（主窗口为
+  BackgroundBrush）与 `Foreground="{DynamicResource TextPrimaryBrush}"`
+- ShellWindow 审核队列角标：`Foreground="White"` 硬编码改为
+  `{DynamicResource TextOnWarningBrush}`——深色主题 Warning 为亮琥珀 #FFB020，
+  白字对比度仅 1.8:1（远低于 WCAG AA 4.5:1）
+- 三个主题字典（Dark/Light/ModernDark）新增 `TextOnWarning` 色与画刷
+  （深色主题 #2A1D00 深棕黑，浅色主题 #FFFFFF）
+- ModernDark.xaml 补齐与 Dark/Light 对齐的缺失键：TextOnAccent、DangerBg、
+  WarningBg、Overlay、TextOnOverlay（色 + 画刷），消除主题切换时
+  DynamicResource 静默失效产生黑字黑底的隐患
+
+## [0.5.3] — 2026-10-05 登录成功主窗口闪退修复（ShutdownMode 陷阱）
+
+绿联 NAS 实测：登录成功后主窗口"闪一下"即消失，进程退出。诊断日志显示
+`[STARTUP] ShellWindow shown.` 后立即触发 `Closing event. Cancel=False`。
+
+根因：经典 WPF 登录窗陷阱。`LoginWindow` 是首个显示的窗口，WPF 自动将其设为
+`Application.MainWindow`；登录成功关闭登录窗时，`ShutdownMode="OnMainWindowClose"`
+（App.xaml）判定"主窗口已关闭"触发整个应用 Shutdown，刚 Show 的 ShellWindow
+被强制关闭。此前 NAS 不可达时用户只能关窗进本地模式，走的是同一关闭路径，
+故该 bug 自 M6-B 登录门禁引入后一直被掩盖。
+
+### 修复
+
+- `App.xaml.cs OnStartup`：启动期间 `ShutdownMode = OnExplicitShutdown`，
+  主窗口 `Show()` 后恢复 `OnMainWindowClose`（WPF 登录窗标准处理模式）
+- `App.xaml.cs` / `ShellWindow.xaml.cs`：保留启动链路 WriteLog 诊断日志
+  （ShellViewModel/ShellWindow 创建、OnLoaded/InitializeAsync/Closing），
+  后续启动类问题可直接从 error.log 定位断点
+
+## [0.5.2] — 2026-10-04 NAS 首次初始化目录结构缺失修复 + UI 线程死锁修复
+
+绿联 NAS 实测发现两个阻塞性问题：
+
+**问题 1：NAS 首次初始化目录结构缺失**
+保存主 NAS 连接并测试通过后，NAS 上未自动创建 `StellarHubShared/` 目录结构，
+导致首次启动时预置管理员账号写入失败（WebDAV PUT 不会自动创建父目录，返回
+409 Conflict，且异常被登录流程静默吞掉只写日志）。根因是
+`SharedStorageService.EnsureSharedStructureAsync` 存在但三个关键写入入口均未调用。
+
+**问题 2：UI 线程死锁导致应用启动无响应**
+`ShowLoginGate` 里用 `.GetAwaiter().GetResult()` 在 UI 线程同步等待 NAS 异步操作，
+而 `WebDavNasConnector` 里大部分 `await` 未加 `.ConfigureAwait(false)`，导致经典
+同步上下文死锁（await 完成后试图回到被阻塞的 UI 线程）。表现为窗口不可见、
+error.log 只有 `[BOOT]` 无 `[LOGIN]`、进程卡死。
+
+### 修复
+
+- `AccountService.InitializeAdminAsync`：写入 `accounts.json` 前调用
+  `EnsureSharedStructureAsync`，首次启动自动建目录
+- `SubmissionService.SubmitFromLocalAsync`：上传到 `pending/` 前调用
+  `EnsureSharedStructureAsync`
+- `SubmissionService.ApproveAsync`：审核入库到 `originals/` /
+  `thumbnails/` 前调用 `EnsureSharedStructureAsync`
+- `App.xaml.cs` `ShowLoginGate`：NAS 探测用 `Task.Run` 包裹，避免 UI 线程同步等待死锁
+- `WebDavNasConnector`：全部 24 个 `await` 补 `.ConfigureAwait(false)`，
+  从根本上消除库代码回流 UI 同步上下文的风险
+- `QL.World.csproj`：修复双 BOM 导致 Debug 构建 MSB4025 失败；保留单个 UTF-8 BOM
+  以兼容 PowerShell 5.1 `Get-Content` 编码检测
+
+## [0.5.1] — 2026-10-03 深色主题文字撞色修复（输入框内容不可见 / 设置窗黑底黑字）
+
+用户肉眼复核发现：登录窗两个输入框看不到输入内容；深色主题下多个窗口文字与
+底色撞色，设置窗尤甚。隔离 WPF 渲染探针定位为真实模板缺陷，与抓图/输入法无关。
+
+### 修复
+
+- **TextBox 内容区被垂直裁剪（根因）**：`Control.Padding` 是可继承属性，全局
+  TextBox 模板把 `Padding` 同时作用在 `ScrollViewer.Margin` 与其内部
+  `ScrollContentPresenter`（继承自 TextBox 的 Padding 被 ScrollViewer 默认
+  模板再次应用），Height=28 的输入框内容视口只剩约 2px，文字仅渲染顶部一条
+  细线，150% 缩放下肉眼不可见。模板改为 Border 硬编码 8,4 内边距、不再通过
+  `Control.Padding` 传递（模板父级继承优先级高于模板内赋值，Padding=0
+  阻断无效，已用 A/B/C/D 探针实证）
+- 登录窗 `LoginPasswordBoxStyle`（PasswordBox）存在同样的双 Padding 缺陷；
+  删除该局部样式，登录窗与设置窗（云端 API Key、NAS 密码）统一复用
+  Generic.xaml 新增的全局 PasswordBox 深色样式；密码眼睛让位改用
+  Padding="0,0,34,0"（仅水平分量，不触发垂直裁剪）
+- 新增缺失的全局深色样式，消除设置窗 Aero2 系统外观回落导致的撞色：
+  TabControl / TabItem（透明底、选中态 TextPrimary 文字 + Accent 下划线、
+  悬停 SurfaceHover）、RadioButton（深色圆环、选中 Accent 圆点）、
+  PasswordBox（Surface 底 / TextPrimary 文字 / 聚焦 Accent 描边）
+- TextBox 模板滚动条可见性改为 TemplateBinding，多行框
+  （备注框 VerticalScrollBarVisibility=Auto）恢复可用
+
+### 变更
+
+- 版本号 0.5.0 → 0.5.1（缺陷修复，修订号 +0.0.1）
+- 全量测试仍为 623，全部通过；Release 构建 0 警告 0 错误
+- 无 UI 编号变更（无新增界面元素，仅样式体系修复）；无新增依赖
+
+## [0.5.0] — 2026-10-02 登录窗口改版（密码显隐 / 记住账户 / 记录密码 / 设置齿轮）
+
+按统一布局重做 W5 登录窗口，内容固定为：用户名、密码（末端显隐切换）、
+登录按钮、记住账户、记录密码、右上角设置齿轮。NAS 配置入口由独立按钮
+收敛进齿轮；关闭登录窗口即进入仅本地模式（行为不变，去掉冗余按钮）。
+
+### 新增
+
+- W5-2 密码输入框末端眼睛开关：PasswordBox/TextBox 互换显示，内容双向同步，登录始终读取 PasswordBox.Password；明文态眼睛叠加斜杠并切换 ToolTip
+- W5-4「记住账户」：登录成功把用户名写入 config.json（rememberedLoginUsername），下次启动自动回填
+- W5-5「记录密码」：登录成功把密码经 DPAPI（CurrentUser）加密写入 config.json（rememberedLoginPassword），下次启动解密回填；勾选联动（记录密码自动勾选记住账户，取消记住账户连带取消记录密码）；登录失败不写入，取消勾选时清除历史记录
+- W5-6 右上角齿轮按钮：未登录身份打开 W3 设置窗口（默认 A1 常规页，可切 A7 配 NAS），关闭后刷新 NAS 可用状态
+
+### 变更
+
+- 移除「仅本地模式」按钮——直接关窗（X/Esc）即本地模式；移除「打开 NAS 设置」按钮——功能收敛进 W5-6 齿轮（不再强制跳转 A7 页签）
+- AppSettings / AppSettingsService 新增 RememberedLoginUsername 与 RememberedLoginPassword（Set/Get/Has，DPAPI 复用云端 API Key 同款加密通道）
+- 版本号 0.4.1 → 0.5.0（新增功能，次版本号 +0.1.0，修订号归零）
+- 全量测试 614 → 623（净 +9：LoginViewModel 记住凭据/级联/落盘 8 个新增 -1 个本地模式事件移除 = 净 +7，AppSettingsService 凭据往返 +2；设置事件测试改名）
+- UI 编号：W5 补充 W5-1…W5-6 子编号；无新增依赖
+
+## [0.4.1] — 2026-10-02 AI 标签置信度落库修复
+
+v0.4.0 收尾核验发现：`AiAnalysisResult.Tags` 已携带每个标签各自的 confidence，
+数据库 `image_tags.confidence` 字段与读取模型也已存在，但批量分析落库前把标签
+合并成字符串列表，导致 AI 返回的逐标签置信度统一丢失为 NULL。本补丁补齐写入
+闭环，不改变手动标签保护规则。
+
+### 修复
+
+- `TagService` 新增逐标签 confidence 写入重载，并复用同一条 UPSERT 契约：AI 不得覆盖手动标签的 source/confidence，手动补标签仍可把 AI 行升级为 manual
+- `AiAnalysisService` 批量分析时改为传递 `AiTag.Confidence`，使云端/本地 AI 返回的每个标签独立写入 `image_tags.confidence`
+- 回归测试覆盖同批标签不同置信度（0.91 / 0.67）及批量分析端到端落库（0.9 / 0.8）
+
+### 变更
+
+- 版本号 0.4.0 → 0.4.1（NO.P 补丁，修订号 +0.0.1）
+- 全量测试 613 → 614（+1：TagService 逐标签 confidence）
+- 无 UI 编号变更；无新增依赖
+
 ## [0.4.0] — 2026-09-30 M9 NAS SFTP 协议扩展
 
 v0.3.0 NAS 接入支持 WebDAV 与 SMB，但绿联等成品 NAS 的 SFTP（SSH）通道

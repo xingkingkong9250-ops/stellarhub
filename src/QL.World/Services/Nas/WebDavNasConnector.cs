@@ -43,7 +43,7 @@ public sealed class WebDavNasConnector : INasConnector
         try
         {
             using HttpResponseMessage resp =
-                await SendPropFindAsync(_spec.RootPath, depth: "0", cancellationToken);
+                await SendPropFindAsync(_spec.RootPath, depth: "0", cancellationToken).ConfigureAwait(false);
             // 401/403 here surfaces as AuthFailed inside SendPropFindAsync.
             return true;
         }
@@ -64,8 +64,8 @@ public sealed class WebDavNasConnector : INasConnector
         try
         {
             using HttpResponseMessage resp =
-                await SendPropFindAsync(path, depth: "1", cancellationToken);
-            string body = await resp.Content.ReadAsStringAsync(cancellationToken);
+                await SendPropFindAsync(path, depth: "1", cancellationToken).ConfigureAwait(false);
+            string body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             // Depth:1 returns [root-itself, ...children]; drop the self entry.
             return WebDavResponseParser.ParseMultistatus(
                 body, skipSelf: true, rootPath: path);
@@ -84,8 +84,8 @@ public sealed class WebDavNasConnector : INasConnector
         try
         {
             using HttpResponseMessage resp =
-                await SendPropFindAsync(path, depth: "0", cancellationToken);
-            string body = await resp.Content.ReadAsStringAsync(cancellationToken);
+                await SendPropFindAsync(path, depth: "0", cancellationToken).ConfigureAwait(false);
+            string body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             var list = WebDavResponseParser.ParseMultistatus(body, skipSelf: false, rootPath: path);
             return list.Count == 0
                 ? throw new NasConnectionException(NasConnectionKind.NotFound, $"not found: {path}")
@@ -105,7 +105,7 @@ public sealed class WebDavNasConnector : INasConnector
         try
         {
             // ResponseHeadersRead streams the body instead of buffering it.
-            HttpResponseMessage resp = await SendGetAsync(path, cancellationToken, completionOption: HttpCompletionOption.ResponseHeadersRead);
+            HttpResponseMessage resp = await SendGetAsync(path, cancellationToken, completionOption: HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
             return new ResponseStream(resp); // disposes resp on dispose
         }
         catch (NasConnectionException) { throw; }
@@ -121,15 +121,15 @@ public sealed class WebDavNasConnector : INasConnector
         string path = ResolveRemotePath(remotePath);
         try
         {
-            HttpResponseMessage resp = await SendGetAsync(path, cancellationToken, HttpCompletionOption.ResponseHeadersRead);
+            HttpResponseMessage resp = await SendGetAsync(path, cancellationToken, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
             try
             {
-                await using (Stream network = await resp.Content.ReadAsStreamAsync(cancellationToken))
+                await using (Stream network = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
                 using (Stream file = new FileStream(
                     destinationPath, FileMode.Create, FileAccess.Write, FileShare.None,
                     bufferSize: 81920, useAsync: true))
                 {
-                    await network.CopyToAsync(file, cancellationToken);
+                    await network.CopyToAsync(file, cancellationToken).ConfigureAwait(false);
                 }
             }
             finally { resp.Dispose(); }
@@ -155,7 +155,7 @@ public sealed class WebDavNasConnector : INasConnector
         {
             using HttpRequestMessage first = BuildRangeRequest(path, offset, length);
             (byte[]? firstBytes, HttpStatusCode firstStatus) =
-                await TrySendRangeAsync(first, cancellationToken);
+                await TrySendRangeAsync(first, cancellationToken).ConfigureAwait(false);
 
             // 206 Partial Content → return the body bytes.
             if (firstStatus == HttpStatusCode.PartialContent && firstBytes is not null)
@@ -169,7 +169,7 @@ public sealed class WebDavNasConnector : INasConnector
             {
                 using HttpRequestMessage retry = BuildRangeRequest(path, offset, length);
                 (byte[]? retryBytes, HttpStatusCode retryStatus) =
-                    await TrySendRangeAsync(retry, cancellationToken);
+                    await TrySendRangeAsync(retry, cancellationToken).ConfigureAwait(false);
                 if (retryStatus == HttpStatusCode.PartialContent && retryBytes is not null)
                     return retryBytes;
                 throw new NasConnectionException(
@@ -213,7 +213,7 @@ public sealed class WebDavNasConnector : INasConnector
             using StreamContent content = new(stream);
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             using HttpRequestMessage req = new(HttpMethod.Put, path) { Content = content };
-            using HttpResponseMessage resp = await SendAsync(req, cancellationToken);
+            using HttpResponseMessage resp = await SendAsync(req, cancellationToken).ConfigureAwait(false);
         }
         catch (NasConnectionException) { throw; }
         catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
@@ -229,7 +229,7 @@ public sealed class WebDavNasConnector : INasConnector
         try
         {
             using HttpRequestMessage req = new(new HttpMethod("MKCOL"), path);
-            using HttpResponseMessage resp = await SendAsync(req, cancellationToken);
+            using HttpResponseMessage resp = await SendAsync(req, cancellationToken).ConfigureAwait(false);
             // 405 Method Not Allowed / 301 → directory already exists; idempotent.
             // 409 Conflict → parent missing; surface as NotFound for caller to handle.
         }
@@ -247,7 +247,7 @@ public sealed class WebDavNasConnector : INasConnector
         try
         {
             using HttpRequestMessage req = new(HttpMethod.Delete, path);
-            using HttpResponseMessage resp = await SendAsync(req, cancellationToken);
+            using HttpResponseMessage resp = await SendAsync(req, cancellationToken).ConfigureAwait(false);
             // 404 → already gone; idempotent.
         }
         catch (NasConnectionException) { throw; }
@@ -320,14 +320,14 @@ public sealed class WebDavNasConnector : INasConnector
         using HttpRequestMessage req = new(new HttpMethod("PROPFIND"), path);
         req.Headers.Add("Depth", depth);
         req.Content = new StringContent(WebDavRequestBuilder.BuildPropFindBody(), Encoding.UTF8, "application/xml");
-        HttpResponseMessage resp = await SendAsync(req, cancellationToken);
+        HttpResponseMessage resp = await SendAsync(req, cancellationToken).ConfigureAwait(false);
         return resp; // ownership transferred (already disposed via using above for the request only)
     }
 
     private async Task<HttpResponseMessage> SendGetAsync(string path, CancellationToken cancellationToken, HttpCompletionOption completionOption)
     {
         using HttpRequestMessage req = new(HttpMethod.Get, path);
-        HttpResponseMessage resp = await SendAsync(req, cancellationToken, completionOption);
+        HttpResponseMessage resp = await SendAsync(req, cancellationToken, completionOption).ConfigureAwait(false);
         return resp;
     }
 
@@ -343,7 +343,7 @@ public sealed class WebDavNasConnector : INasConnector
         HttpResponseMessage resp;
         try
         {
-            resp = await _http.SendAsync(request, completionOption, cancellationToken);
+            resp = await _http.SendAsync(request, completionOption, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
@@ -362,7 +362,7 @@ public sealed class WebDavNasConnector : INasConnector
         HttpResponseMessage resp;
         try
         {
-            resp = await _http.SendAsync(request, HttpCompletionOption.ResponseContentRead, cancellationToken);
+            resp = await _http.SendAsync(request, HttpCompletionOption.ResponseContentRead, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
@@ -387,7 +387,7 @@ public sealed class WebDavNasConnector : INasConnector
                     NasConnectionKind.ProtocolError,
                     $"unexpected status {status} for range request");
             }
-            byte[] bytes = await resp.Content.ReadAsByteArrayAsync(cancellationToken);
+            byte[] bytes = await resp.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
             return (bytes, status);
         }
     }

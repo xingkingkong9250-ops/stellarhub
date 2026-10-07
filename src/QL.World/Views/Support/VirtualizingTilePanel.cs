@@ -158,9 +158,18 @@ public sealed class VirtualizingTilePanel : VirtualizingPanel, IScrollInfo
 
     protected override Size ArrangeOverride(Size finalSize)
     {
-        double itemWidth = ItemWidth;
+        // Mirror of the MeasureOverride unbounded guard: a pending arrange can
+        // still reach this panel with an infinite or non-positive width (e.g.
+        // the outgoing panel draining its final layout pass during an
+        // ItemsPanel swap). Fall back to the last measured viewport so the
+        // column math below never casts infinity/NaN into the column count.
+        double arrangeWidth = (double.IsInfinity(finalSize.Width) || finalSize.Width <= 0)
+            ? _viewportSize.Width
+            : finalSize.Width;
+
+        double itemWidth = Math.Max(1, ItemWidth);
         double itemHeight = ItemHeight;
-        int columns = Math.Max(1, (int)(finalSize.Width / itemWidth));
+        int columns = Math.Max(1, (int)(arrangeWidth / itemWidth));
 
         // Same teardown guard as MeasureOverride: the generator is gone while
         // the outgoing panel drains its final layout pass.

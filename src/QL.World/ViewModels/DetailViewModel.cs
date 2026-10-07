@@ -29,6 +29,7 @@ public sealed class DetailViewModel : ObservableObject
     private CategoryOption? _selectedCategory;
     private bool _hasSelection;
     private bool _isBatch;
+    private int _selectedCount;
     private string _saveHint = string.Empty;
     private string _newTagText = string.Empty;
     private string _batchAddTagsText = string.Empty;
@@ -103,6 +104,10 @@ public sealed class DetailViewModel : ObservableObject
         {
             if (SetProperty(ref _hasSelection, value))
             {
+                // F-07: must also notify IsSingle — on the FIRST single selection
+                // IsBatch never changes (stays false), so its setter doesn't fire
+                // and IsSingle would stay stuck at its initial false value.
+                OnPropertyChanged(nameof(IsSingle));
                 OnPropertyChanged(nameof(ShowEmpty));
                 CommandManagerInvalidate();
             }
@@ -126,7 +131,11 @@ public sealed class DetailViewModel : ObservableObject
     public bool IsSingle => HasSelection && !IsBatch;
     public bool ShowEmpty => !HasSelection;
 
-    public int SelectedCount { get; private set; }
+    public int SelectedCount
+    {
+        get => _selectedCount;
+        private set => SetProperty(ref _selectedCount, value);
+    }
 
     private GalleryItemViewModel? Primary { get; set; }
 

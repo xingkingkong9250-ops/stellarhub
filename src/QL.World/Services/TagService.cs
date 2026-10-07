@@ -29,7 +29,25 @@ public sealed class TagService
         ArgumentNullException.ThrowIfNull(imageIds);
         ArgumentNullException.ThrowIfNull(tags);
 
-        List<string> normalized = NormalizeTags(tags);
+        return AddTags(
+            imageIds,
+            NormalizeTags(tags).Select(tag => (tag, confidence)),
+            source);
+    }
+
+    /// <summary>
+    /// Adds tags with per-tag confidence values to one or more images.
+    /// Manual rows remain protected from AI updates.
+    /// </summary>
+    public int AddTags(
+        IReadOnlyCollection<long> imageIds,
+        IEnumerable<(string Tag, double? Confidence)> tags,
+        TagSource source)
+    {
+        ArgumentNullException.ThrowIfNull(imageIds);
+        ArgumentNullException.ThrowIfNull(tags);
+
+        List<(string Tag, double? Confidence)> normalized = NormalizeTagConfidences(tags);
         if (imageIds.Count == 0 || normalized.Count == 0)
             return 0;
 
@@ -41,32 +59,42 @@ public sealed class TagService
             int created = 0;
             foreach (long imageId in imageIds)
             {
-                foreach (string tag in normalized)
-                {
-                    using var command = conn.CreateCommand();
-                    command.Transaction = tx;
-                    command.CommandText = """
-                        INSERT INTO image_tags (image_id, tag, source, confidence, created_at)
-                        VALUES ($id, $tag, $source, $confidence, $now)
-                        ON CONFLICT(image_id, tag) DO UPDATE SET
-                            source = CASE
-                                WHEN image_tags.source = 'manual' THEN 'manual'
-                                ELSE excluded.source END,
-                            confidence = CASE
-                                WHEN image_tags.source = 'manual' THEN image_tags.confidence
-                                ELSE excluded.confidence END
-                        WHERE image_tags.source <> 'manual' OR excluded.source = 'manual';
-                        """;
-                    command.Parameters.AddWithValue("$id", imageId);
-                    command.Parameters.AddWithValue("$tag", tag);
-                    command.Parameters.AddWithValue("$source", sourceText);
-                    command.Parameters.AddNullable("$confidence", confidence);
-                    command.Parameters.AddWithValue("$now", now);
-                    created += command.ExecuteNonQuery();
-                }
+                foreach ((string tag, double? tagConfidence) in normalized)
+                    created += UpsertTag(conn, tx, imageId, tag, sourceText, tagConfidence, now);
             }
             return created;
         });
+    }
+
+    private static int UpsertTag(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        long imageId,
+        string tag,
+        string source,
+        double? confidence,
+        string now)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO image_tags (image_id, tag, source, confidence, created_at)
+            VALUES ($id, $tag, $source, $confidence, $now)
+            ON CONFLICT(image_id, tag) DO UPDATE SET
+                source = CASE
+                    WHEN image_tags.source = 'manual' THEN 'manual'
+                    ELSE excluded.source END,
+                confidence = CASE
+                    WHEN image_tags.source = 'manual' THEN image_tags.confidence
+                    ELSE excluded.confidence END
+            WHERE image_tags.source <> 'manual' OR excluded.source = 'manual';
+            """;
+        command.Parameters.AddWithValue("$id", imageId);
+        command.Parameters.AddWithValue("$tag", tag);
+        command.Parameters.AddWithValue("$source", source);
+        command.Parameters.AddNullable("$confidence", confidence);
+        command.Parameters.AddWithValue("$now", now);
+        return command.ExecuteNonQuery();
     }
 
     public void RemoveTag(long imageId, string tag)
@@ -166,6 +194,25 @@ public sealed class TagService
             }
         }
         return [.. result.OrderBy(t => t, StringComparer.Ordinal)];
+    }
+
+    internal static List<(string Tag, double? Confidence)> NormalizeTagConfidences(
+        IEnumerable<(string Tag, double? Confidence)> tags)
+    {
+        var result = new Dictionary<string, double?>(StringComparer.Ordinal);
+        foreach ((string rawTag, double? confidence) in tags)
+        {
+            if (string.IsNullOrWhiteSpace(rawTag))
+                continue;
+
+            foreach (string tag in NormalizeTags([rawTag]))
+                result.TryAdd(tag, confidence);
+        }
+
+        return result
+            .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+            .Select(entry => (entry.Key, entry.Value))
+            .ToList();
     }
 
     internal static string ToDb(TagSource source) =>

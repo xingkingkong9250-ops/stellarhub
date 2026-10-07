@@ -34,6 +34,8 @@
     <Color x:Key="DangerBg">#3B1410</Color>
     <Color x:Key="Warning">#FFB020</Color>
     <Color x:Key="WarningBg">#3B2A05</Color>
+    <!-- Text rendered on WarningBrush badges (Warning is bright amber in dark theme → dark text) -->
+    <Color x:Key="TextOnWarning">#2A1D00</Color>
 
     <!-- Translucent cover laid over gallery thumbnails (file-missing badge);
          must adapt per theme instead of a hardcoded dark overlay. -->
@@ -65,6 +67,7 @@
     <SolidColorBrush x:Key="DangerBgBrush" Color="{StaticResource DangerBg}" />
     <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource Warning}" />
     <SolidColorBrush x:Key="WarningBgBrush" Color="{StaticResource WarningBg}" />
+    <SolidColorBrush x:Key="TextOnWarningBrush" Color="{StaticResource TextOnWarning}" />
     <SolidColorBrush x:Key="OverlayBrush" Color="{StaticResource Overlay}" />
     <SolidColorBrush x:Key="TextOnOverlayBrush" Color="{StaticResource TextOnOverlay}" />
 
