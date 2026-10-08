@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- 版本号唯一来源；脚本与界面均从此读取，禁止在别处硬编码 -->
-    <Version>0.5.11</Version>
+    <Version>0.5.12</Version>
     <NoWarn>NU1902</NoWarn>
     <AssemblyName>StellarHub</AssemblyName>
     <RootNamespace>QL.World</RootNamespace>

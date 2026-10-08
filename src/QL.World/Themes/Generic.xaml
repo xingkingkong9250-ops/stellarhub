@@ -219,9 +219,14 @@
                             Background="{TemplateBinding Background}"
                             Padding="{TemplateBinding Padding}">
                         <Grid>
-                            <TextBlock x:Name="arrow" Text="▾" FontSize="10" VerticalAlignment="Center"
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="arrow" Grid.Column="0" Text="▾" FontSize="10"
+                                       VerticalAlignment="Center" Margin="0,0,4,0"
                                        Foreground="{DynamicResource TextMutedBrush}" />
-                            <ContentPresenter Margin="14,0,0,0" VerticalAlignment="Center" />
+                            <ContentPresenter Grid.Column="1" VerticalAlignment="Center" />
                         </Grid>
                     </Border>
                     <ControlTemplate.Triggers>

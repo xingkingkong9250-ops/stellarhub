@@ -9,6 +9,27 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.5.12] — 2026-10-08 侧栏文本叠加修复（F-17）
+
+### 修复
+
+- **F-17 侧栏树节点计数与名称文字叠加（P0）**：`TreeToggleStyle` 内容
+  模板使用 `<Grid>` 但未定义 `ColumnDefinitions`，`DisplayName` 与 `Count`
+  两个 TextBlock 同处 cell(0,0)。Count 设 `HorizontalAlignment="Right"`，
+  在 cell 宽度取两者最大值时，Count 被定位到 cell 右沿——即叠加在
+  DisplayName 右侧字符之上，导致「贴图/纹理 5」「BB 0」等显示成相互压字。
+  修复：三处（B1-1 分类树 / B1-2 收藏夹 / B1-4 贴图组）Grid 均补
+  `ColumnDefinitions`（`*` + `Auto`），Count 放 column 1，并加 6px 左 margin
+  与名称隔离。同步修 `SidebarSectionHeaderStyle` 模板：箭头 ▾ 与标题
+  原靠 `Margin="14,0,0,0"` 偏移，依赖字体度量；改用 `ColumnDefinitions`
+  （Auto + *）+ 4px 右 margin，彻底消除箭头压字风险
+
+### 变更
+
+- 版本号 0.5.11 → 0.5.12（缺陷修复，修订号 +0.0.1，NO.P 补丁轮次）
+- Release 0 警告 0 错误
+- 无 UI 编号变更；无新增依赖
+
 ## [0.5.11] — 2026-10-08 Local-only 模式画廊网格完全空白修复（F-16）
 
 ### 修复

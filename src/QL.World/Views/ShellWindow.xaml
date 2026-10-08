@@ -584,8 +584,12 @@
                                                   IsChecked="{Binding IsSelected, Mode=OneWay}"
                                                   Command="{Binding SelectCommand}">
                                         <Grid>
-                                            <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" />
-                                            <TextBlock HorizontalAlignment="Right" FontSize="11"
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{Binding DisplayName}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Margin="6,0,0,0" FontSize="11"
                                                        VerticalAlignment="Center"
                                                        Foreground="{DynamicResource TextMutedBrush}"
                                                        Text="{Binding Count}" />
@@ -636,8 +640,13 @@
                                             </ContextMenu>
                                         </ToggleButton.ContextMenu>
                                         <Grid>
-                                            <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" />
-                                            <TextBlock HorizontalAlignment="Right" FontSize="11" VerticalAlignment="Center"
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{Binding DisplayName}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Margin="6,0,0,0" FontSize="11"
+                                                       VerticalAlignment="Center"
                                                        Foreground="{DynamicResource TextMutedBrush}"
                                                        Text="{Binding Count}" />
                                         </Grid>
@@ -690,8 +699,12 @@
                                                   IsChecked="{Binding IsSelected, Mode=OneWay}"
                                                   Command="{Binding SelectCommand}">
                                         <Grid>
-                                            <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" />
-                                            <TextBlock HorizontalAlignment="Right" FontSize="11"
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{Binding DisplayName}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Margin="6,0,0,0" FontSize="11"
                                                        VerticalAlignment="Center"
                                                        Foreground="{DynamicResource TextMutedBrush}"
                                                        Text="{Binding MemberCount}" />
