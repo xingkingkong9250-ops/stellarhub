@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -10,7 +11,16 @@ namespace QL.World.Views.Support;
 /// Realizes only the containers intersecting the vertical viewport and
 /// recycles them via the ItemContainerGenerator (container recycling must
 /// be enabled on the owning ListBox).
-/// Based on the classic VirtualizingTilePanel pattern (IScrollInfo).
+/// Based on the classic VirtualizingTilePanel pattern (IScrollInfo), with
+/// the container-lifecycle gaps that caused F-13 closed:
+/// ・out-of-range containers are detached with RemoveInternalChildRange —
+///   IItemContainerGenerator.Remove only updates generator bookkeeping and
+///   never removes the visual, so skipping it left orphan cards stacked in
+///   the panel (ghost overlap / misplacement / blank slots);
+/// ・OnItemsChanged reconciles Add/Remove/Replace/Move/Reset;
+/// ・a generator-reported realized child that is not visually parented to
+///   this panel (right after an ItemsPanel swap on Grid↔List switch) is
+///   re-attached instead of silently skipped.
 /// </summary>
 public sealed class VirtualizingTilePanel : VirtualizingPanel, IScrollInfo
 {
@@ -27,6 +37,14 @@ public sealed class VirtualizingTilePanel : VirtualizingPanel, IScrollInfo
     private Size _viewportSize;
     private Size _extentSize;
     private Point _scrollOffset;
+
+    // F-14: the base VirtualizingPanel.OnItemsChanged path is unreliable
+    // when the panel is created before items arrive (e.g. Grid mode at
+    // startup with async data loading). The generator's ItemsChanged event
+    // may not reach the virtual OnItemsChanged because the ItemsPresenter's
+    // hookup races with the first measure pass. Subscribe directly to the
+    // generator's event on Loaded as a safety net.
+    private bool _genHooked;
 
     public double ItemWidth
     {
@@ -82,6 +100,71 @@ public sealed class VirtualizingTilePanel : VirtualizingPanel, IScrollInfo
     public void MouseWheelLeft() { }
     public void MouseWheelRight() { }
 
+    // ─── Item-container lifecycle ────────────────────────────────────────────
+
+    protected override void OnItemsChanged(object sender, ItemsChangedEventArgs args)
+    {
+        base.OnItemsChanged(sender, args);
+
+        // Classic VirtualizingTilePanel contract: only Remove/Replace/Move
+        // carry a visual range the panel must detach itself. A Reset is owned
+        // by the ItemContainerGenerator — it re-links recycled containers on
+        // the next measure; manually dropping InternalChildren here races with
+        // generator bookkeeping and leaves the viewport permanently blank
+        // (F-13 regression observed after an explicit Items.Refresh).
+        switch (args.Action)
+        {
+            case NotifyCollectionChangedAction.Remove:
+            case NotifyCollectionChangedAction.Replace:
+            case NotifyCollectionChangedAction.Move:
+                if (args.ItemUICount > 0)
+                    RemoveInternalChildRange(args.Position.Index, args.ItemUICount);
+                break;
+        }
+
+        // F-14: VirtualizingPanel.OnItemsChanged does NOT call base
+        // (Panel.OnItemsChanged), so InvalidateMeasure is never invoked
+        // after items arrive. Without this, a panel that first measured
+        // with 0 items (e.g. created before RefreshAsync loaded data)
+        // never re-measures and stays permanently blank.
+        InvalidateMeasure();
+    }
+
+    private void HookGenerator(ItemsControl? owner)
+    {
+        if (_genHooked || owner is null)
+            return;
+        ItemContainerGenerator? gen = owner.ItemContainerGenerator;
+        if (gen is null)
+            return;
+        _genHooked = true;
+        gen.ItemsChanged += (_, args) =>
+        {
+            // F-14: the base virtual OnItemsChanged path is unreliable when
+            // the panel measures before items arrive. Re-invalidate here so
+            // the next measure pass re-generates containers for the new items.
+            if (args.Action == NotifyCollectionChangedAction.Reset)
+                InvalidateMeasure();
+        };
+    }
+
+    protected override void BringIndexIntoView(int index)
+    {
+        if (index < 0 || _viewportSize.Width <= 0)
+            return;
+
+        int columns = Math.Max(1, (int)(_viewportSize.Width / Math.Max(1, ItemWidth)));
+        double itemHeight = Math.Max(1, ItemHeight);
+        int row = index / columns;
+        double top = row * itemHeight;
+        double bottom = top + itemHeight;
+
+        if (top < _scrollOffset.Y)
+            SetVerticalOffset(top);
+        else if (bottom > _scrollOffset.Y + _viewportSize.Height)
+            SetVerticalOffset(bottom - _viewportSize.Height);
+    }
+
     // ─── Layout ──────────────────────────────────────────────────────────────
 
     protected override Size MeasureOverride(Size availableSize)
@@ -93,6 +176,13 @@ public sealed class VirtualizingTilePanel : VirtualizingPanel, IScrollInfo
             Math.Max(0, availableSize.Height));
 
         ItemsControl? owner = ItemsControl.GetItemsOwner(this);
+
+        // F-14: hook the generator's ItemsChanged event directly as a safety
+        // net. The base VirtualizingPanel hookup can race with async data
+        // loading — the panel may measure with 0 items before the generator
+        // connection is fully established, and then never receive the Reset
+        // notification when items arrive.
+        HookGenerator(owner);
 
         if (double.IsInfinity(availableSize.Width) || double.IsInfinity(availableSize.Height))
             return new Size(0, 0);
@@ -127,32 +217,83 @@ public sealed class VirtualizingTilePanel : VirtualizingPanel, IScrollInfo
         // measure can still reach this panel after WPF has unregistered it as
         // the ItemsHost; ItemContainerGenerator is null then and must not be
         // touched (NRE crash on view-mode switch).
-        IItemContainerGenerator? generator = ItemContainerGenerator;
+        // NOTE: .NET 10's VirtualizingPanel.ItemContainerGenerator property can
+        // return null even when the panel is the ItemsHost and the owning
+        // ItemsControl has a live ItemContainerGenerator (observed in .NET 10
+        // desktop apps). Resolve the generator from the owner directly so we
+        // never silently return without realizing containers — that left the
+        // gallery permanently blank in Local-only mode.
+        IItemContainerGenerator? generator = owner?.ItemContainerGenerator;
         if (generator is null)
+        {
             return availableSize;
+        }
 
         GeneratorPosition start = generator.GeneratorPositionFromIndex(firstIndex);
         int childIndex = start.Offset == 0 ? start.Index : start.Index + 1;
 
+        int realizedThisPass = 0;
+        int foreignContainers = 0;
         using (generator.StartAt(start, GeneratorDirection.Forward, true))
         {
             for (int index = firstIndex; index <= lastIndex; index++, childIndex++)
             {
-                UIElement child = (UIElement)generator.GenerateNext(out bool newlyRealized);
-                if (newlyRealized)
+                UIElement? child = generator.GenerateNext(out bool newlyRealized) as UIElement;
+                if (child is null)
+                    break;
+
+                // F-13/F-14: right after an ItemsPanel swap (Grid↔List) the
+                // generator can hand back containers it still considers
+                // realized. Two sub-states:
+                // ・orphan  — no visual parent: safe to re-attach here;
+                // ・foreign — still parented to the OUTGOING panel: it can
+                //   never render in this panel (AddInternalChild on an
+                //   already-parented element throws), so skip it and let the
+                //   recovery below reset the generator. The old check only
+                //   treated "no parent" as attachable, which left the whole
+                //   viewport blank after a swap.
+                DependencyObject? parent = VisualTreeHelper.GetParent(child);
+                if (newlyRealized || parent is null)
                 {
-                    if (childIndex >= InternalChildren.Count)
+                    int insertAt = Math.Clamp(childIndex, 0, InternalChildren.Count);
+                    if (insertAt >= InternalChildren.Count)
                         AddInternalChild(child);
                     else
-                        InsertInternalChild(Math.Max(0, childIndex), child);
+                        InsertInternalChild(insertAt, child);
                     generator.PrepareItemContainer(child);
+                }
+                else if (!ReferenceEquals(parent, this))
+                {
+                    foreignContainers++;
+                    continue;
                 }
 
                 child.Measure(new Size(itemWidth, itemHeight));
+                realizedThisPass++;
             }
         }
 
         CleanupContainers(firstIndex, lastIndex, generator);
+
+        // F-13/F-14 recovery: data exists and the visible range is non-empty,
+        // yet the panel holds no containers.
+        // ・realizedThisPass == 0 — the generator produced nothing this pass
+        //   (swap / reset timing): measure again at Render priority;
+        // ・foreignContainers > 0 — every container handed back still belongs
+        //   to the outgoing panel: drop the generator's stale bookkeeping
+        //   with RemoveAll() so the next pass generates fresh (or detached
+        //   recycled) containers, then measure again.
+        if (InternalChildren.Count == 0 && firstIndex <= lastIndex)
+        {
+            if (foreignContainers > 0)
+                generator.RemoveAll();
+            if (realizedThisPass == 0 || foreignContainers > 0)
+            {
+                Dispatcher.BeginInvoke(new Action(InvalidateMeasure),
+                    System.Windows.Threading.DispatcherPriority.Render);
+            }
+        }
+
         return availableSize;
     }
 
@@ -172,8 +313,10 @@ public sealed class VirtualizingTilePanel : VirtualizingPanel, IScrollInfo
         int columns = Math.Max(1, (int)(arrangeWidth / itemWidth));
 
         // Same teardown guard as MeasureOverride: the generator is gone while
-        // the outgoing panel drains its final layout pass.
-        IItemContainerGenerator? generator = ItemContainerGenerator;
+        // the outgoing panel drains its final layout pass. Resolve from owner
+        // (see MeasureOverride note on .NET 10 VirtualizingPanel behavior).
+        ItemsControl? owner = ItemsControl.GetItemsOwner(this);
+        IItemContainerGenerator? generator = owner?.ItemContainerGenerator;
         if (generator is null)
             return finalSize;
 
@@ -213,10 +356,18 @@ public sealed class VirtualizingTilePanel : VirtualizingPanel, IScrollInfo
     {
         for (int i = InternalChildren.Count - 1; i >= 0; i--)
         {
-            int itemIndex = generator.IndexFromGeneratorPosition(
-                new GeneratorPosition(i, 0));
-            if (itemIndex >= 0 && (itemIndex < firstIndex || itemIndex > lastIndex))
-                generator.Remove(new GeneratorPosition(i, 0), 1);
+            var position = new GeneratorPosition(i, 0);
+            int itemIndex = generator.IndexFromGeneratorPosition(position);
+            if (itemIndex < 0 || itemIndex < firstIndex || itemIndex > lastIndex)
+            {
+                // F-13: generator.Remove updates generation bookkeeping ONLY;
+                // the visual container stays in InternalChildren until the
+                // panel detaches it. Orphaned (-1) visuals are already
+                // detached from the generator — just drop the visual.
+                if (itemIndex >= 0)
+                    generator.Remove(position, 1);
+                RemoveInternalChildRange(i, 1);
+            }
         }
     }
 

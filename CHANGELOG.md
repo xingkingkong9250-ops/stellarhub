@@ -9,6 +9,60 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.5.11] — 2026-10-08 Local-only 模式画廊网格完全空白修复（F-16）
+
+### 修复
+
+- **F-16 Local-only 模式画廊网格区完全空白（P0）**：用户在 staging
+  v0.5.10 真机回归时发现——状态栏显示 235/245 计数、左侧分类树计数正常，
+  但中间网格区纯深色背景，0 卡槽渲染。Debug exe 同环境对比同样空白，
+  排除 R2R 优化问题。诊断日志显示 `MeasureOverride` 进入 itemCount=245/235
+  路径、`isItemsHost=True`、`visualParent=ItemsPresenter` 均正常，但
+  `panel.ItemContainerGenerator`（即 .NET 10 `VirtualizingPanel.ItemContainerGenerator`
+  属性）返回 null，导致 measure pass 在 `if (generator is null) return` 处
+  直接退出，从未调用 `generator.StartAt/GenerateNext` 生成容器。根因：.NET 10
+  桌面环境下 `VirtualizingPanel.ItemContainerGenerator` 在 panel 已注册为
+  ItemsHost 且 owner.ItemContainerGenerator 实例存活的情况下仍可能返回 null
+  （与 .NET Framework / .NET Core 3.x 行为不一致）。修复：`MeasureOverride`
+  与 `ArrangeOverride` 均改用 `owner.ItemContainerGenerator`（`ItemsControl.ItemContainerGenerator`
+  公共属性）直接获取 generator，绕过 .NET 10 `VirtualizingPanel.ItemContainerGenerator`
+  的异常行为。真机 C2/C3/C5/C6/C7 回归全绿
+- 移除本轮排查加入的全部临时诊断日志（`[PANEL] MeasureOverride#N`/`layout`/
+  `end`/`generator=NULL`/`OnItemsChanged` 与 `[GALLERY] RefreshAsync gen=N` 等）
+
+### 变更
+
+- 版本号 0.5.10 → 0.5.11（缺陷修复，修订号 +0.0.1，NO.P 补丁轮次）
+- Release 0 警告 0 错误；`dotnet test` 634 项全部通过
+- 无 UI 编号变更；无新增依赖
+
+## [0.5.10] — 2026-10-08 滚动后画廊卡片永久黑框修复（F-15）
+
+### 修复
+
+- **F-15 向下滚动后新卡片缩略图永久不显示（P1）**：网格/列表首屏缩略图
+  正常，但滚动进入视口的卡片永久黑框（同批行停留十余秒也不恢复），
+  切分类正常、仅滚动复现。根因：`VirtualizedThumbnailLoader` 仅在
+  `ItemsChanged`/`Loaded` 后通过 `ItemContainerGenerator.ContainerFromIndex`
+  轮询挂载容器；自定义 `VirtualizingTilePanel` 在滚动的 measure 过程中新
+  生成的容器在 Background 优先级下不被 `ContainerFromIndex` 返回，且面板
+  直接增删视觉子元素导致这些容器不可靠地触发 `Loaded`/`DataContextChanged`，
+  于是只有首屏被 Attach，滚动新行的缩略图永不加载。修复：改为监听内部
+  ScrollViewer 冒泡的 `ScrollChanged` 事件，并在每次触发时遍历**实时可视化
+  树**对账——对真实存在的 ListBoxItem 幂等挂载并 Attach 当前 DataContext
+  （Attach 缓存命中即返回，重复调用安全）；保留 Unloaded→Detach 与
+  DataContextChanged 快路径。真机多轮上下滚动、快速/慢速滚动、网格/列表
+  切换回归通过
+- 移除本轮排查加入的全部临时高频诊断日志（`[VTP]`/`[VTL]`/SWEEP/
+  `[THUMB]` Attach/Detach/Ready 等），仅保留解码失败与加载异常两条低频
+  错误日志
+
+### 变更
+
+- 版本号 0.5.9 → 0.5.10（缺陷修复，修订号 +0.0.1，NO.P 补丁轮次）
+- Release 0 警告 0 错误；`dotnet test` 634 项全部通过
+- 无 UI 编号变更；无新增依赖
+
 ## [0.5.5] — 2026-10-06 v0.5.4 真机验收 7 项缺陷修复（F-01~F-07）
 
 v0.5.4 真机验收（150% 缩放、绿联 NAS 环境）累计登记 6 项缺陷（F-01~F-06），

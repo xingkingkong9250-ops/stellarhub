@@ -25,6 +25,7 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
 {
     private const int CACHE_LIMIT = 500;
     private const int PREFETCH_RANGE = 15;
+    private const int LOAD_RETRY_DELAY_MS = 350;
 
     private readonly ThumbnailService _thumbnails;
     private readonly INasConnectorFactory? _nasFactory;
@@ -32,15 +33,27 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
     private readonly NetworkConditionMonitor? _networkMonitor;
     private readonly object _gate = new();
 
-    private readonly Dictionary<string, GalleryItemViewModel> _realized = new();
+    // F-08: realized rows are tracked by their unique DB row Id (not FileHash):
+    // identical images share a hash, and a hash-keyed map let duplicate rows
+    // overwrite each other — the loser's card stayed blank forever. The hash
+    // index fans a ready bitmap out to every visible row sharing that hash.
+    private readonly Dictionary<long, GalleryItemViewModel> _realized = new();
+    private readonly Dictionary<string, HashSet<long>> _realizedHashes = new();
     private readonly Dictionary<string, BitmapSource> _cache = new();
     private readonly LinkedList<string> _lru = new();
     private readonly Dictionary<string, LinkedListNode<string>> _lruNodes = new();
     private readonly HashSet<string> _inFlight = new();
+    // F-08: per-hash transient-load retry count (decoder race / AV lock).
+    private readonly Dictionary<string, int> _loadAttempts = new();
+    // F-08: hashes whose corrupt WebP already triggered one regeneration,
+    // so a genuinely undecodable file doesn't enqueue jobs in a tight loop.
+    private readonly HashSet<string> _regenerationRequested = new();
+    private BitmapSource? _placeholderBitmap;
 
     // M5-F: Preview-tier tracking. Separate from _realized because the detail
     // item may not be in the visible gallery range.
-    private readonly Dictionary<string, GalleryItemViewModel> _previewRequested = new();
+    private readonly Dictionary<long, GalleryItemViewModel> _previewRequested = new();
+    private readonly Dictionary<string, long> _previewHashToId = new();
     private readonly HashSet<string> _previewInFlight = new();
 
     private readonly Dictionary<int, INasConnector> _connectors = new();
@@ -67,6 +80,11 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
         _settings = settings;
         _networkMonitor = networkMonitor;
         _thumbnails.ThumbnailReady += OnThumbnailReady;
+        // F-08: when a weak network recovers, re-request thumbnails for the
+        // remote rows that Attach had to skip — otherwise those cards stay
+        // blank until the user scrolls them out and back again.
+        if (_networkMonitor is not null)
+            _networkMonitor.Changed += OnNetworkConditionChanged;
     }
 
     /// <summary>Called by the attached behavior when an item's container loads.</summary>
@@ -75,7 +93,16 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
         ArgumentNullException.ThrowIfNull(item);
         lock (_gate)
         {
-            _realized[item.FileHash] = item;
+            // Id-keyed: duplicate images (same FileHash) no longer evict each
+            // other from the realized set.
+            _realized[item.Id] = item;
+            if (!_realizedHashes.TryGetValue(item.FileHash, out HashSet<long>? ids))
+            {
+                ids = new HashSet<long>();
+                _realizedHashes[item.FileHash] = ids;
+            }
+            ids.Add(item.Id);
+
             if (_cache.TryGetValue(item.FileHash, out BitmapSource? cached))
             {
                 TouchLru(item.FileHash);
@@ -92,9 +119,9 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
         {
             // M5-H: on weak networks, skip remote thumbnail requests — only
             // show cached thumbs so the gallery stays responsive over a slow
-            // link. Local items are unaffected.
-            bool isRemote = item.Source == QL.World.Models.ImageSource.Remote;
-            if (isRemote && _networkMonitor is { IsWeakNetwork: true })
+            // link. Local items are unaffected. The Changed handler re-runs
+            // Attach once the network recovers (F-08).
+            if (IsRemoteOnWeakNetwork(item))
                 return;
 
             _thumbnails.Request(item.FileHash, CreateSource(item),
@@ -107,7 +134,21 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
     {
         lock (_gate)
         {
-            _realized.Remove(item.FileHash);
+            // F-08: identity check — with container recycling, an Unloaded for
+            // the old row can race a DataContextChanged Attach for the new row
+            // sharing the same visual container. Never evict a different row.
+            if (!_realized.TryGetValue(item.Id, out GalleryItemViewModel? current) ||
+                !ReferenceEquals(current, item))
+            {
+                return;
+            }
+            _realized.Remove(item.Id);
+            if (_realizedHashes.TryGetValue(item.FileHash, out HashSet<long>? ids))
+            {
+                ids.Remove(item.Id);
+                if (ids.Count == 0)
+                    _realizedHashes.Remove(item.FileHash);
+            }
         }
     }
 
@@ -116,6 +157,7 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
         lock (_gate)
         {
             _realized.Clear();
+            _realizedHashes.Clear();
         }
     }
 
@@ -152,7 +194,8 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
         ArgumentNullException.ThrowIfNull(item);
         lock (_gate)
         {
-            _previewRequested[item.FileHash] = item;
+            _previewRequested[item.Id] = item;
+            _previewHashToId[item.FileHash] = item.Id;
         }
 
         if (_thumbnails.ThumbnailExists(item.FileHash, ThumbnailLevel.Preview))
@@ -161,6 +204,8 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
         }
         else
         {
+            if (IsRemoteOnWeakNetwork(item))
+                return;
             _thumbnails.Request(item.FileHash, CreateSource(item),
                 ThumbnailLevel.Preview, highPriority: true);
         }
@@ -174,7 +219,11 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
     {
         lock (_gate)
         {
-            _previewRequested.Remove(hash);
+            if (_previewHashToId.TryGetValue(hash, out long id))
+            {
+                _previewRequested.Remove(id);
+                _previewHashToId.Remove(hash);
+            }
         }
     }
 
@@ -195,6 +244,8 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
         if (_disposed) return;
         _disposed = true;
         _thumbnails.ThumbnailReady -= OnThumbnailReady;
+        if (_networkMonitor is not null)
+            _networkMonitor.Changed -= OnNetworkConditionChanged;
         // M5-E: release cached NAS connectors (HttpClient pools) on shutdown.
         lock (_connectorGate)
         {
@@ -208,32 +259,68 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
     }
 
     /// <summary>
+    /// F-08: network health flipped. When the link is healthy again, re-run
+    /// Attach for every realized remote row so skipped thumbnails arrive
+    /// without requiring a scroll round-trip.
+    /// </summary>
+    private void OnNetworkConditionChanged()
+    {
+        if (_disposed || _networkMonitor is null || _networkMonitor.IsWeakNetwork)
+            return;
+
+        List<GalleryItemViewModel> snapshot;
+        lock (_gate)
+        {
+            snapshot = _realized.Values
+                .Where(i => i.Source == QL.World.Models.ImageSource.Remote)
+                .ToList();
+        }
+        foreach (GalleryItemViewModel item in snapshot)
+            Attach(item);
+    }
+
+    private bool IsRemoteOnWeakNetwork(GalleryItemViewModel item) =>
+        item.Source == QL.World.Models.ImageSource.Remote &&
+        _networkMonitor is { IsWeakNetwork: true };
+
+    /// <summary>
     /// M5-F: routes the ThumbnailReady callback by level. Thumb → load into
-    /// the gallery grid/list; Preview → load into the detail pane.
+    /// the gallery grid/list (all visible rows sharing the hash); Preview →
+    /// load into the detail pane.
     /// </summary>
     private void OnThumbnailReady(string hash, ThumbnailLevel level)
     {
         if (_disposed) return;
 
-        GalleryItemViewModel? item;
+        List<GalleryItemViewModel> targets = [];
         lock (_gate)
         {
             if (level == ThumbnailLevel.Thumb)
             {
-                if (!_realized.TryGetValue(hash, out item))
-                    return;
+                if (_realizedHashes.TryGetValue(hash, out HashSet<long>? ids))
+                {
+                    foreach (long id in ids)
+                    {
+                        if (_realized.TryGetValue(id, out GalleryItemViewModel? row))
+                            targets.Add(row);
+                    }
+                }
             }
-            else
+            else if (_previewHashToId.TryGetValue(hash, out long previewId) &&
+                     _previewRequested.TryGetValue(previewId, out GalleryItemViewModel? previewItem))
             {
-                if (!_previewRequested.TryGetValue(hash, out item))
-                    return;
+                targets.Add(previewItem);
             }
         }
 
+        if (targets.Count == 0)
+            return;
+
         if (level == ThumbnailLevel.Preview)
-            StartPreviewLoad(item);
+            StartPreviewLoad(targets[0]);
         else
-            StartLoad(item);
+            foreach (GalleryItemViewModel item in targets)
+                StartLoad(item);
     }
 
     /// <summary>
@@ -302,42 +389,152 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
 
     private void StartLoad(GalleryItemViewModel item)
     {
-        string path = _thumbnails.GetThumbnailPath(item.FileHash, ThumbnailLevel.Thumb);
+        string hash = item.FileHash;
+        string path = _thumbnails.GetThumbnailPath(hash, ThumbnailLevel.Thumb);
 
         lock (_gate)
         {
-            if (_inFlight.Contains(item.FileHash)) return;
-            _inFlight.Add(item.FileHash);
+            if (_inFlight.Contains(hash)) return;
+            _inFlight.Add(hash);
         }
 
-        _ = Task.Run(() =>
+        _ = Task.Run(async () =>
         {
             try
             {
-                if (!File.Exists(path)) return;
-                BitmapSource? bitmap = Helpers.WebpImageDecoder.DecodeFile(path);
-                if (bitmap is null) return;
+                // F-08, case 1: the WebP vanished (regeneration deleted it,
+                // placeholder copy lost a race). Ask the service to produce it
+                // again; its ThumbnailReady callback re-enters StartLoad.
+                if (!File.Exists(path))
+                {
+                    _thumbnails.Request(hash, CreateSource(item),
+                        ThumbnailLevel.Thumb, highPriority: true);
+                    return;
+                }
 
+                BitmapSource? bitmap = Helpers.WebpImageDecoder.DecodeFile(path);
+
+                // F-08, case 2: transient decode failure (AV scan holding the
+                // file, disk hiccup). Retry once after a short delay before
+                // treating the WebP as corrupt — previously the card stayed
+                // blank with no recovery path.
+                if (bitmap is null)
+                {
+                    int attempt;
+                    lock (_gate)
+                    {
+                        attempt = _loadAttempts.TryGetValue(hash, out int n) ? n + 1 : 1;
+                        _loadAttempts[hash] = attempt;
+                    }
+                    if (attempt == 1)
+                    {
+                        await Task.Delay(LOAD_RETRY_DELAY_MS).ConfigureAwait(false);
+                        if (!_disposed && File.Exists(path))
+                            bitmap = Helpers.WebpImageDecoder.DecodeFile(path);
+                    }
+                }
+
+                if (bitmap is not null)
+                {
+                    lock (_gate)
+                    {
+                        _loadAttempts.Remove(hash);
+                        PutCache(hash, bitmap);
+                        PublishToRealized(hash, bitmap);
+                    }
+                    return;
+                }
+
+                // F-08, case 3: the on-disk WebP is genuinely unreadable.
+                // Never leave a permanent blank card — show the placeholder
+                // immediately, then request one bounded regeneration (a
+                // missing source file will publish a placeholder via the
+                // service, which is the correct end state for that row).
+                QL.World.App.WriteLog(
+                    $"[THUMB] decode returned null hash={hash} path={path} exists={File.Exists(path)}");
+                BitmapSource? fallback = GetPlaceholderBitmap();
+                if (fallback is not null)
+                {
+                    lock (_gate)
+                        PublishToRealized(hash, fallback);
+                }
+
+                bool shouldRegenerate;
                 lock (_gate)
                 {
-                    PutCache(item.FileHash, bitmap);
-                    if (_realized.TryGetValue(item.FileHash, out GalleryItemViewModel? live))
-                        live.ThumbnailImage = bitmap;
+                    shouldRegenerate = _regenerationRequested.Add(hash);
+                }
+                if (shouldRegenerate)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[ThumbnailUI] corrupt WebP for {hash}; requesting regeneration");
+                    _thumbnails.Regenerate(hash, CreateSource(item), ThumbnailLevel.Thumb);
                 }
             }
             catch (Exception ex)
             {
+                QL.World.App.WriteLog($"[THUMB] StartLoad exception hash={hash}: {ex.GetType().Name} {ex.Message}");
                 System.Diagnostics.Debug.WriteLine(
-                    $"[ThumbnailUI] decode failed for {item.FileHash}: {ex.Message}");
+                    $"[ThumbnailUI] decode failed for {hash}: {ex.Message}");
             }
             finally
             {
                 lock (_gate)
                 {
-                    _inFlight.Remove(item.FileHash);
+                    _inFlight.Remove(hash);
                 }
             }
         });
+    }
+
+    /// <summary>Pushes a bitmap to every currently-realized row sharing the hash.</summary>
+    private int PublishToRealized(string hash, BitmapSource bitmap)
+    {
+        int n = 0;
+        if (_realizedHashes.TryGetValue(hash, out HashSet<long>? ids))
+        {
+            foreach (long id in ids)
+            {
+                if (_realized.TryGetValue(id, out GalleryItemViewModel? row))
+                {
+                    row.ThumbnailImage = bitmap;
+                    n++;
+                }
+            }
+        }
+        return n;
+    }
+
+    /// <summary>
+    /// F-08: decodes the service's placeholder WebP once and caches the
+    /// frozen bitmap so failed/corrupt rows always show the checker tile
+    /// instead of an empty card.
+    /// </summary>
+    private BitmapSource? GetPlaceholderBitmap()
+    {
+        lock (_gate)
+        {
+            if (_placeholderBitmap is not null)
+                return _placeholderBitmap;
+        }
+
+        try
+        {
+            string placeholderPath = _thumbnails.GetPlaceholderPath();
+            if (!File.Exists(placeholderPath))
+                return null;
+            if (Helpers.WebpImageDecoder.DecodeFile(placeholderPath) is not { } decoded)
+                return null;
+            lock (_gate)
+            {
+                _placeholderBitmap ??= decoded;
+            }
+            return _placeholderBitmap;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -348,26 +545,42 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
     /// </summary>
     private void StartPreviewLoad(GalleryItemViewModel item)
     {
-        string path = _thumbnails.GetThumbnailPath(item.FileHash, ThumbnailLevel.Preview);
+        string hash = item.FileHash;
+        string path = _thumbnails.GetThumbnailPath(hash, ThumbnailLevel.Preview);
 
         lock (_gate)
         {
-            if (_previewInFlight.Contains(item.FileHash)) return;
-            _previewInFlight.Add(item.FileHash);
+            if (_previewInFlight.Contains(hash)) return;
+            _previewInFlight.Add(hash);
         }
 
-        _ = Task.Run(() =>
+        _ = Task.Run(async () =>
         {
             try
             {
-                if (!File.Exists(path)) return;
+                if (!File.Exists(path))
+                {
+                    // F-08: file vanished (regeneration race) — re-request;
+                    // ThumbnailReady re-enters this path.
+                    _thumbnails.Request(hash, CreateSource(item),
+                        ThumbnailLevel.Preview, highPriority: true);
+                    return;
+                }
                 BitmapSource? bitmap = Helpers.WebpImageDecoder.DecodeFile(path);
-                if (bitmap is null) return;
+                if (bitmap is null)
+                {
+                    // F-08: one transient-failure retry, same as the Thumb tier.
+                    await Task.Delay(LOAD_RETRY_DELAY_MS).ConfigureAwait(false);
+                    if (!_disposed && File.Exists(path))
+                        bitmap = Helpers.WebpImageDecoder.DecodeFile(path);
+                }
+                if (bitmap is null)
+                    return;
 
                 lock (_gate)
                 {
-                    if (_previewRequested.TryGetValue(item.FileHash,
-                        out GalleryItemViewModel? live))
+                    if (_previewHashToId.TryGetValue(hash, out long liveId) &&
+                        _previewRequested.TryGetValue(liveId, out GalleryItemViewModel? live))
                     {
                         live.PreviewImage = bitmap;
                     }
@@ -376,13 +589,13 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine(
-                    $"[ThumbnailUI] preview decode failed for {item.FileHash}: {ex.Message}");
+                    $"[ThumbnailUI] preview decode failed for {hash}: {ex.Message}");
             }
             finally
             {
                 lock (_gate)
                 {
-                    _previewInFlight.Remove(item.FileHash);
+                    _previewInFlight.Remove(hash);
                 }
             }
         });

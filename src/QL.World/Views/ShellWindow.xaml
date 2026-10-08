@@ -621,16 +621,18 @@
                                                   AllowDrop="True"
                                                   Drop="OnCollectionDrop">
                                         <ToggleButton.ContextMenu>
-                                            <ContextMenu>
+                                            <!-- F-12: Popup 树中不存在 Window 祖先，AncestorType=Window 绑定必然静默失败；
+                                                 改经 ContextMenu.PlacementTarget（ToggleButton，Tag=ShellViewModel）寻址 -->
+                                            <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
                                                 <MenuItem Header="重命名…"
-                                                          Command="{Binding DataContext.RenameCollectionCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                          CommandParameter="{Binding}" />
+                                                          Command="{Binding DataContext.RenameCollectionCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                                 <MenuItem Header="删除…"
-                                                          Command="{Binding DataContext.DeleteCollectionCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                          CommandParameter="{Binding}" />
+                                                          Command="{Binding DataContext.DeleteCollectionCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                                 <MenuItem Header="设为封面（当前所选）"
-                                                          Command="{Binding DataContext.SetCollectionCoverCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                          CommandParameter="{Binding}" />
+                                                          Command="{Binding DataContext.SetCollectionCoverCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                             </ContextMenu>
                                         </ToggleButton.ContextMenu>
                                         <Grid>
@@ -856,15 +858,16 @@
                             </ListBox.Style>
 
                             <ListBox.ContextMenu>
-                                <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                                <!-- F-11: RelativeSource Self（ContextMenu 自身）而非 AncestorType=ContextMenu——
+                                     在 ContextMenu 元素上查找同名祖先必然失败，导致 DataContext=null、全部命令静默失效 -->
+                                <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
                                     <MenuItem Header="打开（系统默认程序）" Command="{Binding OpenCommand}" />
                                     <MenuItem Header="在资源管理器中定位" Command="{Binding RevealCommand}" />
                                     <MenuItem Header="复制文件路径" Command="{Binding CopyPathCommand}" />
-                                    <!-- U6-B：提交到共享库（仅符合条件的本地文件可见） -->
+                                    <!-- U6-B：提交到共享库（仅选中项符合条件时可见，F-11 改绑 Shell 级 CanSubmitToShared） -->
                                     <MenuItem Header="提交到共享库"
                                               Visibility="{Binding CanSubmitToShared, Converter={StaticResource BoolVis}}"
-                                              Command="{Binding DataContext.SubmitToSharedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                              CommandParameter="{Binding}" />
+                                              Command="{Binding DataContext.SubmitToSharedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                     <!-- M8-D：提交到副库（仅管理员可见，含各副库子项） -->
                                     <MenuItem Header="提交到副库"
                                               Visibility="{Binding DataContext.IsAdmin, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolVis}}"

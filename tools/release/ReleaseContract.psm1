@@ -14,7 +14,10 @@ function Get-ProjectVersion {
         throw "Project file not found: $CsprojPath"
     }
 
-    [xml]$xml = Get-Content -LiteralPath $CsprojPath -Raw
+    # PS 5.1 default ANSI/GBK decode corrupts BOM-less UTF-8 csproj (M4-Z lesson).
+    # Read explicitly as UTF-8 to keep CJK fields intact for XML parsing.
+    $rawText = Get-Content -LiteralPath $CsprojPath -Raw -Encoding UTF8
+    [xml]$xml = $rawText
     $raw = $xml.Project.PropertyGroup.Version |
         Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } |
         Select-Object -First 1

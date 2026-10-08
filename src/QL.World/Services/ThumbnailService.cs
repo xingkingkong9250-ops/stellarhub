@@ -88,6 +88,17 @@ public sealed class ThumbnailService : IDisposable
         File.Exists(GetThumbnailPath(hash, level));
 
     /// <summary>
+    /// F-08: absolute path of the checker placeholder WebP. Callers should
+    /// treat it as read-only; <see cref="EnsurePlaceholderOnDisk"/> guarantees
+    /// publication (atomic via a .partial temp).
+    /// </summary>
+    public string GetPlaceholderPath()
+    {
+        EnsurePlaceholderOnDisk();
+        return Path.Combine(_root, "placeholder.webp");
+    }
+
+    /// <summary>
     /// Enqueues generation unless the WebP already exists.
     /// M5-F: <paramref name="level"/> selects the target tier (Thumb=256px,
     /// Preview=1024px). The same hash can have independent Thumb and Preview
@@ -360,6 +371,7 @@ public sealed class ThumbnailService : IDisposable
 
     private void CopyPlaceholderFor(string hash, ThumbnailLevel level)
     {
+        string temporary = null!;
         try
         {
             string placeholder = EnsurePlaceholderOnDisk();
@@ -367,11 +379,21 @@ public sealed class ThumbnailService : IDisposable
             if (File.Exists(output))
                 return;
             Directory.CreateDirectory(Path.GetDirectoryName(output)!);
-            File.Copy(placeholder, output, overwrite: true);
+            // F-08: publish atomically (.partial → Move). A direct File.Copy
+            // exposed a half-written WebP that the UI decoder could race on,
+            // producing permanent blank cards.
+            temporary = output + $".{Guid.NewGuid():N}.partial";
+            File.Copy(placeholder, temporary, overwrite: true);
+            File.Move(temporary, output, overwrite: true);
         }
         catch
         {
             // Placeholder is best effort; UI falls back to its own empty state.
+        }
+        finally
+        {
+            if (temporary is not null)
+                TryDelete(temporary);
         }
     }
 

@@ -119,9 +119,11 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         SwitchToLocalCommand = new RelayCommand(() => IsLocalScope = true);
         SwitchToSharedCommand = new RelayCommand(() => IsLocalScope = false,
             () => IsSharedLibraryAvailable);
-        SubmitToSharedCommand = new AsyncRelayCommand<object?>(
+        // U6-B/F-11: menu opens with ContextMenu.DataContext = ShellViewModel; the clicked item
+        // is taken from the current selection instead of a CommandParameter.
+        SubmitToSharedCommand = new AsyncRelayCommand(
             SubmitToSharedAsync,
-            p => (p as GalleryItemViewModel)?.CanSubmitToShared == true);
+            () => CanSubmitToShared);
         SubmitToSecondaryNasCommand = new AsyncRelayCommand<NasConnectionSpec?>(
             SubmitToSecondaryNasAsync,
             spec => _services.Permissions.CanSubmitToSecondaryNas && spec is not null && Gallery.PrimarySelected is not null);
@@ -251,8 +253,8 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public RelayCommand SwitchToLocalCommand { get; }
     public RelayCommand SwitchToSharedCommand { get; }
 
-    /// <summary>U6-B: 「提交到共享库」context-menu command; parameter is the clicked item.</summary>
-    public AsyncRelayCommand<object?> SubmitToSharedCommand { get; }
+    /// <summary>U6-B: 「提交到共享库」context-menu command; acts on the current primary selection.</summary>
+    public AsyncRelayCommand SubmitToSharedCommand { get; }
 
     /// <summary>
     /// M8-D: 「提交到副库」context-menu command; parameter is the target
@@ -282,10 +284,13 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>U6-B: uploads the clicked (or selected) item and reports the outcome.</summary>
-    private async Task SubmitToSharedAsync(object? parameter)
+    /// <summary>U6-B/F-11: whether the current primary selection can be submitted to the shared library.</summary>
+    public bool CanSubmitToShared => Gallery.PrimarySelected?.CanSubmitToShared == true;
+
+    /// <summary>U6-B: uploads the current primary selection and reports the outcome.</summary>
+    private async Task SubmitToSharedAsync()
     {
-        var item = parameter as GalleryItemViewModel ?? Gallery.PrimarySelected;
+        var item = Gallery.PrimarySelected;
         if (item is null ||
             _services.Submissions is not { } submissions ||
             _services.CurrentUser is not { } user)
@@ -884,7 +889,12 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     }
 
     private void OnSelectionChanged()
-        => StatusBar.UpdateShortcutHint(Gallery.SelectedItems.Count, Gallery.TotalCount);
+    {
+        StatusBar.UpdateShortcutHint(Gallery.SelectedItems.Count, Gallery.TotalCount);
+        // F-11: keep the gallery context menu's submit item in sync with the selection.
+        OnPropertyChanged(nameof(CanSubmitToShared));
+        SubmitToSharedCommand.RaiseCanExecuteChanged();
+    }
 
     private void ClearFilters()
     {

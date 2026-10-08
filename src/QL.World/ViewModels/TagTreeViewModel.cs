@@ -82,7 +82,7 @@ public sealed class TagTreeViewModel
         }
 
         SyncSelectionState();
-        _ = _gallery.RefreshAsync();
+        _ = RefreshGallerySafe();
     }
 
     private void SelectTag(TagNodeViewModel node)
@@ -91,7 +91,25 @@ public sealed class TagTreeViewModel
         _gallery.Filter.Tag =
             _gallery.Filter.Tag == node.Tag ? null : node.Tag;
         SyncSelectionState();
-        _ = _gallery.RefreshAsync();
+        _ = RefreshGallerySafe();
+    }
+
+    /// <summary>
+    /// F-10: fire-and-forget refresh with exception swallowing. A failed
+    /// RefreshAsync must never leave the gallery stuck empty — the user
+    /// sees the old items rather than a blank grid.
+    /// </summary>
+    private async Task RefreshGallerySafe()
+    {
+        try
+        {
+            await _gallery.RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"[TagTree] gallery refresh failed after filter change: {ex.Message}");
+        }
     }
 
     private void SyncSelectionState()

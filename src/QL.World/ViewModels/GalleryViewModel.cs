@@ -180,8 +180,18 @@ public sealed class GalleryViewModel : ObservableObject
 
     public void NotifySelectionChanged() => SelectionChanged?.Invoke();
 
+    /// <summary>
+    /// F-09/F-10: generation counter. Each call to RefreshAsync bumps the
+    /// generation; the body captures it. If a second RefreshAsync starts
+    /// before the first finishes (rapid category/search switches), the first
+    /// sees generation mismatch and skips overwriting Items — the last writer
+    /// wins, preventing stale results from replacing fresh ones.
+    /// </summary>
+    private int _refreshGeneration;
+
     public async Task RefreshAsync()
     {
+        int generation = Interlocked.Increment(ref _refreshGeneration);
         IsLoading = true;
         _isLoadingMore = false;
         try
@@ -193,6 +203,11 @@ public sealed class GalleryViewModel : ObservableObject
                 await Task.Run(() => _query.QueryGallery(filter));
             int filtered = await Task.Run(() => _query.CountFiltered(filter));
             int total = await Task.Run(_query.TotalCount);
+
+            // F-09/F-10: discard stale results — a newer RefreshAsync has
+            // already started and will deliver its own rows.
+            if (generation != _refreshGeneration)
+                return;
 
             Items.Clear();
             foreach (GalleryListItem row in rows)
@@ -210,7 +225,9 @@ public sealed class GalleryViewModel : ObservableObject
         }
         finally
         {
-            IsLoading = false;
+            // Only the latest generation controls the busy indicator.
+            if (generation == _refreshGeneration)
+                IsLoading = false;
         }
     }
 
@@ -231,10 +248,13 @@ public sealed class GalleryViewModel : ObservableObject
             filter.Offset = Items.Count;
             IReadOnlyList<GalleryListItem> rows =
                 await Task.Run(() => _query.QueryGallery(filter));
+            int filtered = await Task.Run(() => _query.CountFiltered(filter));
 
             foreach (GalleryListItem row in rows)
                 Items.Add(new GalleryItemViewModel(row));
-            HasMoreItems = rows.Count >= PageSize;
+            // F-13: compare against the filtered total, not the page size —
+            // a short last page must not be mistaken for "more available".
+            HasMoreItems = Items.Count < filtered;
         }
         finally
         {

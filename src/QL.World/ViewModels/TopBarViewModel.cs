@@ -57,6 +57,19 @@ public sealed class TopBarViewModel : ObservableObject
         // Dominant-color backfill — independent of the AI mode (PRD).
         ColorCommand = new AsyncRelayCommand(RunColorAnalysisAsync, () => !_isColorRunning);
 
+        // F-14: IsGridView is a pass-through to Gallery; without forwarding,
+        // the B1 view-toggle bound to TopBar.IsGridView never re-pulls when the
+        // mode changes via the Gallery.IsListView-bound counterpart, so both
+        // buttons could render checked at once. Forward the notification.
+        _gallery.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(GalleryViewModel.IsGridView)
+                or nameof(GalleryViewModel.IsListView))
+            {
+                OnPropertyChanged(nameof(IsGridView));
+            }
+        };
+
         // 语义档仅在「AI 档支持文本 embedding」或「库中已有 image embedding」时才显示。
         // 前者覆盖 Cloud 配置好的场景；后者覆盖 Disabled/Local 但库里有历史 embedding 的场景。
         _searchModes = BuildSearchModes();
