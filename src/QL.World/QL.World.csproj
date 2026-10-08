@@ -8,10 +8,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- 版本号唯一来源；脚本与界面均从此读取，禁止在别处硬编码 -->
-    <Version>0.7.0</Version>
+    <Version>0.7.1</Version>
     <!-- 品牌图标（猫与星光相框）；同时作为窗口/任务栏/EXE 图标 -->
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
-    <NoWarn>NU1902</NoWarn>
     <AssemblyName>StellarHub</AssemblyName>
     <RootNamespace>QL.World</RootNamespace>
     <Product>千星汇图</Product>
@@ -29,7 +28,7 @@
     <PackageReference Include="Magick.NET-Q8-AnyCPU" Version="14.17.1" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.22.1" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.10" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageReference Include="SSH.NET" Version="2026.0.0" />
   </ItemGroup>
 
@@ -50,6 +49,22 @@
   <ItemGroup>
     <Resource Include="Assets\brand-logo.jpg" />
     <Resource Include="Assets\app.ico" />
+  </ItemGroup>
+
+  <!-- ImageSharp 3.1.x 分支已停止安全维护，下列 5 条通告的修复版本均为 v4.1.2；
+       升 4.x 需 Six Labors Split License key（Release 构建硬校验），暂不引入。
+       风险论证（2026-10-08 逐条核对 PoC 触发条件，GHSA-jjfr-j3p4-j9gm = High）：
+       本仓库不使用 HistogramEqualization / TiffEncoder / TiffCompression /
+       HalfVector4 / ICC 颜色转换 / IccProfile.Entries，TIFF 仅单向解码
+       （缩略图与预览输出一律 WebP），3 条 High 的内存破坏路径均不可达；
+       仅 BigTIFF 恶意文件存在单线程解码 DoS（桌面场景影响有限），
+       ICC CLUT 缺陷需主动访问 IccProfile.Entries 才触发。 -->
+  <ItemGroup>
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-j3p4-wp97-rph4" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-j9gm-c75j-xc9q" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-jjfr-hcj7-qf5w" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-gwg2-r3hj-4w44" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-wmxv-xphr-5c9g" />
   </ItemGroup>
 
 </Project>

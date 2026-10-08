@@ -9,6 +9,31 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-10-08 ImageSharp 安全升级（3.1.10 → 3.1.12）
+
+### 变更
+
+- **SixLabors.ImageSharp 3.1.10 → 3.1.12**（主工程 + StressGen + ClipSpike）：
+  - 修复 1 条 Moderate 通告（GHSA-rxmq-m78w-7wmc）
+  - 移除 csproj 遗留 `<NoWarn>NU1902</NoWarn>` 全局抑制
+- **残留 5 条通告（3 High + 2 Moderate）按 advisory 精确抑制**：
+  改用 `NuGetAuditSuppress`（逐条 URL，替代全局 NoWarn），未来其它包的
+  新通告不受影响。3.1.x 分支已停止安全维护，5 条的修复版本均为 v4.1.2；
+  升 4.x 需 Six Labors Split License key（Release 构建硬校验），暂不引入。
+  风险论证（2026-10-08 逐条核对 PoC 触发条件，详见 csproj 注释）：
+  本仓库不使用 HistogramEqualization / TiffEncoder / TiffCompression /
+  HalfVector4 / ICC 颜色转换 / IccProfile.Entries，TIFF 仅单向解码
+  （缩略图与预览输出一律 WebP），3 条 High（GHSA-j3p4 / GHSA-j9gm /
+  GHSA-jjfr，float TIFF + 直方图均衡化、TIFF T4/T6 1-bit 编码越界写）
+  的内存破坏路径均不可达；仅 BigTIFF 恶意文件存在单线程解码 DoS
+  （GHSA-wmxv，桌面场景影响有限），ICC CLUT 缺陷（GHSA-gwg2）需主动
+  访问 IccProfile.Entries 才触发
+- **4.1.2 升级预验证（已回退）**：编译 0 错误（现有 API 面完全兼容），
+  仅 Split License 构建校验阻塞 Release 门禁；日后如需升级，
+  在 csproj 配置 `$(SixLaborsLicenseKey)` 或 `sixlabors.lic` 即可
+- 版本号 0.7.0 → 0.7.1（依赖安全补丁，修订号 +0.0.1）
+- Release 0 警告 0 错误 + 全量 634 测试通过
+
 ## [0.7.0] — 2026-10-08 品牌焕新（星光相框猫 Logo + 青蓝星光配色）
 
 ### 新增
