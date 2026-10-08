@@ -18,7 +18,7 @@ public sealed class GalleryViewModel : ObservableObject
     private readonly AppSettingsService _settings;
     private bool _isLoading;
     private bool _isLoadingMore;
-    private bool _isGridView = true;
+    private string _viewMode = "Grid";
     private bool _hasMoreItems;
     private int _totalCount;
     private int _filteredCount;
@@ -37,7 +37,12 @@ public sealed class GalleryViewModel : ObservableObject
             Sort = ParseSort(settings.GallerySort),
             ImportedWithinDays = settings.GalleryRecentImportDays,
         };
-        _isGridView = settings.GalleryViewMode == "Grid";
+        _viewMode = settings.GalleryViewMode switch
+        {
+            "List" => "List",
+            "Browse" => "Browse",
+            _ => "Grid",
+        };
     }
 
     public IReadOnlyList<GallerySortOption> SortOptions { get; } =
@@ -103,23 +108,49 @@ public sealed class GalleryViewModel : ObservableObject
         private set => SetProperty(ref _filterSummary, value);
     }
 
-    public bool IsGridView
+    /// <summary>
+    /// Current presentation mode: "Grid" / "List" / "Browse". Single source of
+    /// truth; <see cref="IsGridView"/>/<see cref="IsListView"/>/
+    /// <see cref="IsBrowseView"/> are pass-through booleans for XAML Toggle
+    /// buttons (mutual exclusion via shared setter).
+    /// </summary>
+    public string ViewMode
     {
-        get => _isGridView;
+        get => _viewMode;
         set
         {
-            if (SetProperty(ref _isGridView, value))
+            string coerced = value switch
             {
+                "List" => "List",
+                "Browse" => "Browse",
+                _ => "Grid",
+            };
+            if (SetProperty(ref _viewMode, coerced))
+            {
+                _settings.GalleryViewMode = coerced;
+                OnPropertyChanged(nameof(IsGridView));
                 OnPropertyChanged(nameof(IsListView));
-                _settings.GalleryViewMode = value ? "Grid" : "List";
+                OnPropertyChanged(nameof(IsBrowseView));
             }
         }
     }
 
+    public bool IsGridView
+    {
+        get => _viewMode == "Grid";
+        set { if (value) ViewMode = "Grid"; }
+    }
+
     public bool IsListView
     {
-        get => !_isGridView;
-        set => IsGridView = !value;
+        get => _viewMode == "List";
+        set { if (value) ViewMode = "List"; }
+    }
+
+    public bool IsBrowseView
+    {
+        get => _viewMode == "Browse";
+        set { if (value) ViewMode = "Browse"; }
     }
 
     public GallerySort Sort
@@ -166,6 +197,21 @@ public sealed class GalleryViewModel : ObservableObject
         }
     }
 
+    /// <summary>B2-4-BRW: masonry card width (image edge; height follows aspect ratio).</summary>
+    public int BrowseZoom
+    {
+        get => _settings.GalleryBrowseZoom;
+        set
+        {
+            if (_settings.GalleryBrowseZoom != value)
+            {
+                _settings.GalleryBrowseZoom = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(BrowseCardWidth));
+            }
+        }
+    }
+
     /// <summary>VirtualizingTilePanel cell width (image edge + card padding).</summary>
     public int GridCardWidth => GridZoom + 16;
 
@@ -174,6 +220,9 @@ public sealed class GalleryViewModel : ObservableObject
 
     /// <summary>List-mode row height driven by B2-4.</summary>
     public int ListRowHeight => ListZoom + 16;
+
+    /// <summary>Masonry column width (image edge; 8px lateral gap added by panel padding).</summary>
+    public int BrowseCardWidth => BrowseZoom;
 
     public GalleryItemViewModel? PrimarySelected =>
         SelectedItems.Count > 0 ? SelectedItems[0] : null;

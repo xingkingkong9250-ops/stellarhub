@@ -103,6 +103,25 @@ public sealed class GalleryItemViewModel : ObservableObject
         Width is int w && Height is int h ? $"{w} × {h}" : "—";
 
     /// <summary>
+    /// B2-3-BRW: image height/width ratio for masonry layout. Falls back to
+    /// 1.0 (square) when dimensions are missing or invalid. Clamped to
+    /// [0.75, 1.5] so cards stay near-square (ArtStation-style balanced feed);
+    /// extreme panoramas / portraits are cropped via Stretch=UniformToFill.
+    /// </summary>
+    public double AspectRatio
+    {
+        get
+        {
+            if (Width is int w && w > 0 && Height is int h && h > 0)
+            {
+                double ratio = (double)h / w;
+                return Math.Clamp(ratio, 0.75, 1.5);
+            }
+            return 1.0;
+        }
+    }
+
+    /// <summary>
     /// U2-E (§4.D.1): first 2 tags joined by 「, 」 plus 「+N」 when there are more.
     /// Empty string when there are no tags (XAML hides the row via ZeroVis).
     /// </summary>

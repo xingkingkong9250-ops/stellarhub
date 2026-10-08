@@ -9,6 +9,86 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.6.2] — 2026-10-08 顶栏改版（VS Code 风格菜单行 + 工具条行）
+
+### 变更
+
+- **标题栏一体化（WindowChrome 合并）**：用 `WindowChrome` 把 Windows 系统
+  标题栏吃掉，Row 0 菜单行（40px）变成可拖动标题栏；自定义三按钮
+  （`CaptionButton` / `CaptionCloseButton` Style + `OnMinimize` /
+  `OnMaximize` / `OnClose` 事件 handler）替代 `UseAeroCaptionButtons`
+  （Windows 11 上 Aero 系统按钮不显示）；比原来 32px 系统标题栏 + 56px 单行
+  顶栏 = 88px → 40+44 = 84px，**净省 4px** 垂直空间，且两行比例协调
+- **顶栏布局重构**：原单行 56px → 双行 84px（菜单行 40 + 工具条行 44），
+  参照 VS Code / Trae 风格；解决窄窗口下右侧控件（排序、缩放、版本号、设置）
+  被推出屏幕的问题
+- **新增文本菜单栏（A1-M 系列）**：Menu + MenuItem，IsMainMenu=True，承载
+  次要功能入口，工具条行只放高频操作
+  - `文件(_F)`：导入图片（Ctrl+I）/ 扫描 NAS 库 / 下载队列
+  - `视图(_V)`：网格 / 列表 / 浏览（IsCheckable 互斥）+ 本地库 / 共享库
+    （仅 NAS 登录可见）
+  - `工具(_T)`：AI 分析 / 分析颜色 / 审核队列（条件可见）/ 设置
+  - `帮助(_H)`：关于 / 打开日志文件夹 / 快捷键提示（指向 C1-R）
+- **工具条行（A1-T）三列 Grid 布局**：
+  - 左 Auto：导入 / 扫描 NAS / AI / 颜色 / 下载队列 / 审核（含 pending 角标）
+  - 中 *：搜索框 + 搜索模式下拉 + 最近入库下拉（CompactHidePanel，
+    窗口 <1500px 时折叠）
+  - 右 Auto：本地/共享库切换 + 视图切换三按钮
+- 通知🔔 + 设置⚙ + 版本号迁移到菜单行右侧系统区
+- 状态栏 / 主分区 / 详情栏编号后移：Grid.Row 1→2、2→3
+- UI 编号新增：A1-M / A1-M-FILE / A1-M-VIEW / A1-M-TOOLS / A1-M-HELP / A1-T
+- 版本号 0.6.1 → 0.6.2（NO.P 补丁轮次）
+
+## [0.6.1] — 2026-10-08 浏览视图打磨（ArtStation 风格对齐）
+
+### 变更
+
+- **B2-3-BRW 长宽比收紧**：`GalleryItemViewModel.AspectRatio` clamp 由
+  `[0.4, 3.0]` 收紧至 `[0.75, 1.5]`，避免过多纵向长方形；与
+  `Stretch=UniformToFill` 配合裁剪极端纵横比，整体偏向近方形
+- **B2-3-BRW 卡片极简化**：默认态仅显示图片，移除常驻评分 chip 与来源
+  徽标；hover 时底部黑色渐变浮层显示「评分 ★ + 文件名」+ 右侧来源徽标
+  （参考 ArtStation Civilization VII 卡片设计）
+- **B2-3-BRW 移除失效按钮**：上一版的「打开 / 定位 / 复制路径」三按钮
+  hover 浮层功能无法触发（命令绑定上下文问题），按用户反馈直接替换为
+  文件名 + 评分文本，无交互按钮；如需操作请使用 B3 详情面板的快捷动作
+- 版本号 0.6.0 → 0.6.1（NO.P 补丁轮次）
+
+## [0.6.0] — 2026-10-08 画廊浏览视图（瀑布流，B2-3-BRW）
+
+### 新增
+
+- **B2-3-BRW 浏览视图（瀑布流）**：A1-3 视图切换新增「⊞ 浏览」第三态，
+  形成 Grid / List / Browse 三态互斥。瀑布流卡片为 ArtStation 风格的
+  极简文本布局：图片满栏宽、来源徽标右下、评分 chip 左上、hover 浮出
+  「打开 / 定位 / 复制路径」三按钮；无文件名 / 标签 / 尺寸文本块
+- **VirtualizingMasonryPanel**：新增像素滚动虚拟化瀑布流面板
+  （`src/QL.World/Views/Support/VirtualizingMasonryPanel.cs`）。等宽不等高，
+  按「最短列优先」放置下一张，`GalleryItemViewModel.AspectRatio`
+  （height/width，钳到 [0.4, 3.0]）决定卡片高度；与 `VirtualizingTilePanel`
+  同样的容器生命周期回收 / 异步加载 generator re-hook / ItemsPanel swap
+  外来容器恢复路径
+- **AspectRatio 计算属性**：`GalleryItemViewModel.AspectRatio` 由原图
+  width/height 计算并钳到合理范围，缺失尺寸回落 1.0（正方形）
+- **B2-4-BRW 浏览缩放滑杆**：B2-1 工具条新增 160–512 卡片宽度滑杆，
+  仅 Browse 态可见；与 Grid/List 各自独立持久化（`gallery_browse_zoom`）
+- **GalleryViewMode 三态**：`AppSettings.GalleryViewMode` 新增 `"Browse"`
+  取值；`AppSettingsService` 加载校验和 clamp 同步扩展；`GalleryViewModel`
+  重构为单源真值 `ViewMode`（string）+ `IsGridView`/`IsListView`/`IsBrowseView`
+  三个 pass-through 布尔；`SharedGalleryViewModel` 同步镜像（不持久化，
+  跟随本地 Gallery 状态）；`TopBarViewModel` 转发三个属性的 PropertyChanged
+
+### 变更
+
+- 版本号 0.5.13 → 0.6.0（新增功能，次版本 +0.1.0，修订号归零，NO.M 轮次）
+- UI 编号变更：A1-3 改为「网格/列表/浏览」三态；新增 B2-3-BRW；
+  B2-4 扩展为含浏览缩放滑杆
+- `SharedGalleryViewModelTests.Toggling_grid_raises_list_changed` 测试更新：
+  原 `IsGridView = !IsGridView` 2-state toggle 改为 `ViewMode = "List"`
+  显式赋值（3-state API 下 setting false 不再唯一确定另一态）
+- Release 0 警告 0 错误；`dotnet test` 634/634 通过
+- 无新增依赖
+
 ## [0.5.13] — 2026-10-08 画廊卡片与导入对话框文本叠加修复（F-18）
 
 ### 修复

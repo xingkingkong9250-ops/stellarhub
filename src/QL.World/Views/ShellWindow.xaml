@@ -16,6 +16,16 @@
         Foreground="{DynamicResource TextPrimaryBrush}"
         Title="{Binding Title}">
 
+    <WindowChrome.WindowChrome>
+        <!-- v0.6.2: 合并系统标题栏与 Row 0 菜单行；Windows 自动在右侧绘制
+             最小化/最大化/关闭三按钮，无需自定义按钮逻辑。 -->
+        <WindowChrome CaptionHeight="40"
+                      GlassFrameThickness="0"
+                      ResizeBorderThickness="6"
+                      CornerRadius="0"
+                      UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
+
     <Window.Resources>
         <x:Array x:Key="RatingSteps" Type="{x:Type sys:Int32}">
             <sys:Int32>1</sys:Int32>
@@ -31,6 +41,40 @@
         <conv:NumericThresholdConverter x:Key="Threshold" />
         <conv:RatingStarBrushConverter x:Key="StarBrush" />
         <conv:HexBrushConverter x:Key="HexBrush" />
+
+        <!-- v0.6.2: 自定义窗口 caption 按钮（替代 UseAeroCaptionButtons，Windows 11 上更稳定） -->
+        <Style x:Key="CaptionButton" TargetType="Button">
+            <Setter Property="Width" Value="46" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Cursor" Value="Arrow" />
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bg" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#14FFFFFF" TargetName="bg" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="CaptionCloseButton" TargetType="Button" BasedOn="{StaticResource CaptionButton}">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E81123" />
+                    <Setter Property="Foreground" Value="White" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
 
         <!-- F-04: responsive top bar — icon-only / shrunken controls under 1500 logical px -->
         <Style x:Key="CompactScanButton" TargetType="Button" BasedOn="{StaticResource SubtleButtonStyle}">
@@ -365,6 +409,91 @@
         <ItemsPanelTemplate x:Key="ListPanelTemplate">
             <VirtualizingStackPanel />
         </ItemsPanelTemplate>
+
+        <!-- B2-3-BRW: minimal-text masonry card. Image-only by default; on hover
+             a bottom gradient reveals file name + rating + source badge
+             (ArtStation-style). No permanent chips / no action buttons. -->
+        <DataTemplate x:Key="BrowseCardTemplate">
+            <Border Margin="4" CornerRadius="6" ClipToBounds="True"
+                    Background="{DynamicResource SurfaceVariantBrush}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}" />
+                        <Setter Property="BorderThickness" Value="0" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="BorderThickness" Value="2" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <Grid>
+                    <Image Source="{Binding ThumbnailImage}" Stretch="UniformToFill"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
+
+                    <!-- Hover overlay: bottom gradient with file name + rating + source badge -->
+                    <Border VerticalAlignment="Bottom">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Setter Property="Background">
+                                    <Setter.Value>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Offset="0" Color="Transparent" />
+                                            <GradientStop Offset="0.45" Color="#A6000000" />
+                                            <GradientStop Offset="1" Color="#E6000000" />
+                                        </LinearGradientBrush>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <Grid Margin="8,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <!-- Rating chip (only when rated > 0) -->
+                                <Border Margin="0,0,6,0" Padding="4,1" CornerRadius="3"
+                                        Background="#33000000"
+                                        Visibility="{Binding Rating, Converter={StaticResource ZeroVis}, ConverterParameter=Invert}">
+                                    <TextBlock Text="{Binding Rating, StringFormat='★{0}'}" FontSize="11"
+                                               Foreground="{DynamicResource AccentDimBrush}" />
+                                </Border>
+                                <TextBlock Text="{Binding FileName}" FontSize="11"
+                                           Foreground="{DynamicResource TextOnOverlayBrush}"
+                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <!-- Source badge (only when present) -->
+                            <Border Grid.Column="1" Margin="6,0,0,0" Padding="4,1" CornerRadius="3"
+                                    Background="#33000000"
+                                    Visibility="{Binding SourceBadge, Converter={StaticResource NullVis}}">
+                                <TextBlock Text="{Binding SourceBadge}" FontSize="10"
+                                           Foreground="{DynamicResource TextOnOverlayBrush}" />
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <!-- Missing file overlay (always visible when IsMissing) -->
+                    <Border Background="{DynamicResource OverlayBrush}"
+                            Visibility="{Binding IsMissing, Converter={StaticResource BoolVis}}">
+                        <TextBlock Text="文件缺失" Foreground="{DynamicResource WarningBrush}"
+                                   FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <ItemsPanelTemplate x:Key="BrowsePanelTemplate">
+            <support:VirtualizingMasonryPanel
+                ItemWidth="{Binding DataContext.BrowseCardWidth, RelativeSource={RelativeSource AncestorType=ListBox}}" />
+        </ItemsPanelTemplate>
     </Window.Resources>
 
     <Window.InputBindings>
@@ -381,113 +510,84 @@
 
     <Grid Background="{DynamicResource BackgroundBrush}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="56" />
+            <RowDefinition Height="40" />
+            <RowDefinition Height="44" />
             <RowDefinition Height="*" />
             <RowDefinition Height="28" />
         </Grid.RowDefinitions>
 
-        <!-- ═══════════ A1 顶栏 ═══════════ -->
+        <!-- ═══════════ A1-M Row 1: 菜单行（VS Code 风格 — 品牌 + 文本菜单栏 + 右侧系统区） ═══════════ -->
         <Border Grid.Row="0" Background="{DynamicResource SurfaceVariantBrush}"
                 BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1">
-            <Grid Margin="14,0">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- U2-A: brand gradient Logo block -->
-                    <Border Width="24" Height="24" CornerRadius="6" Margin="0,0,10,0"
+            <Grid Background="Transparent">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- 左侧：品牌 Logo + 名称 -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0">
+                    <Border Width="20" Height="20" CornerRadius="5" Margin="0,0,8,0"
                             Background="{DynamicResource AccentGradientBrush}" />
-                    <TextBlock Text="千星汇图" FontSize="15" FontWeight="Bold"
+                    <TextBlock Text="千星汇图" FontSize="13" FontWeight="Bold"
                                Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
-                    <TextBlock Text="素材库" Margin="10,2,0,0" FontSize="11"
-                               Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
-                    <Button Margin="16,0,0,0" Style="{StaticResource CompactImportButton}"
-                            Command="{Binding TopBar.ImportCommand}" />
-                    <!-- M5-D N7: scan a NAS library (remote import). -->
-                    <Button Margin="8,0,0,0" Style="{StaticResource CompactScanButton}"
-                            ToolTip="扫描已配置的 NAS 连接目录，索引为远程图片"
-                            AutomationProperties.Name="扫描NAS"
-                            Command="{Binding ScanNasLibraryCommand}" />
-                    <Button Margin="8,0,0,0" Style="{StaticResource CompactAiButton}"
-                            ToolTip="{Binding TopBar.AiDisabledReason}"
-                            Command="{Binding TopBar.AiCommand}" />
-                    <Button Margin="8,0,0,0" Style="{StaticResource CompactColorButton}"
-                            ToolTip="为缺失主色调的图片批量回填 dominant_colors"
-                            Command="{Binding TopBar.ColorCommand}" />
-                    <!-- M5-G: open the persistent download queue window. -->
-                    <Button Margin="8,0,0,0" Style="{StaticResource CompactDownloadButton}"
-                            ToolTip="打开下载队列（NAS→本地，支持续传/重试）"
-                            AutomationProperties.Name="下载队列"
-                            Command="{Binding ShowDownloadQueueCommand}" />
-                    <!-- U6-C: 管理员审核队列入口（含 pending 角标） -->
-                    <Grid Margin="8,0,0,0"
-                          Visibility="{Binding IsReviewAvailable, Converter={StaticResource BoolVis}}">
-                        <Button x:Name="ReviewQueueButton" Style="{StaticResource CompactReviewButton}"
-                                ToolTip="审核用户提交到共享库的图片"
-                                AutomationProperties.Name="审核队列"
-                                Command="{Binding ShowReviewQueueCommand}" />
-                        <Border MinWidth="16" Height="16" Padding="4,0"
-                                HorizontalAlignment="Right" VerticalAlignment="Top"
-                                Margin="0,-4,-6,0" CornerRadius="8"
-                                Background="{DynamicResource WarningBrush}"
-                                Visibility="{Binding PendingCount, Converter={StaticResource ZeroVis}, ConverterParameter=Invert}">
-                            <TextBlock FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextOnWarningBrush}"
-                                       Text="{Binding PendingCount}"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                    </Grid>
                 </StackPanel>
 
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
-                            VerticalAlignment="Center">
-                    <!-- U2-B (§4.B.1): 最近入库 dropdown (hidden in compact mode) -->
-                    <StackPanel Style="{StaticResource CompactHidePanel}" Orientation="Horizontal">
-                        <ComboBox Width="118"
-                                  ItemsSource="{Binding TopBar.RecentImportOptions}"
-                                  DisplayMemberPath="Display"
-                                  SelectedValuePath="Days"
-                                  SelectedValue="{Binding TopBar.SelectedRecentImport}" />
-                        <Border Width="1" Height="24" Margin="12,0"
-                                Background="{DynamicResource BorderSubtleBrush}" />
-                    </StackPanel>
-                    <TextBox x:Name="SearchTextBox" Style="{StaticResource CompactSearchBox}" Height="32"
-                             AutomationProperties.Name="SearchBox"
-                             VerticalContentAlignment="Center"
-                             Text="{Binding TopBar.SearchText, UpdateSourceTrigger=PropertyChanged}"
-                             ToolTip="搜索（300ms 防抖）" />
-                    <ComboBox Width="118" Margin="8,0,0,0"
-                              ItemsSource="{Binding TopBar.SearchModes}"
-                              DisplayMemberPath="Display"
-                              SelectedValuePath="Mode"
-                              SelectedValue="{Binding TopBar.SelectedSearchMode}" />
+                <!-- 中部：文本菜单栏（文件 / 视图 / 工具 / 帮助）— A1-M -->
+                <Menu Grid.Column="1" Background="Transparent" VerticalAlignment="Center"
+                      IsMainMenu="True" Margin="6,0,0,0"
+                      WindowChrome.IsHitTestVisibleInChrome="True">
+                    <MenuItem Header="文件(_F)">
+                        <MenuItem Header="导入图片…" Command="{Binding TopBar.ImportCommand}"
+                                  InputGestureText="Ctrl+I" />
+                        <MenuItem Header="扫描 NAS 库…" Command="{Binding ScanNasLibraryCommand}" />
+                        <MenuItem Header="下载队列…" Command="{Binding ShowDownloadQueueCommand}" />
+                    </MenuItem>
+                    <MenuItem Header="视图(_V)">
+                        <MenuItem Header="网格视图" IsCheckable="True"
+                                  IsChecked="{Binding TopBar.IsGridView, Mode=TwoWay}"
+                                  InputGestureText="▦" />
+                        <MenuItem Header="列表视图" IsCheckable="True"
+                                  IsChecked="{Binding Gallery.IsListView, Mode=TwoWay}"
+                                  InputGestureText="≡" />
+                        <MenuItem Header="浏览视图（瀑布流）" IsCheckable="True"
+                                  IsChecked="{Binding TopBar.IsBrowseView, Mode=TwoWay}"
+                                  InputGestureText="⊞" />
+                        <Separator Style="{StaticResource MenuSeparatorStyle}"
+                                   Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}" />
+                        <MenuItem Header="本地库" IsCheckable="True"
+                                  IsChecked="{Binding IsLocalScope, Mode=TwoWay}"
+                                  Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}" />
+                        <MenuItem Header="共享库"
+                                  Command="{Binding SwitchToSharedCommand}"
+                                  Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}" />
+                    </MenuItem>
+                    <MenuItem Header="工具(_T)">
+                        <MenuItem Header="AI 分析" Command="{Binding TopBar.AiCommand}"
+                                  ToolTip="{Binding TopBar.AiDisabledReason}" />
+                        <MenuItem Header="分析颜色（批量回填）" Command="{Binding TopBar.ColorCommand}" />
+                        <Separator Style="{StaticResource MenuSeparatorStyle}" />
+                        <MenuItem Header="审核队列…" Command="{Binding ShowReviewQueueCommand}"
+                                  Visibility="{Binding IsReviewAvailable, Converter={StaticResource BoolVis}}" />
+                        <Separator Style="{StaticResource MenuSeparatorStyle}"
+                                   Visibility="{Binding IsReviewAvailable, Converter={StaticResource BoolVis}}" />
+                        <MenuItem Header="设置…" Command="{Binding TopBar.SettingsCommand}" />
+                    </MenuItem>
+                    <MenuItem Header="帮助(_H)">
+                        <MenuItem Header="关于 / 版本信息" Command="{Binding TopBar.SettingsCommand}" />
+                        <MenuItem Header="打开日志文件夹" Command="{Binding TopBar.SettingsCommand}" />
+                        <Separator Style="{StaticResource MenuSeparatorStyle}" />
+                        <MenuItem Header="快捷键提示" IsEnabled="False"
+                                  ToolTip="见状态栏右下角上下文提示" />
+                    </MenuItem>
+                </Menu>
 
-                    <Border Width="1" Height="24" Margin="12,0"
-                            Background="{DynamicResource BorderSubtleBrush}" />
-
-                    <!-- U6-A B1-SCOPE: 本地库/共享库切换（仅 NAS 登录可见） -->
-                    <StackPanel Orientation="Horizontal"
-                                Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}">
-                        <ToggleButton Style="{StaticResource CompactScopeToggle}"
-                                      IsChecked="{Binding IsLocalScope}"
-                                      Content="本地库" Tag="💻" ToolTip="本地图片库" />
-                        <ToggleButton Style="{StaticResource CompactScopeToggle}" Margin="4,0,0,0"
-                                      IsChecked="{Binding IsSharedScope, Mode=OneWay}"
-                                      Command="{Binding SwitchToSharedCommand}"
-                                      Content="共享库" Tag="☁️" ToolTip="NAS 共享图库" />
-                    </StackPanel>
-
-                    <Border Width="1" Height="24" Margin="12,0"
-                            Background="{DynamicResource BorderSubtleBrush}"
-                            Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}" />
-
-                    <ToggleButton Style="{StaticResource CompactViewToggle}"
-                                  IsChecked="{Binding TopBar.IsGridView}"
-                                  Content="▦ 网格" Tag="▦" ToolTip="网格视图" />
-                    <ToggleButton Style="{StaticResource CompactViewToggle}" Margin="4,0,0,0"
-                                  IsChecked="{Binding Gallery.IsListView}"
-                                  Content="≡ 列表" Tag="≡" ToolTip="列表视图" />
-
-                    <Border Width="1" Height="24" Margin="12,0"
-                            Background="{DynamicResource BorderSubtleBrush}" />
-
-                    <Grid>
+                <!-- 右侧：通知 + 设置 + 版本号 + 自定义系统三按钮 -->
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center"
+                            WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Grid Margin="0,0,6,0">
                         <Button x:Name="NotificationsButton" Style="{StaticResource SubtleButtonStyle}" Content="🔔"
                                 ToolTip="消息中心"
                                 Command="{Binding TopBar.NotificationsCommand}" />
@@ -551,17 +651,127 @@
                             </Border>
                         </Popup>
                     </Grid>
-                    <Button Style="{StaticResource SubtleButtonStyle}" Content="⚙" Margin="4,0,0,0"
-                            ToolTip="设置（M2 开放）"
+                    <Button Style="{StaticResource SubtleButtonStyle}" Content="⚙" Margin="6,0,0,0"
+                            ToolTip="设置"
                             Command="{Binding TopBar.SettingsCommand}" />
                     <TextBlock Text="{Binding VersionText}" Margin="10,0,0,0" Style="{StaticResource CompactVersionText}"
                                Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
+                    <!-- v0.6.2: 自定义 caption 三按钮（替代系统 AeroCaptionButtons） -->
+                    <Button Style="{StaticResource CaptionButton}" Content="—" Margin="8,0,0,0"
+                            ToolTip="最小化" Click="OnMinimize" />
+                    <Button Style="{StaticResource CaptionButton}" Content="▢"
+                            ToolTip="最大化/还原" Click="OnMaximize" />
+                    <Button Style="{StaticResource CaptionCloseButton}" Content="✕"
+                            ToolTip="关闭" Click="OnClose" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ═══════════ A1-T Row 2: 工具条行（操作按钮 + 搜索 + 视图切换） ═══════════ -->
+        <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1">
+            <Grid Margin="14,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- 左侧：操作工具条 -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Style="{StaticResource CompactImportButton}"
+                            Command="{Binding TopBar.ImportCommand}" />
+                    <!-- M5-D N7: scan a NAS library (remote import). -->
+                    <Button Margin="8,0,0,0" Style="{StaticResource CompactScanButton}"
+                            ToolTip="扫描已配置的 NAS 连接目录，索引为远程图片"
+                            AutomationProperties.Name="扫描NAS"
+                            Command="{Binding ScanNasLibraryCommand}" />
+                    <Button Margin="8,0,0,0" Style="{StaticResource CompactAiButton}"
+                            ToolTip="{Binding TopBar.AiDisabledReason}"
+                            Command="{Binding TopBar.AiCommand}" />
+                    <Button Margin="8,0,0,0" Style="{StaticResource CompactColorButton}"
+                            ToolTip="为缺失主色调的图片批量回填 dominant_colors"
+                            Command="{Binding TopBar.ColorCommand}" />
+                    <!-- M5-G: open the persistent download queue window. -->
+                    <Button Margin="8,0,0,0" Style="{StaticResource CompactDownloadButton}"
+                            ToolTip="打开下载队列（NAS→本地，支持续传/重试）"
+                            AutomationProperties.Name="下载队列"
+                            Command="{Binding ShowDownloadQueueCommand}" />
+                    <!-- U6-C: 管理员审核队列入口（含 pending 角标） -->
+                    <Grid Margin="8,0,0,0"
+                          Visibility="{Binding IsReviewAvailable, Converter={StaticResource BoolVis}}">
+                        <Button x:Name="ReviewQueueButton" Style="{StaticResource CompactReviewButton}"
+                                ToolTip="审核用户提交到共享库的图片"
+                                AutomationProperties.Name="审核队列"
+                                Command="{Binding ShowReviewQueueCommand}" />
+                        <Border MinWidth="16" Height="16" Padding="4,0"
+                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Margin="0,-4,-6,0" CornerRadius="8"
+                                Background="{DynamicResource WarningBrush}"
+                                Visibility="{Binding PendingCount, Converter={StaticResource ZeroVis}, ConverterParameter=Invert}">
+                            <TextBlock FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextOnWarningBrush}"
+                                       Text="{Binding PendingCount}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </Grid>
+                </StackPanel>
+
+                <!-- 中部：搜索框 + 搜索模式 + 最近入库 -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                    <TextBox x:Name="SearchTextBox" Style="{StaticResource CompactSearchBox}" Height="30"
+                             AutomationProperties.Name="SearchBox"
+                             VerticalContentAlignment="Center"
+                             Text="{Binding TopBar.SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="搜索（300ms 防抖）" />
+                    <ComboBox Width="118" Margin="8,0,0,0"
+                              ItemsSource="{Binding TopBar.SearchModes}"
+                              DisplayMemberPath="Display"
+                              SelectedValuePath="Mode"
+                              SelectedValue="{Binding TopBar.SelectedSearchMode}" />
+                    <!-- U2-B: 最近入库 dropdown (collapsed under 1500px) -->
+                    <StackPanel Style="{StaticResource CompactHidePanel}" Orientation="Horizontal">
+                        <ComboBox Width="110" Margin="8,0,0,0"
+                                  ItemsSource="{Binding TopBar.RecentImportOptions}"
+                                  DisplayMemberPath="Display"
+                                  SelectedValuePath="Days"
+                                  SelectedValue="{Binding TopBar.SelectedRecentImport}"
+                                  ToolTip="按入库时间筛选" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- 右侧：本地/共享库切换 + 视图切换 -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- U6-A B1-SCOPE: 本地库/共享库切换（仅 NAS 登录可见） -->
+                    <StackPanel Orientation="Horizontal"
+                                Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}">
+                        <ToggleButton Style="{StaticResource CompactScopeToggle}"
+                                      IsChecked="{Binding IsLocalScope}"
+                                      Content="本地库" Tag="💻" ToolTip="本地图片库" />
+                        <ToggleButton Style="{StaticResource CompactScopeToggle}" Margin="4,0,0,0"
+                                      IsChecked="{Binding IsSharedScope, Mode=OneWay}"
+                                      Command="{Binding SwitchToSharedCommand}"
+                                      Content="共享库" Tag="☁️" ToolTip="NAS 共享图库" />
+                        <Border Width="1" Height="22" Margin="12,0"
+                                Background="{DynamicResource BorderSubtleBrush}" />
+                    </StackPanel>
+
+                    <ToggleButton Style="{StaticResource CompactViewToggle}"
+                                  IsChecked="{Binding TopBar.IsGridView}"
+                                  Content="▦ 网格" Tag="▦" ToolTip="网格视图" />
+                    <ToggleButton Style="{StaticResource CompactViewToggle}" Margin="4,0,0,0"
+                                  IsChecked="{Binding Gallery.IsListView}"
+                                  Content="≡ 列表" Tag="≡" ToolTip="列表视图" />
+                    <!-- B2-3-BRW: 浏览（瀑布流）— 图片为主、极少文本 -->
+                    <ToggleButton Style="{StaticResource CompactViewToggle}" Margin="4,0,0,0"
+                                  IsChecked="{Binding TopBar.IsBrowseView}"
+                                  Content="⊞ 浏览" Tag="⊞" ToolTip="浏览视图（瀑布流）" />
                 </StackPanel>
             </Grid>
         </Border>
 
         <!-- ═══════════ B 主分区 ═══════════ -->
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="240" MinWidth="220" MaxWidth="300" />
                 <ColumnDefinition Width="Auto" />
@@ -836,6 +1046,11 @@
                                     TickFrequency="8" IsSnapToTickEnabled="True"
                                     VerticalAlignment="Center"
                                     Visibility="{Binding Gallery.IsListView, Converter={StaticResource BoolVis}}" />
+                            <!-- B2-4-BRW zoom (browse masonry width) -->
+                            <Slider x:Name="BrowseZoomSlider" Width="120" Minimum="160" Maximum="512"
+                                    TickFrequency="8" IsSnapToTickEnabled="True"
+                                    VerticalAlignment="Center"
+                                    Visibility="{Binding Gallery.IsBrowseView, Converter={StaticResource BoolVis}}" />
                             <Border Background="{DynamicResource BorderSubtleBrush}"
                                     Width="1" Height="16" Margin="10,0" />
                             <TextBlock Text="排序" VerticalAlignment="Center"
@@ -870,6 +1085,10 @@
                                         <DataTrigger Binding="{Binding IsListView}" Value="True">
                                             <Setter Property="ItemsPanel" Value="{StaticResource ListPanelTemplate}" />
                                             <Setter Property="ItemTemplate" Value="{StaticResource ListRowTemplate}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsBrowseView}" Value="True">
+                                            <Setter Property="ItemsPanel" Value="{StaticResource BrowsePanelTemplate}" />
+                                            <Setter Property="ItemTemplate" Value="{StaticResource BrowseCardTemplate}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -950,6 +1169,10 @@
                                         <DataTrigger Binding="{Binding DataContext.Gallery.IsListView, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
                                             <Setter Property="ItemsPanel" Value="{StaticResource ListPanelTemplate}" />
                                             <Setter Property="ItemTemplate" Value="{StaticResource ListRowTemplate}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding DataContext.Gallery.IsBrowseView, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                            <Setter Property="ItemsPanel" Value="{StaticResource BrowsePanelTemplate}" />
+                                            <Setter Property="ItemTemplate" Value="{StaticResource BrowseCardTemplate}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -1364,7 +1587,7 @@
         </Grid>
 
         <!-- ═══════════ C1 状态栏（C1-L 状态 / C1-C 计数 / C1-R 快捷键提示+AI 档位） ═══════════ -->
-        <Border Grid.Row="2" Background="{DynamicResource SurfaceVariantBrush}"
+        <Border Grid.Row="3" Background="{DynamicResource SurfaceVariantBrush}"
                 BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,1,0,0">
             <Grid>
                 <Grid.RowDefinitions>

@@ -17,7 +17,7 @@ public sealed class SharedGalleryViewModel : ObservableObject
     private readonly AppSettingsService _settings;
     private readonly List<GalleryItemViewModel> _allItems = [];
     private readonly Dictionary<string, SharedImageRecord> _records = new(StringComparer.Ordinal);
-    private bool _isGridView;
+    private string _viewMode = "Grid";
 
     public SharedGalleryViewModel(
         AppSettingsService settings,
@@ -25,7 +25,12 @@ public sealed class SharedGalleryViewModel : ObservableObject
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         Thumbnails = thumbnails ?? throw new ArgumentNullException(nameof(thumbnails));
-        _isGridView = settings.GalleryViewMode == "Grid";
+        _viewMode = settings.GalleryViewMode switch
+        {
+            "List" => "List",
+            "Browse" => "Browse",
+            _ => "Grid",
+        };
     }
 
     public IGalleryThumbnailProvider Thumbnails { get; }
@@ -43,20 +48,47 @@ public sealed class SharedGalleryViewModel : ObservableObject
 
     public void NotifySelectionChanged() => SelectionChanged?.Invoke();
 
-    public bool IsGridView
+    /// <summary>
+    /// U6-A: shared gallery view mode mirrors the local Gallery; pass-through
+    /// booleans for XAML Toggle buttons. Setter does NOT persist (the local
+    /// <see cref="GalleryViewModel"/> owns persistence; shared follows UI state).
+    /// </summary>
+    public string ViewMode
     {
-        get => _isGridView;
+        get => _viewMode;
         set
         {
-            if (SetProperty(ref _isGridView, value))
+            string coerced = value switch
+            {
+                "List" => "List",
+                "Browse" => "Browse",
+                _ => "Grid",
+            };
+            if (SetProperty(ref _viewMode, coerced))
+            {
+                OnPropertyChanged(nameof(IsGridView));
                 OnPropertyChanged(nameof(IsListView));
+                OnPropertyChanged(nameof(IsBrowseView));
+            }
         }
+    }
+
+    public bool IsGridView
+    {
+        get => _viewMode == "Grid";
+        set { if (value) ViewMode = "Grid"; }
     }
 
     public bool IsListView
     {
-        get => !_isGridView;
-        set => IsGridView = !value;
+        get => _viewMode == "List";
+        set { if (value) ViewMode = "List"; }
+    }
+
+    public bool IsBrowseView
+    {
+        get => _viewMode == "Browse";
+        set { if (value) ViewMode = "Browse"; }
     }
 
     // Zoom metrics delegate to the same settings as the local gallery so the
@@ -74,9 +106,16 @@ public sealed class SharedGalleryViewModel : ObservableObject
         set => _settings.GalleryListZoom = value;
     }
 
+    public int BrowseZoom
+    {
+        get => _settings.GalleryBrowseZoom;
+        set => _settings.GalleryBrowseZoom = value;
+    }
+
     public int GridCardWidth => GridZoom + 16;
     public int GridCardHeight => GridZoom + 56;
     public int ListRowHeight => ListZoom + 16;
+    public int BrowseCardWidth => BrowseZoom;
 
     /// <summary>
     /// Replaces displayed items from the loaded shared records. Id is a local

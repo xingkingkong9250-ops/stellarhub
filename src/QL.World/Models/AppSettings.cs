@@ -23,7 +23,7 @@ public sealed class AppSettings
     /// <summary>WebP encoder quality (30–100).</summary>
     public int ThumbnailQuality { get; set; } = 82;
 
-    /// <summary>W1/B2 gallery presentation: "Grid" or "List".</summary>
+    /// <summary>W1/B2 gallery presentation: "Grid" / "List" / "Browse".</summary>
     public string GalleryViewMode { get; set; } = "Grid";
 
     /// <summary>W1/B2-2 last chosen sort key.</summary>
@@ -37,6 +37,9 @@ public sealed class AppSettings
 
     /// <summary>B2-4 list row thumbnail zoom (80–512).</summary>
     public int GalleryListZoom { get; set; } = 96;
+
+    /// <summary>B2-4-BRW browse (masonry) card width (160–512).</summary>
+    public int GalleryBrowseZoom { get; set; } = 240;
 
     /// <summary>U3-A (§4.B.2): B1-5 attribute filter section expanded (default collapsed).</summary>
     public bool SidebarAttributeFilterExpanded { get; set; }

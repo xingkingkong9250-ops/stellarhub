@@ -202,6 +202,15 @@ public sealed class AppSettingsService
             next => _settings.GalleryListZoom = next);
     }
 
+    /// <summary>B2-4-BRW browse (masonry) card width (160–512).</summary>
+    public int GalleryBrowseZoom
+    {
+        get => _settings.GalleryBrowseZoom;
+        set => SetAndSave(Math.Clamp(value, MIN_ZOOM, MAX_ZOOM),
+            () => _settings.GalleryBrowseZoom,
+            next => _settings.GalleryBrowseZoom = next);
+    }
+
     /// <summary>U3-A (§4.B.2): B1-5 attribute filter section expanded.</summary>
     public bool SidebarAttributeFilterExpanded
     {
@@ -583,7 +592,7 @@ public sealed class AppSettingsService
         _settings.ThumbnailQuality =
             Math.Clamp(_settings.ThumbnailQuality, MIN_THUMBNAIL_QUALITY, MAX_THUMBNAIL_QUALITY);
 
-        if (_settings.GalleryViewMode is not ("Grid" or "List"))
+        if (_settings.GalleryViewMode is not ("Grid" or "List" or "Browse"))
             _settings.GalleryViewMode = "Grid";
 
         if (string.IsNullOrWhiteSpace(_settings.GallerySort))
@@ -593,6 +602,8 @@ public sealed class AppSettingsService
             Math.Clamp(_settings.GalleryGridZoom, MIN_ZOOM, MAX_ZOOM);
         _settings.GalleryListZoom =
             Math.Clamp(_settings.GalleryListZoom, MIN_ZOOM, MAX_ZOOM);
+        _settings.GalleryBrowseZoom =
+            Math.Clamp(_settings.GalleryBrowseZoom, MIN_ZOOM, MAX_ZOOM);
 
         _settings.WatcherDirectories ??= [];
 

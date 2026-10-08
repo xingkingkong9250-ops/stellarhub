@@ -7,16 +7,22 @@
 | 编号 | 名称 | 状态 | 说明 |
 |---|---|---|---|
 | W1 | 主窗口 | 已实现（M1） | 1400×850，最小 1100×700，PerMonitorV2 |
-| W1/A1 | 顶栏（高 56） | 已实现（M1） | 控件见 A1-1…A1-8（A1-2/A1-8 M3 接线） |
+| W1/A1 | 顶栏（菜单行 40 + 工具条行 44 = 84；菜单行兼任标题栏） | 已实现（M1，v0.6.2 改版） | v0.6.2 用 WindowChrome 合并系统标题栏与 Row 0 菜单行；Row 0 = 标题栏（可拖动 + 自定义 caption 三按钮，因 Windows 11 上 AeroCaptionButtons 不显示）；Row 1 工具条行（A1-1…A1-8 控件）；解决窄窗口下右侧控件被遮挡问题 |
 | W1/A1-1 | 「导入」按钮 | 已实现（M1） | 「＋ 导入图片」，打开 W2 |
 | W1/A1-2 | 「AI 分析」按钮 | 已实现（M3） | AI 可用时触发批量分析；不可用时置灰 + ToolTip 说明原因 |
-| W1/A1-3 | 视图切换（网格/列表） | 已实现（M1） | ToggleButton 互斥切换 + 独立缩放 |
+| W1/A1-3 | 视图切换（网格/列表/浏览） | 已实现（M1+B2-3-BRW） | 三态 ToggleButton 互斥切换；网格/列表各一支缩放滑杆，浏览态独立 160–512 卡片宽度滑杆 |
 | W1/A1-4 | 搜索框 | 已实现（M1） | AutomationId 语义名 SearchBox，300ms 防抖 |
 | W1/A1-5 | 搜索模式下拉 | 已实现（M1） | 标签 / 文件名·备注 / 语义（M3-E1） |
 | W1/A1-6 | 通知铃铛 | 已实现（M2） | 未读红点徽标 + 弹层列表（未读标记/全部已读/清空） |
 | W1/A1-7 | 设置齿轮 | 已实现（M2） | 打开 W3 |
 | W1/A1-8 | 「分析颜色」按钮 | 已实现（M3-D） | 手动批量回填 dominant_colors；与 AI 档位无关；占用主线程串行执行 |
 | W1/A1-9 | Logo 文字块 + AI 按钮品牌渐变 | 已实现（U2-A） | Logo 文字 AccentGradientBrush（Accent→AccentDim）；AI 按钮 hover 切渐变背景 + TextOnAccentBrush 文字 |
+| W1/A1-M | 文本菜单栏（VS Code 风格 Row 0，兼任标题栏） | 已实现（v0.6.2） | Menu + MenuItem；IsMainMenu=True；CaptionHeight=40 让 Row 0 兼任可拖动标题栏；自定义 CaptionButton/CaptionCloseButton Style 替代 AeroCaptionButtons（Windows 11 不显示系统按钮）；Menu + 右侧系统区均加 IsHitTestVisibleInChrome=True；子项见 A1-M-FILE / A1-M-VIEW / A1-M-TOOLS / A1-M-HELP |
+| W1/A1-M-FILE | 「文件(_F)」菜单 | 已实现（v0.6.2） | 导入图片（Ctrl+I）/ 扫描 NAS 库 / 下载队列 |
+| W1/A1-M-VIEW | 「视图(_V)」菜单 | 已实现（v0.6.2） | 三态视图（IsCheckable 互斥：网格/列表/浏览）+ 分隔 + 本地库/共享库（仅 IsSharedLibraryAvailable 可见） |
+| W1/A1-M-TOOLS | 「工具(_T)」菜单 | 已实现（v0.6.2） | AI 分析 / 分析颜色 / 分隔 + 审核队列（仅 IsReviewAvailable 可见）/ 分隔 / 设置 |
+| W1/A1-M-HELP | 「帮助(_H)」菜单 | 已实现（v0.6.2） | 关于（→设置）/ 打开日志文件夹 / 分隔 / 快捷键提示（IsEnabled=False，引导看 C1-R） |
+| W1/A1-T | 工具条行（Row 1，高 42） | 已实现（v0.6.2） | 三列 Grid：左 Auto=导入/扫描/AI/颜色/下载/审核；中 *=搜索框+搜索模式+最近入库（CompactHidePanel）；右 Auto=本地/共享库切换+视图切换三按钮 |
 | W1/B1 | 左栏（220–300，实配 240） | 已实现（M2） | |
 | W1/B1-1 | 素材库树 | 已实现（M1） | 全部 + 10 分类 + 未分类（TagTree）；含子项计数显示（Count 绑定，U1-B 核实） |
 | W1/B1-2 | 收藏夹树 | 已实现（M2） | 单击筛选/再点清除；右键建/改名/删/设封面/加入；画廊拖拽加入；含子项计数显示（U1-B 核实） |
@@ -38,7 +44,8 @@
 | W1/B2-3-TAG | 卡片标签摘要行 | 已实现（U2-E） | 网格卡片第三行：前 2 标签 + 「+N」；无标签隐藏 |
 | W1/B2-3-CM1 | 图卡右键「找相似图」 | 已实现（M3-E1）/ 冒烟（M4-D） | 按 CLIP embedding 余弦相似度返回 top-50；无 embedding 时置灰；UiSmokeB1.ps1 覆盖 |
 | W1/B2-3-ACT | 卡片 hover 操作组 | 已实现（U3-B） | 仅网格态：缩略图底部三按钮浮层（打开原文件↗/资源管理器定位⌖/复制路径⧉），hover 浮出、移出即隐；作用于悬停卡片（参数化命令）而非当前选中；缺失卡被缺失遮罩覆盖天然不可触且 CanExecute 排除；列表态不加 |
-| W1/B2-4 | 缩放滑杆（80–512） | 已实现（M1） | 网格/列表各一支，按视图显隐 |
+| W1/B2-4 | 缩放滑杆（80–512） | 已实现（M1+B2-3-BRW） | 网格/列表各一支；浏览态 160–512 卡片宽度滑杆，按视图显隐 |
+| W1/B2-3-BRW | 浏览（瀑布流）视图 | 已实现（B2-3-BRW） | 三态视图之一；VirtualizingMasonryPanel 等宽不等高瀑布流（短列优先放置），GalleryItemViewModel.AspectRatio 决定每张卡片高度；最小文本：仅来源徽标 + 评分 chip + hover 操作浮层，无文件名/标签/尺寸文本 |
 | W1/B3 | 详情栏（280–400，实配 300） | 已实现（M1） | 含多选批量编辑态 |
 | W1/B3-1 | 大图预览 | 已实现（M1） | 缺失文件覆盖缺失态 |
 | W1/B3-2 | 文件信息/缺失态 | 已实现（M1） | 定位/复制路径/打开原文件；重新定位（M2）已接入 |

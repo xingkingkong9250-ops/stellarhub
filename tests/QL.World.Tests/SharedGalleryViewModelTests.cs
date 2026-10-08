@@ -50,9 +50,12 @@ public sealed class SharedGalleryViewModelTests : IDisposable
     [Fact]
     public void Toggling_grid_raises_list_changed()
     {
+        // B2-3-BRW: view mode is now 3-state (Grid/List/Browse) backed by
+        // ViewMode string; the Is*View booleans are pass-throughs. Switching
+        // to List flips both IsGridView and IsListView.
         bool startedList = _vm.IsListView;
 
-        _vm.IsGridView = !_vm.IsGridView;
+        _vm.ViewMode = "List";
 
         Assert.NotEqual(startedList, _vm.IsListView);
         Assert.NotEqual(_vm.IsGridView, _vm.IsListView);

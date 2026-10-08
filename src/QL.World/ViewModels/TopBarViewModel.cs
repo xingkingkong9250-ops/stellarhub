@@ -61,12 +61,16 @@ public sealed class TopBarViewModel : ObservableObject
         // the B1 view-toggle bound to TopBar.IsGridView never re-pulls when the
         // mode changes via the Gallery.IsListView-bound counterpart, so both
         // buttons could render checked at once. Forward the notification.
+        // B2-3-BRW: same forwarding for the new Browse toggle (List toggle binds
+        // Gallery.IsListView directly, so we don't mirror IsListView on TopBar).
         _gallery.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(GalleryViewModel.IsGridView)
-                or nameof(GalleryViewModel.IsListView))
+                or nameof(GalleryViewModel.IsListView)
+                or nameof(GalleryViewModel.IsBrowseView))
             {
                 OnPropertyChanged(nameof(IsGridView));
+                OnPropertyChanged(nameof(IsBrowseView));
             }
         };
 
@@ -205,6 +209,13 @@ public sealed class TopBarViewModel : ObservableObject
     {
         get => _gallery.IsGridView;
         set => _gallery.IsGridView = value;
+    }
+
+    /// <summary>B2-3-BRW: pass-through to Gallery; bound by A1-3 「浏览」 toggle.</summary>
+    public bool IsBrowseView
+    {
+        get => _gallery.IsBrowseView;
+        set => _gallery.IsBrowseView = value;
     }
 
     // ─── U2-B (§4.B.1): 最近入库 dropdown ───────────────────────────────────

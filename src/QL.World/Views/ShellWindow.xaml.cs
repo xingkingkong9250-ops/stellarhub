@@ -24,6 +24,10 @@ public partial class ShellWindow : Window
     {
         Interval = TimeSpan.FromMilliseconds(ZOOM_DEBOUNCE_MS),
     };
+    private readonly DispatcherTimer _browseZoomTimer = new()
+    {
+        Interval = TimeSpan.FromMilliseconds(ZOOM_DEBOUNCE_MS),
+    };
     /// <summary>Load the next page this many pixels before the bottom (M4-D).</summary>
     private const double LOAD_MORE_THRESHOLD_PX = 500;
     private ScrollViewer? _galleryScroll;
@@ -54,10 +58,17 @@ public partial class ShellWindow : Window
             _listZoomTimer.Stop();
             _viewModel.Gallery.ListZoom = (int)ListZoomSlider.Value;
         };
+        _browseZoomTimer.Tick += (_, _) =>
+        {
+            _browseZoomTimer.Stop();
+            _viewModel.Gallery.BrowseZoom = (int)BrowseZoomSlider.Value;
+        };
         GridZoomSlider.Value = _viewModel.Gallery.GridZoom;
         ListZoomSlider.Value = _viewModel.Gallery.ListZoom;
+        BrowseZoomSlider.Value = _viewModel.Gallery.BrowseZoom;
         GridZoomSlider.ValueChanged += (_, _) => Restart(_gridZoomTimer);
         ListZoomSlider.ValueChanged += (_, _) => Restart(_listZoomTimer);
+        BrowseZoomSlider.ValueChanged += (_, _) => Restart(_browseZoomTimer);
 
         _viewModel.TopBar.FocusSearchRequested += FocusSearch;
 
@@ -65,6 +76,12 @@ public partial class ShellWindow : Window
         GalleryList.MouseMove += GalleryList_MouseMove;
         GalleryList.Loaded += (_, _) => HookGalleryScroll();
     }
+
+    // ─── v0.6.2: 自定义窗口 caption 按钮（替代 UseAeroCaptionButtons） ────
+    private void OnMinimize(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+    private void OnMaximize(object sender, RoutedEventArgs e) =>
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    private void OnClose(object sender, RoutedEventArgs e) => Close();
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
