@@ -9,14 +9,15 @@
 | W1 | 主窗口 | 已实现（M1） | 1400×850，最小 1100×700，PerMonitorV2 |
 | W1/A1 | 顶栏（菜单行 40 + 工具条行 44 = 84；菜单行兼任标题栏） | 已实现（M1，v0.6.2 改版） | v0.6.2 用 WindowChrome 合并系统标题栏与 Row 0 菜单行；Row 0 = 标题栏（可拖动 + 自定义 caption 三按钮，因 Windows 11 上 AeroCaptionButtons 不显示）；Row 1 工具条行（A1-1…A1-8 控件）；解决窄窗口下右侧控件被遮挡问题 |
 | W1/A1-1 | 「导入」按钮 | 已实现（M1） | 「＋ 导入图片」，打开 W2 |
-| W1/A1-2 | 「AI 分析」按钮 | 已实现（M3） | AI 可用时触发批量分析；不可用时置灰 + ToolTip 说明原因 |
+| W1/A1-2 | 「AI 分析」按钮 | 已实现（M3，v0.9.0 语义调整） | 仅分析**无任何标签且无分类**的图（人工/AI 标签均算有标签，跳过不刷新）；AI 不可用时置灰 + ToolTip 说明原因；启动软件不自动分析 |
 | W1/A1-3 | 视图切换（网格/列表/浏览） | 已实现（M1+B2-3-BRW） | 三态 ToggleButton 互斥切换；网格/列表各一支缩放滑杆，浏览态独立 160–512 卡片宽度滑杆 |
 | W1/A1-4 | 搜索框 | 已实现（M1） | AutomationId 语义名 SearchBox，300ms 防抖 |
 | W1/A1-5 | 搜索模式下拉 | 已实现（M1） | 标签 / 文件名·备注 / 语义（M3-E1） |
-| W1/A1-6 | 通知铃铛 | 已实现（M2） | 未读红点徽标 + 弹层列表（未读标记/全部已读/清空） |
+| W1/A1-6 | 通知铃铛 | 已实现（M2） | 未读红点徽标 + 弹层列表（未读标记/全部已读/清空）；v0.7.3 修复弹层绑定路径（VM 转发 Items，此前列表恒空仅徽标正常） |
 | W1/A1-7 | 设置齿轮 | 已实现（M2） | 打开 W3 |
 | W1/A1-8 | 「分析颜色」按钮 | 已实现（M3-D） | 手动批量回填 dominant_colors；与 AI 档位无关；占用主线程串行执行 |
 | W1/A1-9 | 品牌 Logo 图块 + 名称 + AI 按钮品牌渐变 | 已实现（U2-A，v0.7.0 焕新） | v0.7.0 起 Logo 为 22×22 圆角品牌图「星光相框猫」（Assets/brand-logo.jpg，ImageBrush UniformToFill + BorderSubtle 描边），替换原 20×20 渐变占位色块；名称「千星汇图」；AI 按钮 hover 切 AccentGradientBrush（青蓝 #0E9FC0→#3B82F6）+ TextOnAccentBrush 文字。全部窗口图标统一 Assets/app.ico（Generic.xaml 隐式 Window 样式 + csproj ApplicationIcon） |
+| W1/A1-10 | 「🔄 刷新」按钮 | 已实现（v0.8.0） | 顶栏工具条（扫描 NAS 之后）；主动刷新：逐个重扫全部监控目录（ImportService 按 hash 幂等去重）→ 重载画廊 → 状态栏汇报，有新增联动主色调回填；无监控目录退化为纯画廊重载；F5 快捷键同命令；<1500px 收窄为 🔄 图标 |
 | W1/A1-M | 文本菜单栏（VS Code 风格 Row 0，兼任标题栏） | 已实现（v0.6.2） | Menu + MenuItem；IsMainMenu=True；CaptionHeight=40 让 Row 0 兼任可拖动标题栏；自定义 CaptionButton/CaptionCloseButton Style 替代 AeroCaptionButtons（Windows 11 不显示系统按钮）；Menu + 右侧系统区均加 IsHitTestVisibleInChrome=True；子项见 A1-M-FILE / A1-M-VIEW / A1-M-TOOLS / A1-M-HELP |
 | W1/A1-M-FILE | 「文件(_F)」菜单 | 已实现（v0.6.2） | 导入图片（Ctrl+I）/ 扫描 NAS 库 / 下载队列 |
 | W1/A1-M-VIEW | 「视图(_V)」菜单 | 已实现（v0.6.2） | 三态视图（IsCheckable 互斥：网格/列表/浏览）+ 分隔 + 本地库/共享库（仅 IsSharedLibraryAvailable 可见） |
@@ -63,10 +64,12 @@
 | W1/C1-PB | 细进度条 | 已实现（U2-A） | 2px IsIndeterminate，AccentGradientBrush 前景；导入/AI 运行/缩略图挂起时显示 |
 | W1/C1-VER | 品牌化版本号 | 已实现（U2-F） | 页脚右侧显示「vX.Y.Z · 里程碑标签」，仅 Shell；W3/A5 关于页保持纯版本 |
 | W2 | 导入对话框（520×480，可调，最小 460×420） | 已实现（M1） | 来源/选项/进度/日志/取消/完成 |
-| W3 | 设置窗口 | 已实现（M3） | 480×640 TabControl：A1 常规 / A2 缩略图 / A3 AI / A4 监控 / A5 关于 / A6 贴图组 |
+| W2/AI | 「AI 分析（导入完成后自动执行）」三选一 | 已实现（v0.9.0） | 位于文件格式之后：关闭 AI（默认，每次打开重置）/ 云端 AI / 本地 AI；选云端或本地时导入运行结束即对本次新增图按所选后端作用域分析，进度写底部信息提示栏（BatchProgress 事件）；后端按次解析（AiServiceFactory.Create(settings, mode)），不改写 W3/A3 全局设置 |
+| W3 | 设置窗口 | 已实现（M3） | 480×640 TabControl：A1 常规 / A2 缩略图 / A3 AI / A4 监控 / A5 关于 / A6 贴图组；v0.7.2 起全部页签内容包 ScrollViewer（TabScrollStyle，矮窗口自适应滚动条）+ 隧道阶段滚轮统一接管（TabScroll_PreviewMouseWheel，防 ListBox/Slider 吞滚轮），A1–A8 编号不变 |
 | W3/A1 | 常规页签 | 已实现（M2） | 主题（Dark/Light 即时切换）/完整性检查开关；库位置随数据根（M3 可视化） |
 | W3/A2 | 缩略图页签 | 已实现（M2） | 边长/质量滑杆 + 全部重新生成 |
 | W3/A3 | AI 页签 | 已实现（M3 第二阶段） | 三档单选 + 云端配置（base_url/模型/API Key/测试连接）+ 本地 ONNX 区块（状态文本/进度条/下载·取消·手动导入·删除模型四按钮/体积·许可·来源小字行；M3-E2 起下载为 vision+text 模型捆绑包） |
+| W3/A3-LEARN | 「自适应学习」开关 | 已实现（v0.10.0） | 位于 AI 分析模式之后，默认开：融合词表学习/保留率重排/kNN 投票改进本地打标；关闭仅跳过精排，训练数据快照（ai_tag_suggestions）与编辑日志（tag_feedback）仍持续留存 |
 | W3/A4 | 监控目录页签 | 已实现（M2） | 目录列表/添加/移除/自动导入开关，即时生效 |
 | W3/A5 | 关于页签 | 已实现（M2，v0.7.0 加品牌 Logo） | 36×36 圆角品牌 Logo + 名称/版本横排；统计/旧版 Python 库导入/打开日志文件夹 |
 | W3/A6 | 贴图组规则页签 | 已实现（M4） | 尾缀→角色规则行（模式/角色下拉/启用/删除）+ 添加规则/保存并重建/仅重建/恢复默认 + 状态文本 |

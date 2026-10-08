@@ -18,6 +18,13 @@
         <conv:NullToVisibilityConverter x:Key="NullVis" />
         <conv:EnumEqualityConverter x:Key="EnumEq" />
         <conv:BoolToTextConverter x:Key="BoolText" />
+        <!-- v0.7.2 W3 内容自适应滚动：页签内容统一包 ScrollViewer，
+             窗口变矮时出现滚动条而非裁切内容；滚轮在隧道阶段统一接管 -->
+        <Style x:Key="TabScrollStyle" TargetType="ScrollViewer">
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+            <EventSetter Event="PreviewMouseWheel" Handler="TabScroll_PreviewMouseWheel" />
+        </Style>
     </Window.Resources>
 
     <Grid Background="{DynamicResource BackgroundBrush}">
@@ -31,6 +38,7 @@
 
             <!-- ═══ A1 常规 ═══ -->
             <TabItem Header="常规">
+                <ScrollViewer Style="{StaticResource TabScrollStyle}">
                 <StackPanel Margin="14,12">
                     <TextBlock Text="主题" Style="{StaticResource SectionCaptionStyle}" />
                     <ComboBox Width="180" HorizontalAlignment="Left" Margin="0,4,0,0"
@@ -44,10 +52,12 @@
                               Margin="0,4,0,0"
                               IsChecked="{Binding CheckIntegrityOnStartup}" />
                 </StackPanel>
+                </ScrollViewer>
             </TabItem>
 
             <!-- ═══ A2 缩略图 ═══ -->
             <TabItem Header="缩略图">
+                <ScrollViewer Style="{StaticResource TabScrollStyle}">
                 <StackPanel Margin="14,12">
                     <TextBlock Text="缩略图尺寸（长边，128–512 像素）"
                                Style="{StaticResource SectionCaptionStyle}" />
@@ -74,10 +84,12 @@
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                Visibility="{Binding StatusBarText, Converter={StaticResource NullVis}}" />
                 </StackPanel>
+                </ScrollViewer>
             </TabItem>
 
             <!-- ═══ A3 AI ═══ -->
             <TabItem Header="AI 分析">
+                <ScrollViewer Style="{StaticResource TabScrollStyle}">
                 <StackPanel Margin="14,12">
                     <TextBlock Text="AI 分析模式" Style="{StaticResource SectionCaptionStyle}" />
                     <StackPanel Margin="0,6,0,0">
@@ -88,6 +100,12 @@
                         <RadioButton Content="云端服务" GroupName="AiMode" Margin="0,2"
                                      IsChecked="{Binding SelectedAiMode, Converter={StaticResource EnumEq}, ConverterParameter=Cloud}" />
                     </StackPanel>
+
+                    <!-- W3/A3-LEARN (v0.10.0): AI 自适应学习开关 -->
+                    <CheckBox Content="自适应学习（按你的标签修正自动改进本地打标）"
+                              Margin="0,14,0,0"
+                              ToolTip="启用后本地分析会融合：用户词表学习、修正偏好重排、参考样本近邻投票；同时留存 AI 建议与修正记录，为将来模型微调积累训练数据。关闭仅跳过精排，数据仍持续留存。"
+                              IsChecked="{Binding AiLearningEnabled, Mode=TwoWay}" />
 
                     <!-- 云端配置 -->
                     <Border Margin="0,16,0,0" Padding="10,8"
@@ -158,10 +176,12 @@
                         </StackPanel>
                     </Border>
                 </StackPanel>
+                </ScrollViewer>
             </TabItem>
 
             <!-- ═══ A4 监控目录 ═══ -->
             <TabItem Header="监控">
+                <ScrollViewer Style="{StaticResource TabScrollStyle}">
                 <Grid Margin="14,12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -171,7 +191,7 @@
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Text="被监控的目录（文件变动自动入库）"
                                Style="{StaticResource SectionCaptionStyle}" />
-                    <ListBox Grid.Row="1" Margin="0,6,0,0"
+                    <ListBox Grid.Row="1" Margin="0,6,0,0" MinHeight="80"
                              ItemsSource="{Binding WatcherDirectories}"
                              SelectedItem="{Binding SelectedWatcherDirectory}" />
                     <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
@@ -185,10 +205,12 @@
                               Margin="0,12,0,0"
                               IsChecked="{Binding AutoImportOnWatch}" />
                 </Grid>
+                </ScrollViewer>
             </TabItem>
 
             <!-- ═══ A5 关于 / 旧版导入 / 诊断 ═══ -->
             <TabItem Header="关于">
+                <ScrollViewer Style="{StaticResource TabScrollStyle}">
                 <StackPanel Margin="14,12">
                 <StackPanel Orientation="Horizontal">
                     <Border Width="36" Height="36" CornerRadius="9" VerticalAlignment="Top"
@@ -233,10 +255,12 @@
                             Style="{StaticResource SubtleButtonStyle}"
                             Command="{Binding OpenLogsFolderCommand}" />
                 </StackPanel>
+                </ScrollViewer>
             </TabItem>
 
             <!-- ═══ A6 贴图组规则 ═══ -->
             <TabItem Header="贴图组">
+                <ScrollViewer Style="{StaticResource TabScrollStyle}">
                 <Grid Margin="14,12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -247,7 +271,7 @@
                     <TextBlock Grid.Row="0"
                                Text="文件名尾缀 → 贴图角色（尾缀不区分大小写，按目录+基名成组）"
                                Style="{StaticResource SectionCaptionStyle}" />
-                    <ListBox Grid.Row="1" Margin="0,6,0,0"
+                    <ListBox Grid.Row="1" Margin="0,6,0,0" MinHeight="80"
                              ItemsSource="{Binding PbrRules.Rules}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
@@ -297,11 +321,13 @@
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                Visibility="{Binding PbrRules.StatusText, Converter={StaticResource NullVis}}" />
                 </Grid>
+                </ScrollViewer>
             </TabItem>
 
             <!-- ═══ A7 NAS 连接 (M5 N1-N6 + v0.2.1 主 NAS 标记) ═══ -->
             <TabItem Header="NAS 连接"
                      Visibility="{Binding IsNasManagementEnabled, Converter={StaticResource BoolVis}}">
+                <ScrollViewer Style="{StaticResource TabScrollStyle}">
                 <Grid Margin="14,12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -446,11 +472,13 @@
                         </StackPanel>
                     </Border>
                 </Grid>
+                </ScrollViewer>
             </TabItem>
 
             <!-- ═══ A7 用户管理（M6-C，仅管理员）═══ -->
             <TabItem Header="用户管理"
                      Visibility="{Binding IsUserManagementEnabled, Converter={StaticResource BoolVis}}">
+                <ScrollViewer Style="{StaticResource TabScrollStyle}">
                 <Grid Margin="14,12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -532,6 +560,7 @@
                         </StackPanel>
                     </Border>
                 </Grid>
+                </ScrollViewer>
             </TabItem>
         </TabControl>
 

@@ -75,6 +75,12 @@ public sealed class AppSettings
     /// <summary>AI analysis mode. Defaults to Disabled; AI is a pure add-on.</summary>
     public AiMode AiMode { get; set; } = AiMode.Disabled;
 
+    /// <summary>
+    /// v0.10.0: AI 自适应学习开关（词表学习 + 保留率重排 + 参考样本 kNN，
+    /// 仅本地后端；同时留存训练数据快照）。默认开启。
+    /// </summary>
+    public bool AiLearningEnabled { get; set; } = true;
+
     /// <summary>Cloud AI service configuration (base URL, model, encrypted key).</summary>
     public CloudAiConfig CloudAi { get; set; } = new();
 

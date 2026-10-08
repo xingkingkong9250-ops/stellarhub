@@ -16,6 +16,7 @@
         <conv:BoolToVisibilityConverter x:Key="BoolVis" />
         <conv:BoolToVisibilityConverter x:Key="InverseBoolVis" Parameter="Invert" />
         <conv:NullToVisibilityConverter x:Key="NullVis" />
+        <conv:EnumEqualityConverter x:Key="EnumEq" />
     </Window.Resources>
 
     <DockPanel Margin="18">
@@ -79,6 +80,21 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+
+            <!-- W2/AI (v0.9.0): 导入完成后按所选后端自动分析本次新增图 -->
+            <TextBlock Text="AI 分析（导入完成后自动执行）" Margin="0,12,0,0"
+                       Style="{StaticResource SectionCaptionStyle}" />
+            <StackPanel Orientation="Horizontal" IsEnabled="{Binding CanEditOptions}">
+                <RadioButton Content="关闭 AI" GroupName="ImportAiMode" Margin="0,2"
+                             ToolTip="导入后不执行 AI 分析（默认）"
+                             IsChecked="{Binding ImportAiMode, Converter={StaticResource EnumEq}, ConverterParameter=Disabled}" />
+                <RadioButton Content="云端 AI" GroupName="ImportAiMode" Margin="16,2,0,2"
+                             ToolTip="导入完成后用云端模型为无标签的新增图打标分类"
+                             IsChecked="{Binding ImportAiMode, Converter={StaticResource EnumEq}, ConverterParameter=Cloud}" />
+                <RadioButton Content="本地 AI" GroupName="ImportAiMode" Margin="16,2,0,2"
+                             ToolTip="导入完成后用本地离线模型为无标签的新增图打标分类"
+                             IsChecked="{Binding ImportAiMode, Converter={StaticResource EnumEq}, ConverterParameter=Local}" />
+            </StackPanel>
 
             <!-- Progress -->
             <Border Margin="0,14,0,0" Padding="12,10" CornerRadius="8"

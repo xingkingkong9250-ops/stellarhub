@@ -17,6 +17,18 @@ public sealed class TagService
     public TagService(DatabaseService db) => _db = db;
 
     /// <summary>
+    /// v0.10.0: 用户手动新增标签后触发（AI 写入不触发）。
+    /// AiLearningService 订阅记录编辑事件（训练数据留存 + 词表学习）。
+    /// </summary>
+    public event Action<long, string, TagSource>? TagAdded;
+
+    /// <summary>
+    /// v0.10.0: 标签被移除后触发（携带被移除行的来源）。
+    /// AiLearningService 订阅记录编辑事件（保留率统计 + 困难负样本）。
+    /// </summary>
+    public event Action<long, string, TagSource>? TagRemoved;
+
+    /// <summary>
     /// Adds tags to one or more images. Returns the number of newly
     /// created rows (pre-existing protected rows are not counted).
     /// </summary>
@@ -61,6 +73,11 @@ public sealed class TagService
             {
                 foreach ((string tag, double? tagConfidence) in normalized)
                     created += UpsertTag(conn, tx, imageId, tag, sourceText, tagConfidence, now);
+
+                // v0.10.0: 仅用户手动写入触发事件（AI 写入走建议快照）。
+                if (source == TagSource.Manual && TagAdded is not null)
+                    foreach ((string tag, _) in normalized)
+                        TagAdded.Invoke(imageId, tag, source);
             }
             return created;
         });
@@ -100,27 +117,58 @@ public sealed class TagService
     public void RemoveTag(long imageId, string tag)
     {
         string normalized = NormalizeTag(tag);
-        _db.Run(conn =>
+        TagSource removedSource = _db.Run(conn =>
         {
+            // v0.10.0: 先读被移除行的来源（manual/ai），删除后记录编辑事件。
+            string source = "ai";
+            using (var query = conn.CreateCommand())
+            {
+                query.CommandText = "SELECT source FROM image_tags WHERE image_id = $id AND tag = $tag;";
+                query.Parameters.AddWithValue("$id", imageId);
+                query.Parameters.AddWithValue("$tag", normalized);
+                object? result = query.ExecuteScalar();
+                if (result is string s) source = s;
+            }
+
             using var command = conn.CreateCommand();
             command.CommandText = "DELETE FROM image_tags WHERE image_id = $id AND tag = $tag;";
             command.Parameters.AddWithValue("$id", imageId);
             command.Parameters.AddWithValue("$tag", normalized);
             command.ExecuteNonQuery();
+            return source == "manual" ? TagSource.Manual : TagSource.Ai;
         });
+        TagRemoved?.Invoke(imageId, normalized, removedSource);
     }
 
     /// <summary>Deletes a tag from every image. Returns affected image count.</summary>
     public int DeleteTagEverywhere(string tag)
     {
         string normalized = NormalizeTag(tag);
-        return _db.Run(conn =>
+        List<(long ImageId, TagSource Source)> affected = _db.Run(conn =>
         {
+            // v0.10.0: 删除前先取受影响行（image_id + 来源），逐图记录编辑事件。
+            var rows = new List<(long, TagSource)>();
+            using (var query = conn.CreateCommand())
+            {
+                query.CommandText = "SELECT image_id, source FROM image_tags WHERE tag = $tag;";
+                query.Parameters.AddWithValue("$tag", normalized);
+                using var reader = query.ExecuteReader();
+                while (reader.Read())
+                    rows.Add((reader.GetInt64(0),
+                        reader.GetString(1) == "manual" ? TagSource.Manual : TagSource.Ai));
+            }
+
             using var command = conn.CreateCommand();
             command.CommandText = "DELETE FROM image_tags WHERE tag = $tag;";
             command.Parameters.AddWithValue("$tag", normalized);
-            return command.ExecuteNonQuery();
+            command.ExecuteNonQuery();
+            return rows;
         });
+
+        if (TagRemoved is not null)
+            foreach ((long imageId, TagSource source) in affected)
+                TagRemoved.Invoke(imageId, normalized, source);
+        return affected.Count;
     }
 
     public IReadOnlyList<ImageTagRecord> GetTagsForImage(long imageId) =>

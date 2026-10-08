@@ -21,7 +21,22 @@ public static class AiServiceFactory
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        return settings.AiMode switch
+        return Create(settings, settings.AiMode, handler, log);
+    }
+
+    /// <summary>
+    /// v0.9.0 (W2/AI): 按显式指定模式创建后端——导入对话框按次选择
+    /// 云端/本地时使用，不改写全局设置。
+    /// </summary>
+    public static IAiService Create(
+        AppSettingsService settings,
+        AiMode mode,
+        HttpMessageHandler? handler = null,
+        Action<string>? log = null)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        return mode switch
         {
             AiMode.Cloud => new CloudAiService(BuildCloudConfig(settings), handler),
             AiMode.Local => new LocalAiService(settings, log),

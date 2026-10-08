@@ -19,6 +19,7 @@ public sealed class ShellViewModelTests : IDisposable
     private readonly DatabaseService _database;
     private readonly ThumbnailService _thumbnails;
     private readonly DownloadQueueService _downloadQueue;
+    private readonly AppSettingsService _settings;
     private readonly ShellViewModel _viewModel;
 
     public ShellViewModelTests()
@@ -29,37 +30,37 @@ public sealed class ShellViewModelTests : IDisposable
             Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_directory);
 
-        var settings = new AppSettingsService(_directory);
-        settings.Load();
+        _settings = new AppSettingsService(_directory);
+        _settings.Load();
 
         _database = new DatabaseService(_directory);
         _database.Initialize();
 
         var inspector = new ImageInspector();
         var import = new ImportService(_database, inspector);
-        _thumbnails = new ThumbnailService(_directory, settings);
+        _thumbnails = new ThumbnailService(_directory, _settings);
         var imageQuery = new ImageQueryService(_database);
         var tags = new TagService(_database);
         var collections = new CollectionService(_database);
         var notifications = new NotificationService();
-        var watcher = new FileWatcherService(settings, import, imageQuery, notifications);
+        var watcher = new FileWatcherService(_settings, import, imageQuery, notifications);
         var legacyImporter = new LegacyPythonImporter(_database);
 
         var ai = new DisabledAiService();
         var aiAnalysis = new AiAnalysisService(ai, _database, tags, notifications);
         var colors = new ColorAnalysisService(_database);
         var semanticSearch = new SemanticSearchService(_database, ai);
-        var pbrGrouping = new PbrGroupingService(_database, settings);
+        var pbrGrouping = new PbrGroupingService(_database, _settings);
         // M5-G: download queue service needs IUserIdentity + ImageQueryService.
         var userIdentity = new UserIdentityService();
         var downloadQueue = new DownloadQueueService(
-            _database, new StubNasConnectorFactory(), settings, userIdentity, imageQuery);
+            _database, new StubNasConnectorFactory(), _settings, userIdentity, imageQuery);
         _downloadQueue = downloadQueue;
         var services = new ServiceRegistry(
-            settings, _database, inspector, import, _thumbnails, imageQuery,
+            _settings, _database, inspector, import, _thumbnails, imageQuery,
             tags, collections, notifications, watcher, legacyImporter, ai, aiAnalysis,
             colors, semanticSearch, pbrGrouping, new StubNasConnectorFactory(),
-            new ThumbnailCacheService(_directory, settings), downloadQueue,
+            new ThumbnailCacheService(_directory, _settings), downloadQueue,
             new NetworkConditionMonitor(), userIdentity);
         _viewModel = new ShellViewModel(services);
     }
@@ -93,6 +94,46 @@ public sealed class ShellViewModelTests : IDisposable
         Assert.Empty(_viewModel.Gallery.Items);
         Assert.True(
             _viewModel.Gallery.IsGridView || _viewModel.Gallery.IsListView);
+    }
+
+    // ─── A1-10 (v0.8.0): 主动刷新 = 重扫监控目录（幂等）+ 重载画廊 ──────────
+
+    [Fact]
+    public async Task RefreshCommand_imports_new_watched_files_and_reloads_gallery()
+    {
+        string watched = Path.Combine(_directory, "watched");
+        TestImageFactory.CreatePng(watched, "a.png");
+        _settings.SetWatcherDirectories([watched]);
+
+        await _viewModel.RefreshCommand.ExecuteAsync();
+
+        Assert.Single(_viewModel.Gallery.Items);
+        Assert.Contains("刷新完成", _viewModel.StatusBar.StatusText);
+    }
+
+    [Fact]
+    public async Task RefreshCommand_is_idempotent_on_rescan()
+    {
+        string watched = Path.Combine(_directory, "watched");
+        TestImageFactory.CreatePng(watched, "a.png");
+        _settings.SetWatcherDirectories([watched]);
+
+        await _viewModel.RefreshCommand.ExecuteAsync();
+        await _viewModel.RefreshCommand.ExecuteAsync();
+
+        Assert.Single(_viewModel.Gallery.Items);
+        Assert.Contains("无新增", _viewModel.StatusBar.StatusText);
+    }
+
+    [Fact]
+    public async Task RefreshCommand_without_watched_dirs_only_reloads_gallery()
+    {
+        TestImageFactory.CreatePng(_directory, "outside.png"); // 不在监控目录内
+
+        await _viewModel.RefreshCommand.ExecuteAsync();
+
+        Assert.Empty(_viewModel.Gallery.Items);
+        Assert.Contains("仅重载画廊", _viewModel.StatusBar.StatusText);
     }
 
     // ─── U3-B (§4.C.1): B2-3-ACT hover action commands ─────────────────────

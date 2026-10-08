@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using Microsoft.Data.Sqlite;
 using QL.World.Data;
 using QL.World.Tests.Support;
@@ -46,7 +46,7 @@ public sealed class DatabaseServiceTests
             command.CommandText = "PRAGMA user_version;";
             return Convert.ToInt32(command.ExecuteScalar());
         });
-        Assert.Equal(7, version);
+        Assert.Equal(8, version);
 
         // Second Initialize must not throw or duplicate anything.
         library.Db.Initialize();
@@ -100,7 +100,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(7, migrated);
+            Assert.Equal(8, migrated);
 
             var (tableCount, imageCount) = db.Run(conn =>
             {
@@ -196,7 +196,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(7, version);
+            Assert.Equal(8, version);
 
             var families = db.Run(conn =>
             {
@@ -310,7 +310,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(7, version);
+            Assert.Equal(8, version);
 
             // source column exists with DEFAULT 'local' and backfilled the v5 row.
             string sourceDefault = db.Run(conn =>

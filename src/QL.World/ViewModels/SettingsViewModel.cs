@@ -215,6 +215,18 @@ public sealed class SettingsViewModel : ObservableObject
     public IReadOnlyList<AiMode> AiModeOptions { get; } =
         [AiMode.Disabled, AiMode.Local, AiMode.Cloud];
 
+    /// <summary>W3/A3-LEARN (v0.10.0): AI 自适应学习开关（默认开）。</summary>
+    public bool AiLearningEnabled
+    {
+        get => _settings.AiLearningEnabled;
+        set
+        {
+            if (_settings.AiLearningEnabled == value) return;
+            _settings.AiLearningEnabled = value;
+            OnPropertyChanged();
+        }
+    }
+
     public AiMode SelectedAiMode
     {
         get => _settings.AiMode;

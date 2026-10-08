@@ -42,6 +42,10 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         StatusBar = new StatusBarViewModel(services.Thumbnails, services.Settings);
         // U2-A: surface AI/import running state on C1 progress bar without coupling StatusBar to those services.
         StatusBar.IsBusyPredicate = () => TopBar.IsImporting || services.AiAnalysis.IsRunning;
+        // W2/AI (v0.9.0): AI 批量分析进度 → 底部信息提示栏（INPC 属性更新
+        // 由 WPF 自动跨线程封送，服务端在后台线程触发安全）。
+        services.AiAnalysis.BatchProgress += (processed, total) =>
+            StatusBar.PublishMessage($"AI 分析：{processed}/{total} 张");
 
         Gallery.Refreshed += OnGalleryRefreshed;
         Gallery.SelectionChanged += OnSelectionChanged;
@@ -70,7 +74,8 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         };
         _undoTimer.Tick += (_, _) => HideUndoBar();
 
-        RefreshCommand = new AsyncRelayCommand(() => Gallery.RefreshAsync());
+        // A1-10 (v0.8.0): 主动刷新——重扫监控目录（幂等）+ 重载画廊；F5 同命令。
+        RefreshCommand = new AsyncRelayCommand(RefreshLibraryAsync, () => !TopBar.IsImporting);
         ScanNasLibraryCommand = new AsyncRelayCommand(ScanNasLibraryAsync, () => !TopBar.IsImporting);
         FocusSearchCommand = new RelayCommand(() => TopBar.RequestFocusSearch());
         ClearFiltersCommand = new RelayCommand(ClearFilters);
@@ -535,6 +540,64 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         StatusBar.PublishMessage("就绪");
     }
 
+    /// <summary>
+    /// A1-10 主动刷新（v0.8.0）：逐个重扫全部被监控目录（ImportService 按
+    /// hash 幂等去重，已入库文件跳过）→ 重载画廊 → 状态栏汇报。无监控目录
+    /// 或目录不存在时退化为纯画廊重载（与旧 F5 行为一致）。复用 IsImporting
+    /// 防跨命令重入（期间导入/扫描 NAS/AI/颜色按钮同步禁用）；命令自身
+    /// AsyncRelayCommand._isExecuting 防按钮连点。F5 快捷键绑定同一命令。
+    /// </summary>
+    private async Task RefreshLibraryAsync()
+    {
+        if (TopBar.IsImporting) return;
+        TopBar.IsImporting = true;
+        RefreshCommand.RaiseCanExecuteChanged();
+        try
+        {
+            int scanned = 0, added = 0;
+            IReadOnlyList<string> watched = _services.Settings.WatcherDirectories;
+            if (watched.Count > 0)
+            {
+                var progress = new Progress<ImportProgress>(p =>
+                    StatusBar.PublishMessage(
+                        $"刷新：{p.Processed}/{p.ScannedTotal}（新增 {p.Added}）{Path.GetFileName(p.CurrentFile)}"));
+                foreach (string dir in watched)
+                {
+                    if (!Directory.Exists(dir)) continue;
+                    var options = new ImportOptions
+                    {
+                        InputPaths = [dir],
+                        RecurseSubfolders = true,
+                        SkipHidden = true,
+                        EnabledExtensions = ImportOptions.SupportedExtensions,
+                    };
+                    ImportReport report = await _services.Import.ImportAsync(
+                        options, progress, CancellationToken.None);
+                    scanned += report.ScannedTotal;
+                    added += report.AddedCount;
+                }
+            }
+
+            await Gallery.RefreshAsync();
+            if (added > 0)
+            {
+                RunColorBackfill();
+                StatusBar.PublishMessage($"刷新完成：扫描 {scanned}，新增 {added} 张。");
+            }
+            else
+            {
+                StatusBar.PublishMessage(watched.Count > 0
+                    ? $"刷新完成：扫描 {scanned} 个文件，无新增。"
+                    : "刷新完成（未配置监控目录，仅重载画廊）。");
+            }
+        }
+        finally
+        {
+            TopBar.IsImporting = false;
+            RefreshCommand.RaiseCanExecuteChanged();
+        }
+    }
+
     // ─── Import ──────────────────────────────────────────────────────────────
 
     private async Task ImportAsync()
@@ -544,6 +607,9 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         try
         {
             var vm = new ImportViewModel(_services.Import, GetSuggestedImportFolder);
+            // W2/AI (v0.9.0): 导入完成后按所选后端自动分析本次新增图。
+            vm.ImportAnalysisRequested +=
+                (ids, mode) => _ = RunImportAiAnalysisAsync(ids, mode);
             ShowImportDialog?.Invoke(vm);
 
             // The dialog drives completion; reopen guards are handled there.
@@ -575,6 +641,30 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
                 System.Diagnostics.Debug.WriteLine($"[color] backfill failed: {ex.Message}");
             }
         });
+    }
+
+    /// <summary>
+    /// W2/AI (v0.9.0): 导入完成后按所选后端（云端/本地）对本次新增图执行
+    /// 作用域 AI 分析。进度经 AiAnalysisService.BatchProgress 事件反映到
+    /// 底部信息提示栏；完成/取消通知由服务发布（v0.8.1 节流收敛语义）。
+    /// </summary>
+    private async Task RunImportAiAnalysisAsync(IReadOnlyList<long> imageIds, AiMode mode)
+    {
+        if (imageIds.Count == 0 || mode == AiMode.Disabled) return;
+        try
+        {
+            await _services.AiAnalysis.RunBatchAsync(
+                onlyImageIds: imageIds, modeOverride: mode);
+            await Gallery.RefreshAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            // 服务已发布取消通知。
+        }
+        catch (Exception ex)
+        {
+            StatusBar.PublishMessage($"AI 分析失败：{ex.Message}");
+        }
     }
 
     // ─── NAS library scan (N7) ────────────────────────────────────────────

@@ -92,24 +92,17 @@ public sealed class AiAnalysisServiceTests : IDisposable
         Assert.Equal("场景", category);
     }
 
+    // ─── v0.9.0 回归：待分析规则 = 无任何标签（人工或 AI）且无分类 ──────────
+
     [Fact]
-    public async Task RunBatch_skips_images_with_existing_embedding()
+    public async Task RunBatch_skips_images_with_any_tags()
     {
         long id1 = _lib.InsertImage();
         long id2 = _lib.InsertImage();
 
-        // Pre-insert an embedding for id1 so it's skipped.
-        _lib.Db.Run(conn =>
-        {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = """
-                INSERT INTO image_embeddings (image_id, model_id, dim, embedding, created_at)
-                VALUES ($id, 'pre', 1, $blob, '2026-01-01T00:00:00.000Z');
-                """;
-            cmd.Parameters.AddWithValue("$id", id1);
-            cmd.Parameters.AddWithValue("$blob", new byte[] { 0 });
-            cmd.ExecuteNonQuery();
-        });
+        // 人工标签受保护：有标签（无论来源）即跳过，不被 AI 刷新。
+        var tags = new TagService(_lib.Db);
+        tags.AddTags([id1], ["手工标签"], TagSource.Manual);
 
         int callCount = 0;
         var ai = new FakeAiService
@@ -120,13 +113,144 @@ public sealed class AiAnalysisServiceTests : IDisposable
                 return new AiAnalysisResult { Tags = [new AiTag("x", 1.0)] };
             },
         };
-        var tags = new TagService(_lib.Db);
         var notifications = new NotificationService();
         var analysis = new AiAnalysisService(ai, _lib.Db, tags, notifications);
 
         await analysis.RunBatchAsync();
 
         Assert.Equal(1, callCount); // only id2 analyzed
+    }
+
+    [Fact]
+    public async Task RunBatch_skips_images_with_ai_tags()
+    {
+        long id1 = _lib.InsertImage();
+        long id2 = _lib.InsertImage();
+
+        var tags = new TagService(_lib.Db);
+        tags.AddTags([id1], ["历史AI标签"], TagSource.Ai, 0.9);
+
+        int callCount = 0;
+        var ai = new FakeAiService
+        {
+            AnalyzeFunc = _ =>
+            {
+                callCount++;
+                return new AiAnalysisResult { Tags = [new AiTag("x", 1.0)] };
+            },
+        };
+        var notifications = new NotificationService();
+        var analysis = new AiAnalysisService(ai, _lib.Db, tags, notifications);
+
+        await analysis.RunBatchAsync();
+
+        Assert.Equal(1, callCount); // AI 打过标的也不重复分析
+    }
+
+    [Fact]
+    public async Task RunBatch_skips_images_with_category_only()
+    {
+        _lib.InsertImage(category: "场景");
+        _lib.InsertImage();
+
+        int callCount = 0;
+        var ai = new FakeAiService
+        {
+            AnalyzeFunc = _ =>
+            {
+                callCount++;
+                return new AiAnalysisResult { Tags = [new AiTag("x", 1.0)] };
+            },
+        };
+        var notifications = new NotificationService();
+        var tags = new TagService(_lib.Db);
+        var analysis = new AiAnalysisService(ai, _lib.Db, tags, notifications);
+
+        await analysis.RunBatchAsync();
+
+        Assert.Equal(1, callCount); // 只有分类没有标签同样跳过
+    }
+
+    [Fact]
+    public async Task RunBatch_scopes_to_onlyImageIds_when_provided()
+    {
+        long id1 = _lib.InsertImage();
+        _lib.InsertImage();
+        _lib.InsertImage();
+
+        int callCount = 0;
+        var ai = new FakeAiService
+        {
+            AnalyzeFunc = _ =>
+            {
+                callCount++;
+                return new AiAnalysisResult { Tags = [new AiTag("x", 1.0)] };
+            },
+        };
+        var notifications = new NotificationService();
+        var tags = new TagService(_lib.Db);
+        var analysis = new AiAnalysisService(ai, _lib.Db, tags, notifications);
+
+        // W2/AI：导入后仅分析本次新增图。
+        await analysis.RunBatchAsync(onlyImageIds: [id1]);
+
+        Assert.Equal(1, callCount);
+    }
+
+    [Fact]
+    public async Task RunBatch_mode_override_uses_resolved_backend()
+    {
+        _lib.InsertImage();
+
+        AiMode? resolvedMode = null;
+        var cloudBackend = new FakeAiService
+        {
+            AnalyzeFunc = _ => new AiAnalysisResult { Tags = [new AiTag("云", 1.0)] },
+        };
+        var notifications = new NotificationService();
+        var tags = new TagService(_lib.Db);
+        var analysis = new AiAnalysisService(
+            new FakeAiService(), _lib.Db, tags, notifications,
+            backendResolver: mode =>
+            {
+                resolvedMode = mode;
+                return cloudBackend;
+            });
+
+        // W2/AI：按次指定云端后端，不经全局设置。
+        int count = await analysis.RunBatchAsync(modeOverride: AiMode.Cloud);
+
+        Assert.Equal(1, count);
+        Assert.Equal(AiMode.Cloud, resolvedMode);
+    }
+
+    [Fact]
+    public async Task RunBatch_records_suggestion_snapshots_for_training()
+    {
+        _lib.InsertImage();
+        var ai = new FakeAiService
+        {
+            AnalyzeFunc = _ => new AiAnalysisResult
+            {
+                PrimaryCategory = "角色",
+                Tags = [new AiTag("勇士", 0.8)],
+            },
+        };
+        var notifications = new NotificationService();
+        var tags = new TagService(_lib.Db);
+        var learning = new AiLearningService(_lib.Db);
+        var analysis = new AiAnalysisService(ai, _lib.Db, tags, notifications, learning: learning);
+
+        await analysis.RunBatchAsync();
+
+        // v0.10.0: 训练数据留存——1 标签 + 1 主分类 = 2 行快照，永不删除。
+        int rows = _lib.Db.Run(conn =>
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM ai_tag_suggestions;";
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        });
+        Assert.Equal(2, rows);
     }
 
     [Fact]
@@ -183,6 +307,57 @@ public sealed class AiAnalysisServiceTests : IDisposable
         await analysis.RunBatchAsync();
 
         Assert.Contains(notifications.Items, e => e.Kind == NotificationKind.AiBatchCompleted);
+    }
+
+    // ─── v0.8.1 回归：失败图死循环 + 进度通知刷屏 ─────────────────────────
+
+    [Fact]
+    public async Task RunBatch_terminates_when_all_remaining_fail()
+    {
+        for (int i = 0; i < 3; i++)
+            _lib.InsertImage();
+
+        int calls = 0;
+        var ai = new FakeAiService
+        {
+            AnalyzeFunc = _ =>
+            {
+                calls++;
+                return new AiAnalysisResult { ErrorMessage = "corrupt" };
+            },
+        };
+        var notifications = new NotificationService();
+        var tags = new TagService(_lib.Db);
+        var analysis = new AiAnalysisService(ai, _lib.Db, tags, notifications);
+
+        // 回归：失败图不写 embedding，旧实现每轮重新取同一批 → 死循环
+        // （实测 13 张失败图被重复处理十几万次）。现在必须正常终止。
+        int count = await analysis.RunBatchAsync();
+
+        Assert.Equal(0, count);
+        Assert.Equal(3, calls); // 每张图每轮至多处理一次
+        Assert.Equal(3, analysis.ProcessedCount);
+    }
+
+    [Fact]
+    public async Task RunBatch_progress_entries_collapse_to_single_completion()
+    {
+        for (int i = 0; i < 5; i++)
+            _lib.InsertImage();
+        var ai = new FakeAiService
+        {
+            AnalyzeFunc = _ => new AiAnalysisResult { Tags = [new AiTag("x", 1.0)] },
+        };
+        var notifications = new NotificationService();
+        var tags = new TagService(_lib.Db);
+        var analysis = new AiAnalysisService(ai, _lib.Db, tags, notifications);
+
+        // 回归：进度通知每批一条曾把消息中心刷爆；节流收敛后运行结束
+        // 应只留下一条完成通知（快速跑完时甚至不会出现进度条目）。
+        await analysis.RunBatchAsync();
+
+        Assert.DoesNotContain(notifications.Items, e => e.Kind == NotificationKind.AiBatchProgress);
+        Assert.Single(notifications.Items, e => e.Kind == NotificationKind.AiBatchCompleted);
     }
 
     [Fact]

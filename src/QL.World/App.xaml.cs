@@ -118,7 +118,19 @@ public partial class App : Application
                 colorAnalysis);
             var legacyImporter = new LegacyPythonImporter(_database);
             IAiService aiService = AiServiceFactory.Create(settings, log: WriteLog);
-            var aiAnalysis = new AiAnalysisService(aiService, _database, tagService, notifications, WriteLog);
+            // v0.9.0 (W2/AI): backendResolver 支持导入对话框按次选择云端/本地，
+            // 不改写全局设置；解析失败（Disabled）时 RunBatchAsync 会发布不可用通知。
+            // v0.10.0: AiLearningService 承载自适应学习 + 训练数据留存；
+            // TagService 编辑事件转发为 tag_feedback 日志（只追加不删除）。
+            var aiLearning = new AiLearningService(_database);
+            tagService.TagAdded += (id, tag, source) =>
+                aiLearning.RecordFeedback(id, tag, "added", source);
+            tagService.TagRemoved += (id, tag, source) =>
+                aiLearning.RecordFeedback(id, tag, "removed", source);
+            var aiAnalysis = new AiAnalysisService(aiService, _database, tagService, notifications, WriteLog,
+                mode => AiServiceFactory.Create(settings, mode, log: WriteLog),
+                learning: aiLearning,
+                learningEnabled: () => settings.AiLearningEnabled);
             var semanticSearch = new SemanticSearchService(_database, aiService);
             aiAnalysis.EmbeddingsUpdated += semanticSearch.Invalidate;
             _watcher = watcher;

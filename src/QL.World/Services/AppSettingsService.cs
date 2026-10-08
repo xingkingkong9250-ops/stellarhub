@@ -115,6 +115,18 @@ public sealed class AppSettingsService
             next => _settings.ShowSourceBadge = next);
     }
 
+    /// <summary>
+    /// v0.10.0: AI 自适应学习开关（W3/A3）。默认 true。
+    /// 关闭后本地分析跳过学习精排，训练数据快照仍写入（留存最大化）。
+    /// </summary>
+    public bool AiLearningEnabled
+    {
+        get => _settings.AiLearningEnabled;
+        set => SetAndSave(value,
+            () => _settings.AiLearningEnabled,
+            next => _settings.AiLearningEnabled = next);
+    }
+
     // ─── Login credentials (W5) ───────────────────────────────────────────
 
     /// <summary>W5-4: 记住的登录用户名（明文，用户名本身非敏感）；null=未记住。</summary>

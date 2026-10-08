@@ -72,4 +72,21 @@ public sealed class NotificationListViewModelTests
         var vm = new NotificationListViewModel(service);
         Assert.Same(service.Items, vm.Notifications.Items);
     }
+
+    /// <summary>
+    /// v0.7.3 回归：ShellWindow 弹层绑定的是 TopBar.Notifications.Items
+    /// （VM 层直取），此前 VM 未转发该属性导致绑定静默失败——列表恒空、
+    /// 「暂无消息」恒显，而徽标 HasUnreadBadge 正常（有消息也提示无消息）。
+    /// </summary>
+    [Fact]
+    public void Items_forwards_service_collection_for_popup_binding()
+    {
+        var service = new NotificationService();
+        var vm = new NotificationListViewModel(service);
+
+        service.Publish(NotificationKind.ImportCompleted, "导入完成", "已导入 3 张");
+
+        Assert.Same(service.Items, vm.Items);
+        Assert.Single(vm.Items);
+    }
 }

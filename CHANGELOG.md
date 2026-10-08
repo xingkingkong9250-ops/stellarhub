@@ -9,6 +9,143 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-10-09 AI 自适应学习（三方案）+ 训练数据留存
+
+### 新增
+
+- **AiLearningService：不重训模型的应用层「越用越准」管线**，三方案
+  融合于本地分析精排（RefineAsync，任一环数据不足自动退化为原始结果，
+  管线故障绝不影响主分析）：
+  1. **候选词表学习**——用户人工标签按使用频次进入候选词表（≤32 个，
+     排除保留率过低的词），经 text_model 计算文本 embedding 与图像
+     embedding 余弦打分，AI 从此能打出用户领域自定义词（embedding 按
+     标签缓存于 learned_tag_embeddings）
+  2. **修正偏好重排**——保留率 = 1−删除次数/建议次数；<0.30 的标签
+     剔除（需 ≥3 条建议），其余按保留率最高 0.75× 降权重排
+  3. **参考样本 kNN**——有 embedding 且有 manual 标签的图构成经验库
+     （仅 local 来源向量，≤4000），新图取 top-8 近邻相似度加权投票，
+     与零样本排序融合
+- **训练数据留存（为将来模型微调准备）**，schema v8 新增三表：
+  - `ai_tag_suggestions`：AI 原始建议快照（标签+主分类+置信度+后端+
+    模型），永不删除——用户删改不影响，与最终态对齐即得正负样本
+  - `tag_feedback`：用户标签编辑事件日志（added/removed/bulk_removed +
+    行来源），只追加永不删除——偏好统计与困难负样本原始依据
+  - `learned_tag_embeddings`：学习词表文本 embedding 缓存
+- **W3/A3-LEARN「自适应学习」开关**（默认开，即时生效）：关闭仅跳过
+  精排，训练数据快照与编辑日志不受影响（留存最大化）
+- TagService 新增 TagAdded/TagRemoved 事件（仅用户编辑触发，AI 写入
+  走建议快照；RemoveTag 先读行来源再删除；DeleteTagEverywhere 逐图记录）
+- 测试 +11：建议快照/错误跳过/编辑事件/全局删除逐图记录/保留率/词表
+  排序与低保留剔除/经验库联表/词表+kNN 融合/低保留剔除精排/无 embedding
+  退化/RunBatch 快照集成；DatabaseServiceTests 版本断言 7→8
+- 版本号 0.9.0 → 0.10.0（NO.M，新增功能 +0.1.0）；UI_NUMBERING 新增
+  W3/A3-LEARN
+
+## [0.9.0] — 2026-10-09 AI 分析规则调整：标签驱动 + W2/AI 导入后自动分析
+
+### 新增
+
+- **W2/AI「AI 分析（导入完成后自动执行）」选项组**（导入对话框，
+  文件格式之后）：关闭 AI（默认）/ 云端 AI / 本地 AI 三选一；选云端或
+  本地时，导入运行结束即对**本次新增图**按所选后端执行作用域 AI 分析，
+  进度显示在底部信息提示栏
+  - `AiServiceFactory.Create(settings, mode)` 新增按次指定模式重载，
+    不改写全局设置（W3/A3 保持不变）；App 组装时向 AiAnalysisService
+    注入 backendResolver
+  - ImportViewModel：`ImportAiMode`（默认 Disabled，每次打开对话框
+    重置，避免无意消耗云端额度）+ `ImportAnalysisRequested` 事件携带
+    本次新增图 ID 与模式；取消的导入只分析已入库部分
+  - AiAnalysisService 新增 `BatchProgress(已处理, 总数)` 事件，
+    ShellViewModel 订阅后写状态栏（INPC 属性更新由 WPF 自动封送）
+  - 按次覆盖后端时 embedding source 如实记录（cloud/local 跟随实际
+    backend，不再取全局 _ai.Mode）
+
+### 修复/调整
+
+- **AI 待分析规则改为标签驱动**：待分析 = 无任何标签（人工或 AI 写入
+  均算）且无分类的图；有标签或分类的一律跳过——不论来源，不再以
+  embedding 有无为准，避免反复刷新库中已有标签分类
+  - 启动软件仍不自动分析（语义不变）；顶栏「AI 分析」按钮/工具菜单
+    即"为无标签图补打标"语义
+  - GetPendingBatch 改按 image_tags 不存在 + primary_category 为空
+    过滤（作用域经 json_each 传入，规避超长 IN 参数列表）
+  - AiAnalysisServiceTests：改写跳过语义测试（人工标签/AI 标签/仅分类
+    三态跳过）+ 新增作用域与后端覆盖解析测试；新增 ImportViewModelTests
+    （默认关闭不触发 / 云端模式触发并携带 ID）
+  - 版本号 0.8.1 → 0.9.0（NO.M，新增功能 +0.1.0）；UI_NUMBERING 新增
+    W2/AI、A1-2 语义注记更新
+
+## [0.8.1] — 2026-10-08 AI 批量分析「死循环 + 通知刷屏」修复
+
+### 修复
+
+- **AI 批量分析死循环（消息提示循环 BUG）**：失败图不写 embedding，
+  `GetPendingBatch` 每轮按"最前面的 pending"取样会永远取到同一批
+  永久失败图（实测 13 张损坏图被重复处理十几万次：ProcessedCount
+  162380 / 成功仅 2846），且每轮发布一条「AI 分析进行中」通知把
+  消息中心与未读徽标刷爆
+  - GetPendingBatch 改 keyset 分页（`i.id > $afterId` 游标只前进），
+    每张图每轮至多处理一次，无论成败循环必然终止；失败图下次手动
+    分析仍会重试（无持久失败标记，保持最小改动）
+  - 进度通知节流（≥5s 一条）且发布前 ClearByKind 收敛为最新单条，
+    运行结束清掉进度条目只留一条「AI 分析完成」（带失败计数）
+  - AiAnalysisServiceTests 补 2 项回归：全失败必终止（每图仅 1 次调用）
+    + 进度条目收敛、仅剩单条完成通知
+  - 版本号 0.8.0 → 0.8.1（NO.P，缺陷修复 +0.0.1）
+
+## [0.8.0] — 2026-10-08 W1/A1-10 主动刷新数据按钮
+
+### 新增
+
+- **A1-10「🔄 刷新」按钮（顶栏工具条，扫描 NAS 之后）**：此前刷新仅
+  F5 快捷键可用且只重载 SQLite 查询，磁盘上新增文件不会被动入库
+  （除非监控目录 watcher 触发或手动导入）
+  - RefreshCommand 升级为「主动刷新」：逐个重扫全部被监控目录
+    （ImportService 按 hash 幂等去重，已入库文件跳过）→ 重载画廊 →
+    状态栏汇报（扫描/新增计数）；有新增时联动主色调回填
+  - 无监控目录或目录不存在时退化为纯画廊重载（兼容旧行为）
+  - 复用 IsImporting 跨命令防重入（刷新期间导入/扫描 NAS/AI/颜色
+    禁用）；F5 快捷键绑定同一命令，语义同步升级
+  - 窄窗口（<1500 逻辑像素）按钮收窄为 🔄 图标（F-04 响应式同款）
+  - ShellViewModelTests 补 3 项测试：新文件入库 + 重扫幂等 + 无监控
+    目录退化
+  - 版本号 0.7.3 → 0.8.0（NO.M，新增功能 +0.1.0）；UI_NUMBERING
+    新增 A1-10（A1-9 之后顺延）
+
+## [0.7.3] — 2026-10-08 W1/A1-6 消息中心「有黄点但列表恒空」修复
+
+### 修复
+
+- **A1-6 消息中心显示错误（消息实际存在，非无消息）**：弹层 ListBox
+  与「暂无消息」空态绑定 `TopBar.Notifications.Items`（NotificationListViewModel
+  层），但该 VM 未转发服务上的 `Items`，绑定静默失败 → 列表恒空、空态
+  文案恒显；而未读黄点徽标绑定 `HasUnreadBadge` 正常工作，形成
+  「有未读黄点但显示暂无消息」的矛盾状态
+  - NotificationListViewModel 新增 `Items` 转发属性（直接返回服务的
+    ObservableCollection），XAML 绑定路径无需改动
+  - NotificationListViewModelTests 补 `Items_forwards_service_collection_
+    for_popup_binding` 回归测试（原有 6 项保留）
+  - 版本号 0.7.2 → 0.7.3（UI 补丁，修订号 +0.0.1）
+
+## [0.7.2] — 2026-10-08 W3 设置窗口内容自适应滚动
+
+### 修复
+
+- **W3 设置窗口内容被遮挡（缺滚轮浏览）**：A1–A8 各页签内容原为普通
+  StackPanel/Grid 直排，窗口高度不足时（典型：A3 AI 页云端+本地两区块、
+  A7 NAS 详情表单 N2–N6、A8 新建用户表单）底部控件直接被裁切且无法
+  滚动查看
+  - 全部 7 个页签内容统一包 `ScrollViewer`（`TabScrollStyle`：
+    垂直 Auto / 水平 Disabled，矮窗口自动出现滚动条，拉高窗口即恢复
+    平铺，实现自适应）
+  - 滚轮接管：内层 ListBox/Slider 即使自身无可滚动余量也会吞掉
+    MouseWheel 冒泡事件，新增 `TabScroll_PreviewMouseWheel` 在隧道阶段
+    统一滚动外层 ScrollViewer（一格 Delta=120 → 60px，接近系统默认行速）；
+    ComboBox 弹层为独立 Popup 视觉树不受影响
+  - A4/A6 列表补 `MinHeight=80`，防止外层滚动布局下空列表塌陷
+  - 版本号 0.7.1 → 0.7.2（UI 补丁，修订号 +0.0.1）；UI_NUMBERING.md
+    W3 行为注记同步，A1–A8 编号不变
+
 ## [0.7.1] — 2026-10-08 ImageSharp 安全升级（3.1.10 → 3.1.12）
 
 ### 变更

@@ -20,6 +20,7 @@ public sealed class ImportViewModel : ObservableObject
     private string _sourceSummary = "尚未选择";
     private bool _recurse = true;
     private bool _skipHidden = true;
+    private AiMode _importAiMode = AiMode.Disabled;
     private bool _isRunning;
     private bool _isFinished;
     private int _scannedTotal;
@@ -28,6 +29,7 @@ public sealed class ImportViewModel : ObservableObject
     private int _skipped;
     private string _currentFile = string.Empty;
     private string _resultSummary = string.Empty;
+    private ImportReport? _lastReport;
 
     public ImportViewModel(ImportService import, Func<string>? getSuggestedFolder = null)
     {
@@ -60,7 +62,28 @@ public sealed class ImportViewModel : ObservableObject
     /// <summary>Close returns the number of newly added images.</summary>
     public event Action<int>? RequestClose;
 
+    /// <summary>
+    /// W2/AI (v0.9.0): 导入运行成功结束后触发（新增数 &gt; 0 且选择了 AI 模式）。
+    /// ShellViewModel 订阅后按所选后端对本次新增图执行作用域 AI 分析，
+    /// 进度反映到底部信息提示栏。
+    /// </summary>
+    public event Action<IReadOnlyList<long>, AiMode>? ImportAnalysisRequested;
+
     public int AddedOnClose { get; private set; }
+
+    /// <summary>
+    /// W2/AI (v0.9.0): 导入后自动 AI 分析的后端选择（关闭/云端/本地）。
+    /// 每次打开对话框默认「关闭 AI」，避免无意消耗云端额度。
+    /// </summary>
+    public AiMode ImportAiMode
+    {
+        get => _importAiMode;
+        set => SetProperty(ref _importAiMode, value);
+    }
+
+    /// <summary>最近一次导入运行新增的图片 ID（作用域分析用）。</summary>
+    public IReadOnlyList<long> AddedIds =>
+        _lastReport?.Added.Select(item => item.Id).ToList() ?? (IReadOnlyList<long>)[];
 
     public string SourceSummary
     {
@@ -228,11 +251,17 @@ public sealed class ImportViewModel : ObservableObject
                 LogLines.Add(line);
 
             AddedOnClose = report.AddedCount;
+            _lastReport = report;
             ResultSummary = report.Cancelled
                 ? $"已取消：新增 {report.AddedCount} 张，跳过 {report.SkippedCount} 张"
                 : $"完成：新增 {report.AddedCount} 张，跳过 {report.SkippedCount} 张";
             if (report.LogLines.Count > 0)
                 CurrentFile = string.Empty;
+
+            // W2/AI (v0.9.0): 导入完成后按所选后端自动分析本次新增图
+            //（取消的导入只分析已入库部分；关闭 AI 则不触发）。
+            if (AddedOnClose > 0 && ImportAiMode != AiMode.Disabled)
+                ImportAnalysisRequested?.Invoke(AddedIds, ImportAiMode);
         }
         catch (Exception ex)
         {

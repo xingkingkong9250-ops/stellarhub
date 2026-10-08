@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using QL.World.Services.Nas;
 using QL.World.ViewModels;
 
@@ -70,8 +71,24 @@ public partial class SettingsWindow : Window
     }
 
     /// <summary>
-    /// v0.2.1: 未登录场景下打开设置窗口时直接定位到 A7 NAS 页签（index 6），
+    /// v0.7.2: 未登录场景下打开设置窗口时直接定位到 A7 NAS 页签（index 6），
     /// 便于首次启动配置 NAS。仅当 caller 显式调用时生效；普通打开走默认选中。
     /// </summary>
     public void SelectNasTab() => MainTabs.SelectedIndex = 6;
+
+    /// <summary>
+    /// W3 内容自适应滚轮（v0.7.2）：页签内容包在 TabScrollStyle 的外层
+    /// ScrollViewer 里，但内层 ListBox / Slider 等控件即使自身无可滚动余量
+    /// 也会把 MouseWheel 冒泡事件标记为已处理，导致外层无法滚轮浏览、
+    /// 矮窗口下内容被裁切。这里在隧道阶段（Preview）统一接管：直接滚动
+    /// 外层 ScrollViewer（滚轮一格 Delta=120 → 60px，接近系统默认行速），
+    /// 保证窗口任意高度下所有页签内容都能用滚轮完整浏览。
+    /// ComboBox 弹层是独立 Popup 视觉树，不受此接管影响。
+    /// </summary>
+    private void TabScroll_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (e.Handled || sender is not ScrollViewer sv) return;
+        sv.ScrollToVerticalOffset(sv.VerticalOffset - e.Delta * 0.5);
+        e.Handled = true;
+    }
 }

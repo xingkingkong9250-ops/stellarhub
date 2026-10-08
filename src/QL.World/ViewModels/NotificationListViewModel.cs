@@ -1,5 +1,7 @@
+using System.Collections.ObjectModel;
 using System.Windows.Input;
 using QL.World.Helpers;
+using QL.World.Models;
 using QL.World.Services;
 
 namespace QL.World.ViewModels;
@@ -27,6 +29,14 @@ public sealed class NotificationListViewModel : ObservableObject
 
     /// <summary>Underlying service; the popup list binds its Items directly.</summary>
     public NotificationService Notifications => _notifications;
+
+    /// <summary>
+    /// v0.7.3 修复：弹层 ListBox ItemsSource 与「暂无消息」空态绑定的是
+    /// TopBar.Notifications.Items（即本 VM），此前 VM 未转发该属性，绑定
+    /// 静默失败 → 列表恒空、空态文案恒显，而徽标（HasUnreadBadge）正常，
+    /// 造成「有未读黄点但列表显示暂无消息」。此处转发服务的 Items。
+    /// </summary>
+    public ObservableCollection<NotificationEntry> Items => _notifications.Items;
 
     public RelayCommand TogglePopupCommand { get; }
     public RelayCommand MarkAllReadCommand { get; }
