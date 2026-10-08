@@ -264,9 +264,14 @@
                     <StackPanel Grid.Row="1" Margin="2,6,2,0">
                         <TextBlock Text="{Binding FileName}" FontSize="12" TextTrimming="CharacterEllipsis" />
                         <Grid Margin="0,2,0,0">
-                            <TextBlock Text="{Binding DimensionsText}" FontSize="11"
-                                       Foreground="{DynamicResource TextMutedBrush}" />
-                            <TextBlock HorizontalAlignment="Right" FontSize="11"
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{Binding DimensionsText}" FontSize="11"
+                                       Foreground="{DynamicResource TextMutedBrush}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="1" Margin="6,0,0,0" FontSize="11"
                                        Foreground="{DynamicResource WarningBrush}"
                                        Text="{Binding Rating, StringFormat='★{0}'}"
                                        Visibility="{Binding Rating, Converter={StaticResource ZeroVis}, ConverterParameter=Invert}" />

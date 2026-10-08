@@ -9,6 +9,31 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.5.13] — 2026-10-08 画廊卡片与导入对话框文本叠加修复（F-18）
+
+### 修复
+
+- **F-18a 画廊卡片维度与星级叠加（P0）**：`GridCardTemplate` 底部
+  信息行的 `<Grid>` 未定义 `ColumnDefinitions`，`DimensionsText`
+  与 `Rating`（★N）同处 cell(0,0)。Rating 设
+  `HorizontalAlignment="Right"`，在 cell 宽度取两者最大值时被定位
+  到右沿——即叠加在 DimensionsText 右侧字符上，导致「1920×1080」
+  与「★5」相互压字。修复：补 `ColumnDefinitions`（* + Auto），
+  DimensionsText 放 column 0 并加 `TextTrimming="CharacterEllipsis"`
+  以应对窄卡片下长维度串；Rating 放 column 1 + 6px 左 margin
+- **F-18b 导入对话框文件名与统计叠加（P0）**：`ImportDialog` 进度
+  区 `<Grid>` 未定义 `ColumnDefinitions`，`CurrentFile` 文件名与
+  右侧统计 StackPanel（新增 N / 跳过 N / processed/total）同处
+  cell(0,0)，长文件名与统计相互压字。修复：补 `ColumnDefinitions`
+  （* + Auto），CurrentFile 放 column 0（已有 TextTrimming），统计
+  StackPanel 放 column 1 + 12px 左 margin
+
+### 变更
+
+- 版本号 0.5.12 → 0.5.13（缺陷修复，修订号 +0.0.1，NO.P 补丁轮次）
+- Release 0 警告 0 错误
+- 无 UI 编号变更；无新增依赖
+
 ## [0.5.12] — 2026-10-08 侧栏文本叠加修复（F-17）
 
 ### 修复

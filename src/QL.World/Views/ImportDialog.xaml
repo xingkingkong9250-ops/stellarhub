@@ -89,9 +89,13 @@
                     <ProgressBar Minimum="0" Maximum="1"
                                  Value="{Binding ProgressFraction, Mode=OneWay}" />
                     <Grid Margin="0,8,0,0">
-                        <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
                                    Text="{Binding CurrentFile}" TextTrimming="CharacterEllipsis" />
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0">
                             <TextBlock FontSize="12" Foreground="{DynamicResource AccentDimBrush}"
                                        Text="{Binding Added, StringFormat='新增 {0}'}" />
                             <TextBlock FontSize="12" Margin="12,0,0,0"
