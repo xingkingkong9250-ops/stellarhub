@@ -9,6 +9,42 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-10-08 品牌焕新（星光相框猫 Logo + 青蓝星光配色）
+
+### 新增
+
+- **品牌 Logo 落地（用户指定品牌图，原图 1:1 保留）**：
+  - `Assets/brand-logo.jpg`（WPF Resource）：青蓝发光相框 + 白色小猫 +
+    金黄星光，与「StellarHub / 千星汇图」语义直接对应
+  - `Assets/app.ico`：由品牌图派生的多尺寸图标（256 PNG +
+    64/48/32/16 DIB 混合编码），写入 csproj `<ApplicationIcon>`，
+    EXE / 任务栏 / Alt+Tab 图标同步焕新
+  - Generic.xaml 隐式 Window 样式统一 `Icon`，全部窗口（含导入、
+    输入框、下载队列、审核队列等对话框）一处生效
+- **三处界面品牌位替换**：
+  - 顶栏 A1-9：20×20 渐变占位色块 → 22×22 圆角品牌图（描边 + 名称）
+  - 登录页 W5-7（新编号）：64×64 圆角 Logo + 青蓝柔光投影 + 产品名，
+    窗高 360 → 440
+  - 设置 W3/A5 关于页：36×36 Logo 与产品名/版本横排
+
+### 变更
+
+- **配色全面对齐品牌图（Dark / Light / ModernDark 三套主题）**：
+  - Dark：中性炭灰 → 深空蓝黑（Background `#0A0F16` / Surface
+    `#101822`，SurfaceVariant/Hover/Active/Border 全部冷蓝调）；
+    紫色强调 → 青蓝（Accent `#2288E0` / AccentDim `#71C9FF` /
+    AccentBg `#0C2A42`）；品牌渐变改青→蓝 `#0E9FC0 → #3B82F6`
+  - Light：强调色同步青蓝（`#176FBF` / `#0B4F8F` / `#E4F1FC`），
+    面板改冷白调，文字随冷调微调；TextMuted 两主题均保持 WCAG AA
+    （≥ 4.5:1，实测 5:1 以上）
+- **评分星标改星光金**：新增 Gold/GoldDim 色板与
+  GoldBrush / GoldDimBrush（深底亮金 `#F5CB5C`、浅底压深 `#8F6600`），
+  `RatingStarBrushConverter` 激活态由 AccentDimBrush 改 GoldBrush，
+  与品牌图上的金黄星光呼应
+- 版本号 0.6.2 → 0.7.0（品牌功能 + 配色改版，次版本号 +0.1.0）
+- 全量 634 测试通过；Release 代码 0 警告（仅存量 NU1903
+  ImageSharp 3.1.10 安全通告，与本轮无关）
+
 ## [0.6.2] — 2026-10-08 顶栏改版（VS Code 风格菜单行 + 工具条行）
 
 ### 变更

@@ -8,6 +8,11 @@
          dictionary can be swapped at runtime.
          ═══════════════════════════════════════════════════════════ -->
 
+    <!-- v0.7.0 品牌资源：AppIconSource=窗口/任务栏图标；
+         BrandLogoSource=界面内嵌品牌 Logo（星光相框猫）。 -->
+    <ImageSource x:Key="AppIconSource">pack://application:,,,/Assets/app.ico</ImageSource>
+    <ImageSource x:Key="BrandLogoSource">pack://application:,,,/Assets/brand-logo.jpg</ImageSource>
+
     <!-- F-03: a ComboBox with only DisplayMemberPath puts the RAW option object
          into its closed-box content (SelectionBoxItem) with no template, so it
          fell back to ToString. These implicit per-type templates render the
@@ -49,6 +54,8 @@
     <Style TargetType="{x:Type Window}">
         <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <!-- v0.7.0: 所有窗口统一品牌图标（任务栏/标题栏/Alt+Tab） -->
+        <Setter Property="Icon" Value="{StaticResource AppIconSource}" />
         <Setter Property="FontFamily" Value="Microsoft YaHei UI, Segoe UI" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="UseLayoutRounding" Value="True" />

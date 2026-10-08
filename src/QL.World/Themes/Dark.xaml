@@ -3,31 +3,36 @@
 
     <!-- ═══════════════════════════════════════════════════════════
          QL World — Dark theme baseline (M0)
-         Neutral charcoal surfaces with a violet accent.
+         v0.7.0 品牌焕新：深空蓝黑底 + 青蓝主色（源自品牌图
+         「星光相框猫」的青蓝发光相框）+ 暖金星光辅色。
          M1 adds control styles; M2 adds the matching Light.xaml.
          ═══════════════════════════════════════════════════════════ -->
 
-    <!-- Base Colors -->
-    <Color x:Key="Background">#0D0E12</Color>
-    <Color x:Key="Surface">#17171C</Color>
-    <Color x:Key="SurfaceVariant">#202027</Color>
-    <Color x:Key="SurfaceHover">#2C2C36</Color>
-    <Color x:Key="SurfaceActive">#3A3A46</Color>
-    <Color x:Key="Border">#3A3A46</Color>
-    <Color x:Key="BorderSubtle">#2A2A33</Color>
+    <!-- Base Colors (deep-space navy) -->
+    <Color x:Key="Background">#0A0F16</Color>
+    <Color x:Key="Surface">#101822</Color>
+    <Color x:Key="SurfaceVariant">#15202D</Color>
+    <Color x:Key="SurfaceHover">#1D2B3D</Color>
+    <Color x:Key="SurfaceActive">#28405A</Color>
+    <Color x:Key="Border">#2C4159</Color>
+    <Color x:Key="BorderSubtle">#1E2D3F</Color>
 
     <!-- Text
          TextMuted minimum contrast vs Surface/SurfaceVariant ≥ 4.5:1 (WCAG AA)
-         — #9696A2 measures 6.1:1 on Surface, 5.5:1 on SurfaceVariant. -->
-    <Color x:Key="TextPrimary">#F2F2F5</Color>
-    <Color x:Key="TextSecondary">#A8A8B3</Color>
-    <Color x:Key="TextMuted">#9696A2</Color>
+         — #8FA1B5 measures ~6.5:1 on Surface, ~6.1:1 on SurfaceVariant. -->
+    <Color x:Key="TextPrimary">#EEF4FA</Color>
+    <Color x:Key="TextSecondary">#A8B8C9</Color>
+    <Color x:Key="TextMuted">#8FA1B5</Color>
     <Color x:Key="TextOnAccent">#FFFFFF</Color>
 
-    <!-- Accent (violet) -->
-    <Color x:Key="Accent">#7C5CFF</Color>
-    <Color x:Key="AccentDim">#A48BFF</Color>
-    <Color x:Key="AccentBg">#2A2150</Color>
+    <!-- Accent (azure-cyan, from the brand frames) -->
+    <Color x:Key="Accent">#2288E0</Color>
+    <Color x:Key="AccentDim">#71C9FF</Color>
+    <Color x:Key="AccentBg">#0C2A42</Color>
+
+    <!-- 品牌辅色：星光金（评分星标等点睛处） -->
+    <Color x:Key="Gold">#F5CB5C</Color>
+    <Color x:Key="GoldDim">#C99E3A</Color>
 
     <!-- Status -->
     <Color x:Key="Danger">#FF5A52</Color>
@@ -39,9 +44,9 @@
 
     <!-- Translucent cover laid over gallery thumbnails (file-missing badge);
          must adapt per theme instead of a hardcoded dark overlay. -->
-    <Color x:Key="Overlay">#CC17171C</Color>
+    <Color x:Key="Overlay">#CC0A1018</Color>
     <!-- U2-D: text color for badges rendered on top of OverlayBrush (≥ 4.5:1). -->
-    <Color x:Key="TextOnOverlay">#E6E6EC</Color>
+    <Color x:Key="TextOnOverlay">#E6EEF8</Color>
 
     <!-- Brushes -->
     <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource Background}" />
@@ -58,10 +63,14 @@
     <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource Accent}" />
     <SolidColorBrush x:Key="AccentDimBrush" Color="{StaticResource AccentDim}" />
     <SolidColorBrush x:Key="AccentBgBrush" Color="{StaticResource AccentBg}" />
-    <!-- U2-A: brand gradient for Logo / AI button hover / C1 progress bar only -->
+    <!-- v0.7.0: 星光金品牌辅色（评分星标等点睛处） -->
+    <SolidColorBrush x:Key="GoldBrush" Color="{StaticResource Gold}" />
+    <SolidColorBrush x:Key="GoldDimBrush" Color="{StaticResource GoldDim}" />
+    <!-- U2-A: brand gradient for Logo / AI button hover / C1 progress bar only
+         v0.7.0: 品牌青蓝（相框发光色），端点压深保证白字可读 -->
     <LinearGradientBrush x:Key="AccentGradientBrush" StartPoint="0,0" EndPoint="1,0">
-        <GradientStop Offset="0" Color="{StaticResource Accent}" />
-        <GradientStop Offset="1" Color="{StaticResource AccentDim}" />
+        <GradientStop Offset="0" Color="#0E9FC0" />
+        <GradientStop Offset="1" Color="#3B82F6" />
     </LinearGradientBrush>
     <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource Danger}" />
     <SolidColorBrush x:Key="DangerBgBrush" Color="{StaticResource DangerBg}" />

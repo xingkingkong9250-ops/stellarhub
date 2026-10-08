@@ -178,7 +178,7 @@ public sealed class HexBrushConverter : IValueConverter
         throw new NotSupportedException();
 }
 
-/// <summary>Star foreground: active → AccentDim, idle → TextMuted.</summary>
+/// <summary>Star foreground: active → Gold (brand star), idle → TextMuted.</summary>
 public sealed class RatingStarBrushConverter : IMultiValueConverter
 {
     public object Convert(object?[] values, Type targetType, object? parameter, CultureInfo culture)
@@ -187,7 +187,8 @@ public sealed class RatingStarBrushConverter : IMultiValueConverter
         int rating = values[0] is int r ? r : 0;
         int star = values[1] is int s ? s : 0;
         if (values[2] is not FrameworkElement element) return Brushes.Gray;
-        object? brush = element.TryFindResource(rating >= star ? "AccentDimBrush" : "TextMutedBrush");
+        // v0.7.0: 激活星标使用品牌星光金（GoldBrush），未激活用 TextMutedBrush。
+        object? brush = element.TryFindResource(rating >= star ? "GoldBrush" : "TextMutedBrush");
         return brush ?? Brushes.Gray;
     }
 

@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:conv="clr-namespace:QL.World.Views.Converters"
         mc:Ignorable="d"
-        Width="400" Height="360"
+        Width="400" Height="440"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource SurfaceBrush}"
@@ -28,11 +28,23 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <!-- 标题 -->
-            <TextBlock Grid.Row="0"
-                       Text="千星汇图" FontSize="20" FontWeight="Bold"
-                       Foreground="{DynamicResource AccentBrush}"
-                       HorizontalAlignment="Center" />
+            <!-- W5-7 品牌 Logo + 标题 -->
+            <StackPanel Grid.Row="0">
+                <Border Width="64" Height="64" CornerRadius="14"
+                        HorizontalAlignment="Center"
+                        BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
+                    <Border.Background>
+                        <ImageBrush ImageSource="{StaticResource BrandLogoSource}" Stretch="UniformToFill" />
+                    </Border.Background>
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="18" ShadowDepth="0" Opacity="0.5"
+                                          Color="#2EA4F0" />
+                    </Border.Effect>
+                </Border>
+                <TextBlock Text="千星汇图" FontSize="20" FontWeight="Bold"
+                           Margin="0,10,0,0" HorizontalAlignment="Center"
+                           Foreground="{DynamicResource AccentBrush}" />
+            </StackPanel>
             <TextBlock Grid.Row="1" Margin="0,4,0,18"
                        Text="请登录以使用共享图库" FontSize="12"
                        Foreground="{DynamicResource TextMutedBrush}"

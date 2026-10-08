@@ -527,10 +527,14 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <!-- 左侧：品牌 Logo + 名称 -->
+                <!-- 左侧：品牌 Logo + 名称（v0.7.0 品牌图：星光相框猫） -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0">
-                    <Border Width="20" Height="20" CornerRadius="5" Margin="0,0,8,0"
-                            Background="{DynamicResource AccentGradientBrush}" />
+                    <Border Width="22" Height="22" CornerRadius="6" Margin="0,0,8,0"
+                            BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
+                        <Border.Background>
+                            <ImageBrush ImageSource="{StaticResource BrandLogoSource}" Stretch="UniformToFill" />
+                        </Border.Background>
+                    </Border>
                     <TextBlock Text="千星汇图" FontSize="13" FontWeight="Bold"
                                Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                 </StackPanel>

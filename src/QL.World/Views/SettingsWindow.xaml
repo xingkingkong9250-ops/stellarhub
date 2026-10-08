@@ -190,10 +190,20 @@
             <!-- ═══ A5 关于 / 旧版导入 / 诊断 ═══ -->
             <TabItem Header="关于">
                 <StackPanel Margin="14,12">
-                    <TextBlock Text="千星汇图" FontSize="16" FontWeight="Bold"
-                               Foreground="{DynamicResource TextPrimaryBrush}" />
-                    <TextBlock Text="{Binding VersionText}" Margin="0,2,0,0"
-                               Foreground="{DynamicResource TextMutedBrush}" />
+                <StackPanel Orientation="Horizontal">
+                    <Border Width="36" Height="36" CornerRadius="9" VerticalAlignment="Top"
+                            BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
+                        <Border.Background>
+                            <ImageBrush ImageSource="{StaticResource BrandLogoSource}" Stretch="UniformToFill" />
+                        </Border.Background>
+                    </Border>
+                    <StackPanel Margin="10,1,0,0">
+                        <TextBlock Text="千星汇图" FontSize="16" FontWeight="Bold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBlock Text="{Binding VersionText}" Margin="0,2,0,0"
+                                   Foreground="{DynamicResource TextMutedBrush}" />
+                    </StackPanel>
+                </StackPanel>
 
                     <TextBlock Text="统计" Margin="0,16,0,0"
                                Style="{StaticResource SectionCaptionStyle}" />

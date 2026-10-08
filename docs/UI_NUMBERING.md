@@ -16,7 +16,7 @@
 | W1/A1-6 | 通知铃铛 | 已实现（M2） | 未读红点徽标 + 弹层列表（未读标记/全部已读/清空） |
 | W1/A1-7 | 设置齿轮 | 已实现（M2） | 打开 W3 |
 | W1/A1-8 | 「分析颜色」按钮 | 已实现（M3-D） | 手动批量回填 dominant_colors；与 AI 档位无关；占用主线程串行执行 |
-| W1/A1-9 | Logo 文字块 + AI 按钮品牌渐变 | 已实现（U2-A） | Logo 文字 AccentGradientBrush（Accent→AccentDim）；AI 按钮 hover 切渐变背景 + TextOnAccentBrush 文字 |
+| W1/A1-9 | 品牌 Logo 图块 + 名称 + AI 按钮品牌渐变 | 已实现（U2-A，v0.7.0 焕新） | v0.7.0 起 Logo 为 22×22 圆角品牌图「星光相框猫」（Assets/brand-logo.jpg，ImageBrush UniformToFill + BorderSubtle 描边），替换原 20×20 渐变占位色块；名称「千星汇图」；AI 按钮 hover 切 AccentGradientBrush（青蓝 #0E9FC0→#3B82F6）+ TextOnAccentBrush 文字。全部窗口图标统一 Assets/app.ico（Generic.xaml 隐式 Window 样式 + csproj ApplicationIcon） |
 | W1/A1-M | 文本菜单栏（VS Code 风格 Row 0，兼任标题栏） | 已实现（v0.6.2） | Menu + MenuItem；IsMainMenu=True；CaptionHeight=40 让 Row 0 兼任可拖动标题栏；自定义 CaptionButton/CaptionCloseButton Style 替代 AeroCaptionButtons（Windows 11 不显示系统按钮）；Menu + 右侧系统区均加 IsHitTestVisibleInChrome=True；子项见 A1-M-FILE / A1-M-VIEW / A1-M-TOOLS / A1-M-HELP |
 | W1/A1-M-FILE | 「文件(_F)」菜单 | 已实现（v0.6.2） | 导入图片（Ctrl+I）/ 扫描 NAS 库 / 下载队列 |
 | W1/A1-M-VIEW | 「视图(_V)」菜单 | 已实现（v0.6.2） | 三态视图（IsCheckable 互斥：网格/列表/浏览）+ 分隔 + 本地库/共享库（仅 IsSharedLibraryAvailable 可见） |
@@ -68,7 +68,7 @@
 | W3/A2 | 缩略图页签 | 已实现（M2） | 边长/质量滑杆 + 全部重新生成 |
 | W3/A3 | AI 页签 | 已实现（M3 第二阶段） | 三档单选 + 云端配置（base_url/模型/API Key/测试连接）+ 本地 ONNX 区块（状态文本/进度条/下载·取消·手动导入·删除模型四按钮/体积·许可·来源小字行；M3-E2 起下载为 vision+text 模型捆绑包） |
 | W3/A4 | 监控目录页签 | 已实现（M2） | 目录列表/添加/移除/自动导入开关，即时生效 |
-| W3/A5 | 关于页签 | 已实现（M2） | 版本/统计/旧版 Python 库导入/打开日志文件夹 |
+| W3/A5 | 关于页签 | 已实现（M2，v0.7.0 加品牌 Logo） | 36×36 圆角品牌 Logo + 名称/版本横排；统计/旧版 Python 库导入/打开日志文件夹 |
 | W3/A6 | 贴图组规则页签 | 已实现（M4） | 尾缀→角色规则行（模式/角色下拉/启用/删除）+ 添加规则/保存并重建/仅重建/恢复默认 + 状态文本 |
 | W3/A7 | NAS 连接页签 | 已实现（M5 WebDav + M7 Smb + v0.2.1 主 NAS/门禁 + M8 ShareLink/聚合/迁移 + M9 Sftp） | 连接列表（N1）/ 详情表单 N2-N5 / 测试连接 + 设为主 NAS + 保存（N6）；M9 起协议下拉三选项齐备（N3-N5 联动）；M8-D 加「🔗 分享链接」入口 + 列表 🔗 图标区分 ShareLink 副库；M8-E 加「设为主 NAS 并迁移数据」+「搬运到此处...」（管理员可见）+ 迁移进度文案 +「显示数据来源徽章」CheckBox；v0.2.1 加管理员门禁（IsNasManagementEnabled：未登录或管理员可见，普通用户隐藏） |
 | W3/A7-N1 | NAS 连接列表 + 新建/删除 + 主 NAS 标记 + 分享链接 | 已实现（M5-C + v0.2.1 + M8-D） | ObservableCollection 绑定；新建按钮分配单调递增 id（不复用已删除）；M8-D 加「🔗 分享链接」按钮（Role=ShareLink，匿名访问，无密码框）；删除按钮清除选中连接（含密码）；v0.2.1 列表项「★ 主」徽标（IsPrimary=true 显示），M8-D 加「🔗」图标（IsShareLink=true 显示） |
@@ -90,13 +90,14 @@
 | W4/D4 | 工具栏 | 已实现（M5-G） | 全部重试 / 全部取消 / 清空已完成 / 打开根目录 |
 | W3/A7-PRE | ProgressiveImage 三层渐显 | 已实现（M5-F/H） | 详情栏 B3-1 大图预览替换为 ProgressiveImage 控件：PlaceholderLayer（256px thumb，已缓存）→ PreviewLayer（1024px preview，加载完成淡入替代）→ FinalLayer（原图，按需淡入替代）；每层 DoubleAnimation 200ms QuadraticEase；上层淡入完成才折叠下层避免闪烁 |
 | W3/A7-WEAK | 弱网优先策略 | 已实现（M5-H） | NetworkConditionMonitor.IsWeakNetwork=true 时：画廊 Attach 与 Prefetch 跳过远程项请求（仅显示已缓存 thumb）；本地项不受影响；恢复后自动恢复请求。无 UI 控件，行为层实现 |
-| W5 | 登录窗口（400×360） | 已实现（M6-B/U6 + v0.2.1 简化 + v0.5.0 改版） | v0.5.0 起内容固定为 6 项：W5-1…W5-6；系统自动取主 NAS IsPrimary=true 优先，无主取第一个；首次启动检测主 NAS accounts.json 为空 → 自动创建预置管理员 XingKongKong/zzh18254359250 + 用户名预填；登录按钮 CanLogin 联动 IsBusy + 有可用 NAS；直接关窗（X/Esc）即仅本地模式。v0.5.0 移除「仅本地模式」按钮与「打开 NAS 设置」按钮（后者功能收敛进 W5-6；二者此前无子编号） |
+| W5 | 登录窗口（400×440） | 已实现（M6-B/U6 + v0.2.1 简化 + v0.5.0 改版 + v0.7.0 品牌 Logo） | v0.7.0 起内容为 7 项：W5-1…W5-6 + 顶部 W5-7 品牌 Logo（窗高 360→440）；系统自动取主 NAS IsPrimary=true 优先，无主取第一个；首次启动检测主 NAS accounts.json 为空 → 自动创建预置管理员 XingKongKong/zzh18254359250 + 用户名预填；登录按钮 CanLogin 联动 IsBusy + 有可用 NAS；直接关窗（X/Esc）即仅本地模式。v0.5.0 移除「仅本地模式」按钮与「打开 NAS 设置」按钮（后者功能收敛进 W5-6；二者此前无子编号） |
 | W5-1 | 用户名输入框 | 已实现（M6-B） | 绑定 LoginViewModel.Username |
 | W5-2 | 密码输入框 + 末端显隐开关 | 已实现（v0.5.0） | PasswordBox（与全局 TextBox 同构样式，掩码态）/ TextBox（明文态）按末端眼睛 ToggleButton 互换，双向同步、登录始终读 PasswordBox.Password；勾选明文态眼睛叠加斜杠 + ToolTip 切换；PasswordChanged 走代码后置（PasswordBox 不可绑定） |
 | W5-3 | 登录按钮 | 已实现（M6-B） | AccentButtonStyle 通宽，IsDefault；IsEnabled 绑 CanLogin |
 | W5-4 | 「记住账户」勾选 | 已实现（v0.5.0） | 绑 RememberAccount；登录成功存 config.json rememberedLoginUsername 并下次回填用户名；取消勾选连带取消 W5-5 |
 | W5-5 | 「记录密码」勾选 | 已实现（v0.5.0） | 绑 RememberPassword，勾选连带勾选 W5-4；登录成功密码经 DPAPI(CurrentUser) 加密存 config.json rememberedLoginPassword，启动解密回填密码框（明文不经绑定属性）；未勾选/登录失败不写；ToolTip 说明本机加密 |
 | W5-6 | 右上角设置齿轮 | 已实现（v0.5.0） | 角落 30×30 SubtleButtonStyle「⚙」；打开 W3 设置窗口（未登录身份，默认 A1 常规页，可切 A7 配 NAS）；关闭后 RefreshNasState 立即生效 |
+| W5-7 | 顶部品牌 Logo + 产品名 | 已实现（v0.7.0） | 64×64 圆角品牌图「星光相框猫」（Assets/brand-logo.jpg，ImageBrush UniformToFill + BorderSubtle 描边 + #2EA4F0 柔光 DropShadow）+ 下方 20px 粗体「千星汇图」（AccentBrush）；窗高 360→440；位置锚点在 W5-1 之上，编号按续编分配 7 |
 | W3/A8 | 用户管理页签 | 已实现（M6-C/U6 编号确认） | 仅管理员可见；账号列表/新建用户/启用禁用/重置密码/删除用户；M6-C 初编 A7 与 NAS 页签撞号，U6 起统一改 A8 |
 | W1/B1-SCOPE | 本地库/共享库分段切换 | 已实现（U6-A） | 画廊上方分段控件；仅 NAS 登录用户可切共享段；切换时详情栏（B3）随作用域换模板，搜索词按作用域重新应用 |
 | W1/B2-SHARED | 共享库画廊 | 已实现（U6-A + M8-C 聚合 + M8-E 来源徽章） | SharedGalleryList：共享 ListBox 复用 B2-3 网格/列表 DataTemplate；缩略图走 SharedThumbnailCache（弱网同样跳过）；M8-C 起用 AggregatedSharedLibraryService 并发加载主+副 library.json 主库优先去重，每条注入 SourceNasId；SourceBadge 默认「共享」，M8-E 起当 ShowSourceBadge=true 改显「nas://{SourceNasId}」便于管理员区分来源 |
