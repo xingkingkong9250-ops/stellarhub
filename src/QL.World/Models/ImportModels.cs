@@ -25,6 +25,12 @@ public sealed class ImportOptions
     /// </summary>
     public int? NasConnectionId { get; init; }
 
+    /// <summary>
+    /// M11: 一级分类名，决定分类层硬链接目录 library\<分类>\。
+    /// null/空 → 归入「未分类」。由 W2 导入对话框提供（未选择即未分类）。
+    /// </summary>
+    public string? PrimaryCategory { get; init; }
+
     /// <summary>Lower-cased allow-list including the dot (".jpg").</summary>
     public IReadOnlySet<string> EnabledExtensions { get; init; } =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -48,8 +54,13 @@ public sealed class ImportProgress
     public string CurrentFile { get; set; } = string.Empty;
 }
 
-/// <summary>One successfully imported row (used to enqueue thumbnails).</summary>
-public sealed record ImportedItem(long Id, string FilePath, string FileHash);
+/// <summary>
+/// One successfully imported row (used to enqueue thumbnails).
+/// M11: <paramref name="FilePath"/> is the category hardlink in managed
+/// mode (legacy mode: source path); <paramref name="OriginalPath"/> is
+/// always the external/source path the bytes came from.
+/// </summary>
+public sealed record ImportedItem(long Id, string FilePath, string FileHash, string OriginalPath = "");
 
 /// <summary>Outcome of an import run.</summary>
 public sealed class ImportReport

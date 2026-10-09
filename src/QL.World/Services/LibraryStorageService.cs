@@ -43,15 +43,21 @@ public sealed class LibraryStorageService
         string contentHash,
         Stream content,
         string originalFileName,
-        string entryCode)
+        string entryCode,
+        string? existingPhysicalPath = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(libraryRoot);
         ArgumentException.ThrowIfNullOrWhiteSpace(contentHash);
         ArgumentNullException.ThrowIfNull(content);
         ArgumentException.ThrowIfNullOrWhiteSpace(entryCode);
 
-        string targetPath = LibraryRootResolver.GetPhysicalPath(
-            libraryRoot, contentHash, originalFileName, entryCode);
+        // Cross-category re-import of a known hash: re-materialize into the
+        // already-registered shard path (library_files.physical_path) instead
+        // of minting a second physical file named after the new entry code.
+        string targetPath = !string.IsNullOrWhiteSpace(existingPhysicalPath)
+            ? existingPhysicalPath
+            : LibraryRootResolver.GetPhysicalPath(
+                libraryRoot, contentHash, originalFileName, entryCode);
 
         if (File.Exists(targetPath))
         {

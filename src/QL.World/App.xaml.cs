@@ -105,7 +105,10 @@ public partial class App : Application
 
             var inspector = new ImageInspector();
             var pbrGrouping = new PbrGroupingService(_database, settings, WriteLog);
-            var importService = new ImportService(_database, inspector, pbrGrouping);
+            // M11: 传入 W7 向导选定的托管库根目录（未配置时 ImportService
+            // 回落 legacy 模式；向导在 L100-L102 之间介入，此时值已定）。
+            var importService = new ImportService(
+                _database, inspector, pbrGrouping, settings.LibraryRootPath);
             _thumbnails = new ThumbnailService(dataRoot, settings);
             _thumbnailCache = new ThumbnailCacheService(dataRoot, settings);
             _thumbnailCache.Start();
