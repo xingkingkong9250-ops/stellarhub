@@ -18,11 +18,11 @@
 | W1/A1-8 | 「分析颜色」按钮 | 已实现（M3-D） | 手动批量回填 dominant_colors；与 AI 档位无关；占用主线程串行执行 |
 | W1/A1-9 | 品牌 Logo 图块 + 名称 + AI 按钮品牌渐变 | 已实现（U2-A，v0.7.0 焕新） | v0.7.0 起 Logo 为 22×22 圆角品牌图「星光相框猫」（Assets/brand-logo.jpg，ImageBrush UniformToFill + BorderSubtle 描边），替换原 20×20 渐变占位色块；名称「千星汇图」；AI 按钮 hover 切 AccentGradientBrush（青蓝 #0E9FC0→#3B82F6）+ TextOnAccentBrush 文字。全部窗口图标统一 Assets/app.ico（Generic.xaml 隐式 Window 样式 + csproj ApplicationIcon） |
 | W1/A1-10 | 「🔄 刷新」按钮 | 已实现（v0.8.0） | 顶栏工具条（扫描 NAS 之后）；主动刷新：逐个重扫全部监控目录（ImportService 按 hash 幂等去重）→ 重载画廊 → 状态栏汇报，有新增联动主色调回填；无监控目录退化为纯画廊重载；F5 快捷键同命令；<1500px 收窄为 🔄 图标 |
-| W1/A1-M | 文本菜单栏（VS Code 风格 Row 0，兼任标题栏） | 已实现（v0.6.2） | Menu + MenuItem；IsMainMenu=True；CaptionHeight=40 让 Row 0 兼任可拖动标题栏；自定义 CaptionButton/CaptionCloseButton Style 替代 AeroCaptionButtons（Windows 11 不显示系统按钮）；Menu + 右侧系统区均加 IsHitTestVisibleInChrome=True；子项见 A1-M-FILE / A1-M-VIEW / A1-M-TOOLS / A1-M-HELP |
-| W1/A1-M-FILE | 「文件(_F)」菜单 | 已实现（v0.6.2） | 导入图片（Ctrl+I）/ 扫描 NAS 库 / 下载队列 |
-| W1/A1-M-VIEW | 「视图(_V)」菜单 | 已实现（v0.6.2） | 三态视图（IsCheckable 互斥：网格/列表/浏览）+ 分隔 + 本地库/共享库（仅 IsSharedLibraryAvailable 可见） |
-| W1/A1-M-TOOLS | 「工具(_T)」菜单 | 已实现（v0.6.2） | AI 分析 / 分析颜色 / 分隔 + 审核队列（仅 IsReviewAvailable 可见）/ 分隔 / 设置 |
-| W1/A1-M-HELP | 「帮助(_H)」菜单 | 已实现（v0.6.2） | 关于（→设置）/ 打开日志文件夹 / 分隔 / 快捷键提示（IsEnabled=False，引导看 C1-R） |
+| W1/A1-M | 文本菜单栏（VS Code 风格 Row 0，兼任标题栏） | 已移除（v0.14.2） | v0.14.2 移除：文件/视图/工具功能全部已有快捷按钮（重复入口），帮助三项无实际功能。Ctrl+I 等快捷键仍由 InputBindings 生效。编号 A1-M-FILE/VIEW/TOOLS/HELP 同步作废，不复用。 |
+| W1/A1-M-FILE | 「文件(_F)」菜单 | 已移除（v0.14.2） | 同 A1-M |
+| W1/A1-M-VIEW | 「视图(_V)」菜单 | 已移除（v0.14.2） | 同 A1-M |
+| W1/A1-M-TOOLS | 「工具(_T)」菜单 | 已移除（v0.14.2） | 同 A1-M |
+| W1/A1-M-HELP | 「帮助(_H)」菜单 | 已移除（v0.14.2） | 同 A1-M |
 | W1/A1-T | 工具条行（Row 1，高 42） | 已实现（v0.6.2，v0.12.3 调整） | 三列 Grid：左 Auto=导入/扫描/AI/颜色/下载/审核；中 *=搜索框+搜索模式+最近入库（CompactHidePanel）；右 Auto=本地/共享库切换（视图切换三按钮 v0.12.3 起迁移至 W1/B2-1 区） |
 | W1/B1 | 左栏 | 已实现（M2，v0.14.0 双模式） | v0.14.0 起宽度动态：图标模式 ≈60px / 文字模式 ≈240px（`SidebarIconMode`，默认图标模式）；顶部模式切换按钮（»/«）始终可见；图标模式=漏斗筛选 Popup + 分类图标垂直列表；文字模式=完整分类树 + B1-6 筛选组 |
 | W1/B1-ICON | 图标模式分类列表 | 已实现（v0.14.0） | 仅图标模式可见；8 个分类图标按钮（全部/角色/生物/场景/道具/素材/未分类）垂直排列，40×40，hover 显示 `名称 (计数)` tooltip，点击筛选 primary_category；图标 Geometry 真源 `CategoryNodeViewModel.IconGeometry` |

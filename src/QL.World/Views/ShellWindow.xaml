@@ -670,54 +670,7 @@
                                Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                 </StackPanel>
 
-                <!-- 中部：文本菜单栏（文件 / 视图 / 工具 / 帮助）— A1-M -->
-                <Menu Grid.Column="1" Background="Transparent" VerticalAlignment="Center"
-                      IsMainMenu="True" Margin="6,0,0,0"
-                      WindowChrome.IsHitTestVisibleInChrome="True">
-                    <MenuItem Header="文件(_F)">
-                        <MenuItem Header="导入图片…" Command="{Binding TopBar.ImportCommand}"
-                                  InputGestureText="Ctrl+I" />
-                        <MenuItem Header="扫描 NAS 库…" Command="{Binding ScanNasLibraryCommand}" />
-                        <MenuItem Header="下载队列…" Command="{Binding ShowDownloadQueueCommand}" />
-                    </MenuItem>
-                    <MenuItem Header="视图(_V)">
-                        <MenuItem Header="网格视图" IsCheckable="True"
-                                  IsChecked="{Binding TopBar.IsGridView, Mode=TwoWay}"
-                                  InputGestureText="▦" />
-                        <MenuItem Header="列表视图" IsCheckable="True"
-                                  IsChecked="{Binding Gallery.IsListView, Mode=TwoWay}"
-                                  InputGestureText="≡" />
-                        <MenuItem Header="浏览视图（瀑布流）" IsCheckable="True"
-                                  IsChecked="{Binding TopBar.IsBrowseView, Mode=TwoWay}"
-                                  InputGestureText="⊞" />
-                        <Separator Style="{StaticResource MenuSeparatorStyle}"
-                                   Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}" />
-                        <MenuItem Header="本地库" IsCheckable="True"
-                                  IsChecked="{Binding IsLocalScope, Mode=TwoWay}"
-                                  Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}" />
-                        <MenuItem Header="共享库"
-                                  Command="{Binding SwitchToSharedCommand}"
-                                  Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}" />
-                    </MenuItem>
-                    <MenuItem Header="工具(_T)">
-                        <MenuItem Header="AI 分析" Command="{Binding TopBar.AiCommand}"
-                                  ToolTip="{Binding TopBar.AiDisabledReason}" />
-                        <MenuItem Header="分析颜色（批量回填）" Command="{Binding TopBar.ColorCommand}" />
-                        <Separator Style="{StaticResource MenuSeparatorStyle}" />
-                        <MenuItem Header="审核队列…" Command="{Binding ShowReviewQueueCommand}"
-                                  Visibility="{Binding IsReviewAvailable, Converter={StaticResource BoolVis}}" />
-                        <Separator Style="{StaticResource MenuSeparatorStyle}"
-                                   Visibility="{Binding IsReviewAvailable, Converter={StaticResource BoolVis}}" />
-                        <MenuItem Header="设置…" Command="{Binding TopBar.SettingsCommand}" />
-                    </MenuItem>
-                    <MenuItem Header="帮助(_H)">
-                        <MenuItem Header="关于 / 版本信息" Command="{Binding TopBar.SettingsCommand}" />
-                        <MenuItem Header="打开日志文件夹" Command="{Binding TopBar.SettingsCommand}" />
-                        <Separator Style="{StaticResource MenuSeparatorStyle}" />
-                        <MenuItem Header="快捷键提示" IsEnabled="False"
-                                  ToolTip="见状态栏右下角上下文提示" />
-                    </MenuItem>
-                </Menu>
+                <!-- v0.14.2: 菜单栏已移除（文件/视图/工具全部已有快捷按钮，帮助项无实际功能） -->
 
                 <!-- 右侧：通知 + 设置 + 版本号 + 自定义系统三按钮 -->
                 <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center"
