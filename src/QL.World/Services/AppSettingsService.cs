@@ -311,6 +311,24 @@ public sealed class AppSettingsService
             next => _settings.SidebarFilterGroupsExpanded = next);
     }
 
+    /// <summary>v0.13.0: B1 左栏图标模式开关（true=仅图标，false=图标+文字）。</summary>
+    public bool SidebarIconMode
+    {
+        get => _settings.SidebarIconMode;
+        set => SetAndSave(value,
+            () => _settings.SidebarIconMode,
+            next => _settings.SidebarIconMode = next);
+    }
+
+    /// <summary>v0.13.0: B3 详情栏展开状态（true=展开，false=折叠）。</summary>
+    public bool DetailPanelExpanded
+    {
+        get => _settings.DetailPanelExpanded;
+        set => SetAndSave(value,
+            () => _settings.DetailPanelExpanded,
+            next => _settings.DetailPanelExpanded = next);
+    }
+
     // ─── U3-C (§4.E.3): B1-COL sidebar section collapse states ─────────────
 
     public bool SidebarLibraryExpanded

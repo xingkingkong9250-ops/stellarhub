@@ -195,3 +195,31 @@ public sealed class RatingStarBrushConverter : IMultiValueConverter
     public object[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture) =>
         throw new NotSupportedException();
 }
+
+/// <summary>
+/// v0.13.0: bool → GridLength（用于 ColumnDefinition.Width 动态切换）。
+/// Parameter 格式 "trueWidth,falseWidth"，如 "240,60" 表示 true→240px、false→60px。
+/// 解析失败回退 GridLength.Auto。
+/// </summary>
+public sealed class BoolToGridLengthConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        bool flag = value is bool b && b;
+        string? spec = parameter as string;
+        if (string.IsNullOrWhiteSpace(spec))
+            return new GridLength(1, GridUnitType.Auto);
+
+        string[] parts = spec.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2)
+            return new GridLength(1, GridUnitType.Auto);
+
+        double width = flag
+            ? (double.TryParse(parts[0], out double t) ? t : 1)
+            : (double.TryParse(parts[1], out double f) ? f : 1);
+        return new GridLength(width, GridUnitType.Pixel);
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}

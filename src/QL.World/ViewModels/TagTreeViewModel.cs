@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Windows.Media;
 using QL.World.Helpers;
 using QL.World.Models;
 using QL.World.Models.Taxonomy;
@@ -171,12 +172,35 @@ public sealed class CategoryNodeViewModel : ObservableObject
         Category = category;
         IsUncategorized = uncategorized;
         SelectCommand = new RelayCommand(() => select(this));
+        IconGeometry = BuildIcon(displayName, uncategorized);
     }
 
     public string DisplayName { get; }
     public string? Category { get; }
     public bool IsUncategorized { get; }
     public RelayCommand SelectCommand { get; }
+
+    /// <summary>
+    /// v0.13.0: 图标模式下显示的分类图标 Geometry。
+    /// 与 Themes/Icons.xaml 中的 StreamGeometry 保持一致（单一真源为下方 BuildIcon）。
+    /// </summary>
+    public Geometry IconGeometry { get; }
+
+    private static Geometry BuildIcon(string displayName, bool uncategorized)
+    {
+        string data = (displayName, uncategorized) switch
+        {
+            ("全部", _) => "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
+            ("角色", _) => "M12 5a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM6 21v-2a6 6 0 0 1 12 0v2",
+            ("生物", _) => "M12 14c-3 0-5 2-5 4s2 3 5 3 5-1 5-3-2-4-5-4zM8 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM16 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM5 13a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM19 13a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z",
+            ("场景", _) => "M3 20l6-10 4 6 2-3 6 7zM16 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4z",
+            ("道具", _) => "M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zM12 3v18M4 7.5l8 4.5 8-4.5",
+            ("素材", _) => "M4 8l8-4 8 4-8 4-8-4zM4 13l8 4 8-4M4 18l8 4 8-4",
+            (_, true) => "M12 3a5 5 0 0 1 5 5c0 2-1.5 3-3 4s-2 1.5-2 3v1M12 19v.5",
+            _ => "M12 3a5 5 0 0 1 5 5c0 2-1.5 3-3 4s-2 1.5-2 3v1M12 19v.5",
+        };
+        return Geometry.Parse(data);
+    }
 
     /// <summary>二级标签节点（分类组的标签词表；全部/未分类为空）。</summary>
     public ObservableCollection<TagNodeViewModel> Children { get; } = [];

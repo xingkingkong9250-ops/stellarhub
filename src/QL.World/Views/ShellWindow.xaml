@@ -41,6 +41,8 @@
         <conv:NumericThresholdConverter x:Key="Threshold" />
         <conv:RatingStarBrushConverter x:Key="StarBrush" />
         <conv:HexBrushConverter x:Key="HexBrush" />
+        <!-- v0.13.0: bool → GridLength（B1 左栏宽度 / B3 详情栏宽度动态切换） -->
+        <conv:BoolToGridLengthConverter x:Key="BoolGridLen" />
 
         <!-- v0.6.2: 自定义窗口 caption 按钮（替代 UseAeroCaptionButtons，Windows 11 上更稳定） -->
         <Style x:Key="CaptionButton" TargetType="Button">
@@ -897,17 +899,142 @@
         <!-- ═══════════ B 主分区 ═══════════ -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="240" MinWidth="220" MaxWidth="300" />
+                <!-- v0.13.0: B1 左栏宽度随 IsSidebarTextMode 切换：文字模式 240 / 图标模式 60 -->
+                <ColumnDefinition Width="{Binding IsSidebarTextMode, Converter={StaticResource BoolGridLen}, ConverterParameter='240,60'}" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="300" MinWidth="280" MaxWidth="400" />
+                <!-- v0.13.0: B3 详情栏宽度随 IsDetailPanelExpanded 切换：展开 300 / 折叠 40 -->
+                <ColumnDefinition Width="{Binding IsDetailPanelExpanded, Converter={StaticResource BoolGridLen}, ConverterParameter='300,40'}" />
             </Grid.ColumnDefinitions>
 
             <!-- ─── B1 左栏 ─── -->
             <Border Grid.Column="0" Background="{DynamicResource SurfaceBrush}"
                     BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,1,0">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,12,8,12">
+                <DockPanel>
+                    <!-- v0.13.0: 顶部模式切换按钮（图标/文字），始终显示。
+                         图标模式显示 »（展开为文字模式），文字模式显示 «（收起为图标模式） -->
+                    <Button DockPanel.Dock="Top" Height="32" Margin="2"
+                            Style="{StaticResource SubtleButtonStyle}"
+                            Command="{Binding ToggleSidebarModeCommand}">
+                        <Button.ToolTip>
+                            <TextBlock>
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="收起侧栏（当前文字模式）" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSidebarIconMode}" Value="True">
+                                                <Setter Property="Text" Value="展开侧栏（当前图标模式）" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Button.ToolTip>
+                        <Path Width="16" Height="16" Stretch="Uniform"
+                              Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5">
+                            <Path.Style>
+                                <Style TargetType="Path">
+                                    <Setter Property="Data" Value="{StaticResource IconCollapse}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSidebarIconMode}" Value="True">
+                                            <Setter Property="Data" Value="{StaticResource IconExpand}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Path.Style>
+                        </Path>
+                    </Button>
+
+                    <!-- ═══ 图标模式（约 60px）：漏斗筛选 + 分类图标 ═══ -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="4,4"
+                                  Visibility="{Binding IsSidebarIconMode, Converter={StaticResource BoolVis}}">
+                        <StackPanel>
+                            <!-- 漏斗筛选按钮 + Popup（承载 B1-6 全部筛选组） -->
+                            <ToggleButton x:Name="FilterPopupToggle" Margin="0,0,0,6"
+                                          HorizontalAlignment="Center"
+                                          Style="{StaticResource SubtleToggleButtonStyle}"
+                                          Width="40" Height="40"
+                                          ToolTip="筛选标签组">
+                                <Path Width="20" Height="20" Stretch="Uniform"
+                                      Stroke="{DynamicResource TextPrimaryBrush}" StrokeThickness="1.5"
+                                      Data="{StaticResource IconFilter}" />
+                                <ToggleButton.ContextMenu>
+                                    <ContextMenu />
+                                </ToggleButton.ContextMenu>
+                            </ToggleButton>
+                            <Popup PlacementTarget="{Binding ElementName=FilterPopupToggle}"
+                                   Placement="Right" HorizontalOffset="4" VerticalOffset="-32"
+                                   IsOpen="{Binding IsChecked, ElementName=FilterPopupToggle, Mode=TwoWay}"
+                                   StaysOpen="False"
+                                   PopupAnimation="Slide">
+                                <Border Width="280" MaxHeight="600"
+                                        Background="{DynamicResource SurfaceBrush}"
+                                        BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1"
+                                        CornerRadius="8">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,8">
+                                        <StackPanel>
+                                            <TextBlock Text="筛选标签组" Style="{StaticResource SectionCaptionStyle}" />
+                                            <!-- B1-6-1 美术风格 / B1-6-2 文件格式 -->
+                                            <ItemsControl ItemsSource="{Binding FilterGroups.GroupsBeforePalette}"
+                                                          ItemTemplate="{StaticResource FilterGroupTemplate}" />
+                                            <!-- B1-6-3 色彩倾向 -->
+                                            <TextBlock Text="色彩倾向" Margin="2,2,0,0" FontSize="11"
+                                                       Foreground="{DynamicResource TextMutedBrush}" />
+                                            <ItemsControl ItemsSource="{Binding FilterGroups.Palette.Swatches}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Style="{StaticResource ColorSwatchStyle}"
+                                                                Command="{Binding SelectCommand}"
+                                                                ToolTip="{Binding Hex}" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <!-- B1-6-4..7 / B1-6-11 -->
+                                            <ItemsControl ItemsSource="{Binding FilterGroups.GroupsAfterPalette}"
+                                                          ItemTemplate="{StaticResource FilterGroupTemplate}" />
+                                            <!-- B1-6-8 分辨率 / B1-6-9 大小 / B1-6-10 评分 -->
+                                            <ItemsControl ItemsSource="{Binding FilterGroups.AttributeGroups}"
+                                                          ItemTemplate="{StaticResource FilterGroupTemplate}" />
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+
+                            <!-- 分类图标列表（垂直） -->
+                            <ItemsControl ItemsSource="{Binding TagTree.CategoryNodes}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <ToggleButton HorizontalAlignment="Center"
+                                                      Width="40" Height="40" Margin="0,2"
+                                                      Style="{StaticResource SubtleToggleButtonStyle}"
+                                                      AutomationProperties.Name="{Binding DisplayName}"
+                                                      IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                                      Command="{Binding SelectCommand}">
+                                            <ToggleButton.ToolTip>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding DisplayName}" />
+                                                    <TextBlock Text=" (" />
+                                                    <TextBlock Text="{Binding Count}" />
+                                                    <TextBlock Text=")" />
+                                                </StackPanel>
+                                            </ToggleButton.ToolTip>
+                                            <Path Width="22" Height="22" Stretch="Uniform"
+                                                  Stroke="{DynamicResource TextPrimaryBrush}" StrokeThickness="1.5"
+                                                  Data="{Binding IconGeometry}" />
+                                        </ToggleButton>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- ═══ 文字模式（约 240px）：完整分类树 + 筛选组 ═══ -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,12,8,12"
+                                  Visibility="{Binding IsSidebarTextMode, Converter={StaticResource BoolVis}}">
                     <StackPanel>
                         <!-- U3-C (§4.E.3): B1-COL 分区标题可折叠，折叠态显示子项数 (N) -->
                         <ToggleButton Style="{StaticResource SidebarSectionHeaderStyle}"
@@ -1150,7 +1277,8 @@
                                           ItemTemplate="{StaticResource FilterGroupTemplate}" />
                         </StackPanel>
                     </StackPanel>
-                </ScrollViewer>
+                    </ScrollViewer>
+                </DockPanel>
             </Border>
 
             <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"
@@ -1372,7 +1500,30 @@
             <!-- ─── B3 详情栏 ─── -->
             <Border Grid.Column="4" Background="{DynamicResource SurfaceBrush}"
                     BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1,0,0,0">
-                <Grid>
+                <DockPanel>
+                    <!-- v0.13.0: 折叠态窄条（约 40px），点击展开详情 -->
+                    <Button DockPanel.Dock="Left" Width="40"
+                            Style="{StaticResource SubtleButtonStyle}"
+                            Command="{Binding ToggleDetailPanelCommand}"
+                            ToolTip="展开详情栏"
+                            Visibility="{Binding IsDetailPanelCollapsed, Converter={StaticResource BoolVis}}">
+                        <Path Width="16" Height="16" Stretch="Uniform"
+                              Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5"
+                              Data="{StaticResource IconExpand}" />
+                    </Button>
+                    <!-- 展开态：原有详情内容 -->
+                    <DockPanel Visibility="{Binding IsDetailPanelExpanded, Converter={StaticResource BoolVis}}">
+                        <!-- 折叠按钮（收起为窄条） -->
+                        <Button DockPanel.Dock="Top" Height="28" HorizontalAlignment="Right"
+                                Margin="0,4,8,0"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                Command="{Binding ToggleDetailPanelCommand}"
+                                ToolTip="收起详情栏">
+                            <Path Width="14" Height="14" Stretch="Uniform"
+                                  Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5"
+                                  Data="{StaticResource IconCollapse}" />
+                        </Button>
+                        <Grid>
                 <Grid Visibility="{Binding IsLocalScope, Converter={StaticResource BoolVis}}">
                     <!-- Empty -->
                     <StackPanel VerticalAlignment="Top" Margin="20"
@@ -1731,7 +1882,9 @@
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>
-                </Grid>
+                        </Grid>
+                    </DockPanel>
+                </DockPanel>
             </Border>
         </Grid>
 

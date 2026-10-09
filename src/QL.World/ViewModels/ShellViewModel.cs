@@ -518,6 +518,52 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         }
     }
 
+    // ─── v0.13.0: B1 图标模式 / B3 详情折叠 ─────────────────────────────
+
+    /// <summary>
+    /// true=B1 左栏图标模式（约 60px，仅分类图标）；
+    /// false=图标+文字模式（约 240px，完整分类树）。
+    /// </summary>
+    public bool IsSidebarIconMode
+    {
+        get => _services.Settings.SidebarIconMode;
+        set
+        {
+            if (_services.Settings.SidebarIconMode == value) return;
+            _services.Settings.SidebarIconMode = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsSidebarTextMode));
+        }
+    }
+
+    /// <summary>IsSidebarIconMode 的反向绑定（XAML 中便于表达「文字模式」显隐）。</summary>
+    public bool IsSidebarTextMode => !IsSidebarIconMode;
+
+    /// <summary>
+    /// true=B3 详情栏展开（约 300px 完整面板）；
+    /// false=折叠（约 40px 窄条）。
+    /// </summary>
+    public bool IsDetailPanelExpanded
+    {
+        get => _services.Settings.DetailPanelExpanded;
+        set
+        {
+            if (_services.Settings.DetailPanelExpanded == value) return;
+            _services.Settings.DetailPanelExpanded = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsDetailPanelCollapsed));
+        }
+    }
+
+    /// <summary>IsDetailPanelExpanded 的反向绑定。</summary>
+    public bool IsDetailPanelCollapsed => !IsDetailPanelExpanded;
+
+    /// <summary>切换 B1 左栏图标/文字模式。</summary>
+    public RelayCommand ToggleSidebarModeCommand => new(() => IsSidebarIconMode = !IsSidebarIconMode);
+
+    /// <summary>切换 B3 详情栏展开/折叠。</summary>
+    public RelayCommand ToggleDetailPanelCommand => new(() => IsDetailPanelExpanded = !IsDetailPanelExpanded);
+
     public string LibraryHeaderText =>
         SidebarLibraryExpanded ? "素材库" : $"素材库 ({TagTree.CategoryNodes.Count})";
 

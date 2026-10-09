@@ -8,6 +8,8 @@
                 <!-- Index 0 is the swappable theme dictionary (see App.SetTheme). -->
                 <ResourceDictionary Source="Themes/Dark.xaml" />
                 <ResourceDictionary Source="Themes/Generic.xaml" />
+                <!-- v0.13.0: 分类/功能图标 Geometry 资源 -->
+                <ResourceDictionary Source="Themes/Icons.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

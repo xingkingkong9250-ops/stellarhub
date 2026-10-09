@@ -45,6 +45,21 @@ public sealed class AppSettings
     /// <summary>M12-F: B1-6 筛选标签组 section expanded (default collapsed).</summary>
     public bool SidebarFilterGroupsExpanded { get; set; }
 
+    /// <summary>
+    /// v0.13.0: B1 左栏显示模式。true=图标模式（约 60px，仅分类图标），
+    /// false=图标+文字模式（约 240px，完整分类树）。默认图标模式以放大中央画廊。
+    /// 默认 true 的 bool 必须 Never 忽略。
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    public bool SidebarIconMode { get; set; } = true;
+
+    /// <summary>
+    /// v0.13.0: B3 详情栏展开状态。true=展开（约 300px 完整面板），
+    /// false=折叠（约 40px 窄条）。默认折叠以放大中央画廊。
+    /// 默认 false 的 bool 无需 Never 忽略（WhenWritingDefault 会写入 false）。
+    /// </summary>
+    public bool DetailPanelExpanded { get; set; }
+
     // ─── U3-C (§4.E.3): B1-COL sidebar section collapse states (default all expanded) ──
     // 默认 true 的 bool 必须 Never 忽略：WhenWritingDefault 会吞掉 false，导致重载回落 true。
 

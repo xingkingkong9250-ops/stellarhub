@@ -9,6 +9,45 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.14.1] — 2026-10-10 修复：登录窗口关闭后主界面无法打开（XamlParseException）
+
+### 修复
+
+- **B1 图标模式 ToggleButton 样式类型不匹配**：`FilterPopupToggle` 和分类图标列表的 `ToggleButton` 误用了 `SubtleButtonStyle`（TargetType=Button），导致 `XamlParseException: "Button" TargetType 与元素 "ToggleButton" 的类型不匹配`，ShellWindow 构造失败被 `OnStartup` catch 后 `Shutdown(1)`，表现为「登录窗口关闭后主界面不打开」。
+  - 新增 `SubtleToggleButtonStyle`（TargetType=ToggleButton，完整 ControlTemplate），替换两处 ToggleButton 的 Style 引用。
+
+### 验证
+
+- 启动日志确认 `ShellWindow shown.` + `InitializeAsync completed.`，主界面正常打开。
+
+## [0.14.0] — 2026-10-09 布局瘦身：B1 图标模式 + B3 可折叠，最大化中央画廊
+
+### 变更
+
+- **B1 左栏双模式（v0.14.0）**：新增 `SidebarIconMode` 设置（默认 true=图标模式）。
+  - **图标模式（约 60px）**：顶部模式切换按钮 + 漏斗筛选按钮（Popup 承载 B1-6 全部 11 组筛选）+ 分类图标垂直列表（8 个：全部/角色/生物/场景/道具/素材/未分类，hover 显示 `名称 (计数)` tooltip）。
+  - **图标+文字模式（约 240px）**：恢复完整分类树 + B1-6 筛选标签组。
+  - 顶部切换按钮（»/«）在两种模式下始终可见，状态持久化。
+- **B1-6 筛选标签组浮层化**：图标模式下通过漏斗按钮的 Popup 调出（宽 280px，右对齐，点击外部关闭）；文字模式下仍常驻展开。
+- **B3 详情栏可折叠（v0.14.0）**：新增 `DetailPanelExpanded` 设置（默认 false=折叠）。
+  - **折叠态（约 40px）**：仅显示一个展开按钮（»）。
+  - **展开态（约 300px）**：完整详情面板，右上角加折叠按钮（«）。
+- **列宽动态绑定**：B1/B3 的 `ColumnDefinition.Width` 通过新增 `BoolToGridLengthConverter`（Parameter `"trueWidth,falseWidth"`）绑定到 VM 布尔属性，避免硬编码宽度反复摇摆。
+- **分类图标资源**：新增 `Themes/Icons.xaml` 资源字典，定义 8 个分类 + 漏斗/展开/收起共 11 个 `StreamGeometry`；`CategoryNodeViewModel` 新增 `IconGeometry` 属性（`Geometry.Parse`，测试环境无 Application 也可用）。
+
+### 测试
+
+- 785 项测试全绿（Release 0 警告 0 错误）。
+
+### UI 编号同步
+
+- `W1/B1` 左栏：宽度由固定 240 改为动态（图标 60 / 文字 240）。
+- 新增 `W1/B1-ICON` 图标模式分类列表（图标按钮 + tooltip）。
+- 新增 `W1/B1-FLT` 漏斗筛选按钮 + Popup（承载 B1-6）。
+- `W1/B1-1` 分类树：仅文字模式可见。
+- `W1/B1-6` 筛选标签组：文字模式常驻；图标模式经 W1/B1-FLT Popup 调出。
+- `W1/B3` 详情栏：宽度由固定 300 改为动态（展开 300 / 折叠 40）；折叠态显示展开按钮。
+
 ## [0.13.7] — 2026-10-09 UI 迁移：质感分类自 B1-1 移入 B1-6 筛选标签组（B1-6-11）
 
 ### 变更
