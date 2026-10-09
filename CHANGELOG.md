@@ -9,6 +9,23 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.13.6] — 2026-10-09 UI 隐藏：B1-2 收藏夹 / B1-3 热门标签 / B1-4 贴图组（功能预留）
+
+### 变更
+
+- **左栏三分区暂隐藏（功能预留，非删除）**：B1-2 收藏夹树、B1-3 高频标签
+  Top50、B1-4 贴图组树按用户要求暂不放在 B1 位置展示。ShellWindow.xaml
+  三个分区头与内容面板加 `Visibility="Collapsed"`，分区头注释记录还原
+  方法（删除 Collapsed 还原 BoolVis 绑定）；编号保留不作废。
+- **预留范围**：ViewModel（CollectionTree/TagTree.TopTagNodes/PbrGroupTree）、
+  服务层、折叠态持久化（sidebar_collections/top_tags/pbr_groups_expanded）、
+  画廊拖拽加入收藏夹、W3/A6 贴图组规则页全部保留不动——仅 UI 入口隐藏。
+- 后续待办：用户要求在合适时机于别处补充这三个功能的入口（不在左栏），
+  届时恢复或重挂 UI 即可（project_memory 已记录 PEND-002）。
+- `docs/UI_NUMBERING.md`：B1-2/3/4 改「暂隐藏（功能预留）」；B1-COL 收敛
+  为素材库 + 筛选标签组两个可见分区头。冒烟脚本 UiSmokeU3 同步：断言
+  收藏夹/热门标签/贴图组分区头不存在、重启后仍隐藏。
+
 ## [0.13.5] — 2026-10-09 UI 合并：属性筛选三维并入筛选标签组（B1-5 作废）
 
 ### 变更

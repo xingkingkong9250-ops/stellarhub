@@ -3,10 +3,11 @@
 # 用法: powershell -ExecutionPolicy Bypass -File tools\smoke\UiSmokeU3.ps1
 # 前置: .NET 10 SDK；脚本自建 Debug 构建并用隔离数据根，不影响真实数据。
 # 退出码: 0 = 全部通过；非 0 = 存在失败步骤。
-# 覆盖：W1/B1-COL 四分区 ToggleButton、折叠态计数文本、config.json false 显式写入、
-#       同数据根重启后折叠态保持；W1/B1-6 筛选标签组展开后标签/格式/属性桶 chips 存在性；
+# 覆盖：W1/B1-COL 分区 ToggleButton（素材库可见、B1-2/3/4 隐藏、B1-5 作废）、折叠态计数文本、
+#       config.json false 显式写入、同数据根重启后折叠态保持；W1/B1-6 筛选标签组展开后标签/格式/属性桶 chips 存在性；
 #       W3/A1 完整性复选框取消勾选后的持久化。
-# 注：v0.13.5 起原 B1-5 属性筛选分区作废，分辨率/文件大小/评分并入 B1-6-8/9/10。
+# 注：v0.13.5 起原 B1-5 属性筛选分区作废，分辨率/文件大小/评分并入 B1-6-8/9/10；
+#     v0.13.6 起 B1-2 收藏夹 / B1-3 热门标签 / B1-4 贴图组三分区头暂隐藏（功能预留）。
 # 未覆盖：W1/B2-3-ACT hover 操作组（空库无卡片，且 IsMouseOver 需真实光标，留待人工验收）。
 
 $ErrorActionPreference = 'Stop'
@@ -155,17 +156,17 @@ try {
     $mainWin = $app.Window
     Write-Host "  Main window: $($mainWin.Current.Name)"
 
-    # ── 1. 四分区 ToggleButton 存在（B1-COL；v0.13.5 B1-5 属性筛选已作废） ──
+    # ── 1. 分区 ToggleButton 存在性（B1-COL；v0.13.5 B1-5 作废、v0.13.6 B1-2/3/4 暂隐藏） ──
     Write-Host '[Smoke] Step 1: section header toggle buttons exist'
     $tLibrary  = Find-FirstByName $mainWin '素材库'   ([System.Windows.Automation.ControlType]::Button)
     $tCollect  = Find-FirstByName $mainWin '收藏夹'   ([System.Windows.Automation.ControlType]::Button)
     $tTopTags  = Find-FirstByName $mainWin '热门标签' ([System.Windows.Automation.ControlType]::Button)
     $tPbr      = Find-FirstByName $mainWin '贴图组'   ([System.Windows.Automation.ControlType]::Button)
     $tAttr     = Find-FirstByName $mainWin '属性筛选' ([System.Windows.Automation.ControlType]::Button)
-    Assert-Step '四分区 ToggleButton 存在 (B1-COL)' (
-        $null -ne $tLibrary -and $null -ne $tCollect -and $null -ne $tTopTags -and
-        $null -ne $tPbr) '缺少分区标题 ToggleButton'
+    Assert-Step '素材库 ToggleButton 存在 (B1-COL)' ($null -ne $tLibrary) '缺少素材库分区标题 ToggleButton'
     Assert-Step '「属性筛选」分区头已移除 (B1-5 v0.13.5 作废)' ($null -eq $tAttr) '仍存在「属性筛选」标题'
+    Assert-Step '收藏夹/热门标签/贴图组分区头暂隐藏 (v0.13.6)' (
+        $null -eq $tCollect -and $null -eq $tTopTags -and $null -eq $tPbr) '仍存在应隐藏的分区标题'
     if ($null -ne $tLibrary) {
         Assert-Step '素材库标题支持 TogglePattern' (
             $tLibrary.GetSupportedPatterns() -contains [System.Windows.Automation.TogglePattern]::Pattern) '不支持 TogglePattern'
@@ -268,10 +269,7 @@ try {
         Assert-Step '重启后标题仍为「素材库 (8)」' ($header2 -eq '素材库 (8)') "实际「$header2」"
     }
     $tCollect2 = Find-FirstByName $mainWin '收藏夹' ([System.Windows.Automation.ControlType]::Button)
-    if ($null -ne $tCollect2) {
-        Assert-Step '重启后收藏夹保持展开（On）' (
-            (Get-ToggleState $tCollect2) -eq [System.Windows.Automation.ToggleState]::On) '收藏夹应仍为展开'
-    }
+    Assert-Step '重启后收藏夹头仍隐藏 (v0.13.6)' ($null -eq $tCollect2) '收藏夹不应可见'
 }
 finally {
     if ($null -ne $app) { Stop-App $app }

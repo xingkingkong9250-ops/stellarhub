@@ -981,12 +981,16 @@
                                 Visibility="{Binding Gallery.FilterSummary, Converter={StaticResource NullVis}}"
                                 Command="{Binding ClearFiltersCommand}" />
 
+                        <!-- v0.13.6: B1-2 收藏夹分区暂隐藏（功能预留，VM/服务层与折叠态
+                             持久化全部保留）；恢复时删除下方两处 Visibility="Collapsed"，
+                             内容面板还原为 BoolVis 绑定 SidebarCollectionsExpanded -->
                         <ToggleButton Margin="2,16,0,0"
                                       Style="{StaticResource SidebarSectionHeaderStyle}"
                                       AutomationProperties.Name="收藏夹"
                                       IsChecked="{Binding SidebarCollectionsExpanded}"
-                                      Content="{Binding CollectionsHeaderText}" />
-                        <StackPanel Visibility="{Binding SidebarCollectionsExpanded, Converter={StaticResource BoolVis}}">
+                                      Content="{Binding CollectionsHeaderText}"
+                                      Visibility="Collapsed" />
+                        <StackPanel Visibility="Collapsed">
                             <Button Content="＋ 新建" Style="{StaticResource ChipActiveButtonStyle}"
                                     Margin="0,4,0,0" HorizontalAlignment="Left"
                                     Command="{Binding CreateCollectionCommand}" />
@@ -1032,14 +1036,18 @@
                             </ItemsControl>
                         </StackPanel>
 
+                        <!-- v0.13.6: B1-3 热门标签 Top50 暂隐藏（功能预留）；恢复时删除
+                             两处 Visibility="Collapsed"，ItemsControl 还原为 BoolVis
+                             绑定 SidebarTopTagsExpanded -->
                         <ToggleButton Margin="2,16,0,0"
                                       Style="{StaticResource SidebarSectionHeaderStyle}"
                                       AutomationProperties.Name="热门标签"
                                       IsChecked="{Binding SidebarTopTagsExpanded}"
-                                      Content="{Binding TopTagsHeaderText}" />
+                                      Content="{Binding TopTagsHeaderText}"
+                                      Visibility="Collapsed" />
                         <ItemsControl Margin="2,0,0,0"
                                       ItemsSource="{Binding TagTree.TopTagNodes}"
-                                      Visibility="{Binding SidebarTopTagsExpanded, Converter={StaticResource BoolVis}}">
+                                      Visibility="Collapsed">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <WrapPanel />
@@ -1061,13 +1069,18 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
+                        <!-- v0.13.6: B1-4 贴图组分区暂隐藏（功能预留，PBR 组服务与
+                             W3/A6 规则页不受影响）；恢复时删除两处
+                             Visibility="Collapsed"，ItemsControl 还原为 BoolVis
+                             绑定 SidebarPbrGroupsExpanded -->
                         <ToggleButton Margin="2,16,0,0"
                                       Style="{StaticResource SidebarSectionHeaderStyle}"
                                       AutomationProperties.Name="贴图组"
                                       IsChecked="{Binding SidebarPbrGroupsExpanded}"
-                                      Content="{Binding PbrGroupsHeaderText}" />
+                                      Content="{Binding PbrGroupsHeaderText}"
+                                      Visibility="Collapsed" />
                         <ItemsControl ItemsSource="{Binding PbrGroupTree.GroupNodes}"
-                                      Visibility="{Binding SidebarPbrGroupsExpanded, Converter={StaticResource BoolVis}}">
+                                      Visibility="Collapsed">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <ToggleButton Style="{StaticResource TreeToggleStyle}"
