@@ -20,8 +20,22 @@ public sealed class LegacyPythonImporter
     private const int BATCH_SIZE = 50;
 
     private readonly DatabaseService _db;
+    private readonly string? _libraryRoot;
+    private readonly LibraryStorageService _storage;
 
-    public LegacyPythonImporter(DatabaseService db) => _db = db;
+    /// <param name="libraryRoot">
+    /// M11: 传入 W7 选定的托管库根时，每条旧版记录按与正常导入一致的
+    /// 语义入库（CAS 副本 + 分类硬链接 + 编码）；null 时保持旧版直存。
+    /// </param>
+    public LegacyPythonImporter(
+        DatabaseService db,
+        string? libraryRoot = null,
+        LibraryStorageService? storage = null)
+    {
+        _db = db;
+        _libraryRoot = string.IsNullOrWhiteSpace(libraryRoot) ? null : libraryRoot;
+        _storage = storage ?? new LibraryStorageService();
+    }
 
     /// <summary>Default location of the Python prototype's library file.</summary>
     public static string DefaultLegacyDbPath { get; } =
@@ -78,14 +92,21 @@ public sealed class LegacyPythonImporter
                 List<LegacyRow> batch = pending;
                 pending = new List<LegacyRow>(BATCH_SIZE);
 
+                // M11: 物理层发生在批事务之外（文件 IO 不长时间持锁；
+                // 编码预留走独立事务）。失败的行回落旧版直存登记，
+                // 保留元数据，不阻断整批导入。
+                List<PreparedRow> prepared = batch
+                    .Select(row => PrepareManaged(row, report))
+                    .ToList();
+
                 _db.RunInTransaction((conn, tx) =>
                 {
-                    foreach (LegacyRow row in batch)
+                    foreach (PreparedRow item in prepared)
                     {
-                        long newId = InsertImage(conn, tx, row);
-                        idMap[row.Id] = newId;
-                        snapshot.Paths.Add(row.FilePath);
-                        snapshot.Hashes.Add(row.Hash);
+                        long newId = InsertImage(conn, tx, item);
+                        idMap[item.Row.Id] = newId;
+                        snapshot.Paths.Add(item.Row.FilePath);
+                        snapshot.Hashes.Add(item.Row.Hash);
                         report.AddedCount++;
                     }
                 });
@@ -156,7 +177,10 @@ public sealed class LegacyPythonImporter
     {
         var snapshot = new ExistingSnapshot();
         using var command = conn.CreateCommand();
-        command.CommandText = "SELECT file_path, file_hash FROM images;";
+        // M11: 托管行的唯一路径是分类硬链接，外部原路径存 original_path，
+        // 去重要同时覆盖两种行。
+        command.CommandText =
+            "SELECT COALESCE(original_path, file_path), file_hash FROM images;";
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
@@ -165,6 +189,40 @@ public sealed class LegacyPythonImporter
         }
         return snapshot;
     });
+
+    /// <summary>
+    /// M11: reserves an entry code (own transaction), copies bytes into CAS
+    /// and creates the category hardlink. Any failure — including a missing
+    /// source file — falls back to legacy direct-path registration so the
+    /// metadata row is never lost.
+    /// </summary>
+    private PreparedRow PrepareManaged(LegacyRow row, LegacyImportReport report)
+    {
+        if (_libraryRoot is null || !File.Exists(row.FilePath))
+            return new PreparedRow(row, null, null, null);
+
+        try
+        {
+            string entryCode = _db.RunInTransaction((conn, tx) =>
+                EntryCodeGenerator.Next(
+                    conn, tx, DateOnly.FromDateTime(DateTime.Now), row.Hash));
+
+            string physicalPath = _storage.EnsurePhysicalFromFile(
+                _libraryRoot, row.Hash, row.FilePath, entryCode);
+
+            string hardlinkPath = LibraryRootResolver.GetCategoryHardlinkPath(
+                _libraryRoot, row.Category, row.FileName, entryCode);
+            _storage.CreateCategoryHardlink(physicalPath, hardlinkPath);
+
+            return new PreparedRow(row, entryCode, physicalPath, hardlinkPath);
+        }
+        catch (Exception ex)
+        {
+            report.LogLines.Add(
+                $"托管失败，按旧版路径登记：{row.FileName}（{ex.Message}）");
+            return new PreparedRow(row, null, null, null);
+        }
+    }
 
     private static List<LegacyRow> LoadLegacyImages(SqliteConnection legacy, LegacyImportReport report)
     {
@@ -202,22 +260,30 @@ public sealed class LegacyPythonImporter
         return rows;
     }
 
-    private static long InsertImage(SqliteConnection conn, SqliteTransaction tx, LegacyRow row)
+    private static long InsertImage(SqliteConnection conn, SqliteTransaction tx, PreparedRow item)
     {
+        LegacyRow row = item.Row;
+        bool managed = item.EntryCode is not null
+            && item.PhysicalPath is not null
+            && item.HardlinkPath is not null;
+
         using var command = conn.CreateCommand();
         command.Transaction = tx;
         command.CommandText = """
             INSERT INTO images
                 (file_path, file_name, sortable_name, file_hash, file_size,
                  width, height, format, rating, notes, primary_category,
-                 dominant_colors, is_missing, created_at, updated_at)
+                 dominant_colors, is_missing, created_at, updated_at,
+                 library_hash, library_path, original_path, entry_code)
             VALUES
                 ($path, $name, $sortable, $hash, $size,
                  $width, $height, $format, $rating, $notes, $category,
-                 NULL, 0, $created, $created);
+                 NULL, 0, $created, $created,
+                 $libHash, $libPath, $origPath, $entryCode);
             SELECT last_insert_rowid();
             """;
-        command.Parameters.AddWithValue("$path", row.FilePath);
+        command.Parameters.AddWithValue("$path",
+            managed ? item.HardlinkPath! : row.FilePath);
         command.Parameters.AddWithValue("$name", row.FileName);
         command.Parameters.AddWithValue("$sortable", row.SortableName);
         command.Parameters.AddWithValue("$hash", row.Hash);
@@ -229,7 +295,39 @@ public sealed class LegacyPythonImporter
         command.Parameters.AddWithValue("$notes", row.Notes);
         command.Parameters.AddNullable("$category", row.Category);
         command.Parameters.AddWithValue("$created", row.CreatedAt);
-        return Convert.ToInt64(command.ExecuteScalar());
+        command.Parameters.AddNullable("$libHash", managed ? row.Hash : null);
+        command.Parameters.AddNullable("$libPath",
+            managed ? item.HardlinkPath : null);
+        command.Parameters.AddNullable("$origPath",
+            managed ? row.FilePath : null);
+        command.Parameters.AddNullable("$entryCode",
+            managed ? item.EntryCode : null);
+        long newId = Convert.ToInt64(command.ExecuteScalar());
+
+        if (managed)
+        {
+            using var lib = conn.CreateCommand();
+            lib.Transaction = tx;
+            lib.CommandText = """
+                INSERT OR IGNORE INTO library_files
+                    (content_hash, physical_path, file_size, width, height,
+                     format, entry_code, created_at)
+                VALUES
+                    ($hash, $phys, $size, $width, $height,
+                     $format, $code, $created);
+                """;
+            lib.Parameters.AddWithValue("$hash", row.Hash);
+            lib.Parameters.AddWithValue("$phys", item.PhysicalPath);
+            lib.Parameters.AddWithValue("$size", row.FileSize);
+            lib.Parameters.AddNullable("$width", row.Width);
+            lib.Parameters.AddNullable("$height", row.Height);
+            lib.Parameters.AddNullable("$format", row.Format);
+            lib.Parameters.AddWithValue("$code", item.EntryCode);
+            lib.Parameters.AddWithValue("$created", row.CreatedAt);
+            lib.ExecuteNonQuery();
+        }
+
+        return newId;
     }
 
     private int ImportTags(SqliteConnection legacy, Dictionary<long, long> idMap)
@@ -420,4 +518,11 @@ public sealed class LegacyPythonImporter
         string Notes,
         string? Category,
         string CreatedAt);
+
+    /// <summary>M11: per-row managed-storage artifacts; all null = legacy row.</summary>
+    private sealed record PreparedRow(
+        LegacyRow Row,
+        string? EntryCode,
+        string? PhysicalPath,
+        string? HardlinkPath);
 }

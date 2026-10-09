@@ -514,6 +514,25 @@ public sealed class SettingsViewModel : ObservableObject
     public RelayCommand AddWatcherDirectoryCommand { get; }
     public RelayCommand RemoveWatcherDirectoryCommand { get; }
 
+    // ─── A1 M11 素材库托管 ────────────────────────────────────────────────
+
+    /// <summary>W3/A1：库目录只读展示（M11 不支持改库，按钮置灰）。</summary>
+    public string LibraryRootDisplayText =>
+        string.IsNullOrWhiteSpace(_settings.LibraryRootPath)
+            ? "未配置（旧版直存模式）"
+            : _settings.LibraryRootPath;
+
+    /// <summary>W7 选过「跳过」时开关才有实际意义，否则置灰。</summary>
+    public bool CanToggleLegacyVisibility => _settings.LegacyDataSkipped;
+
+    public bool ShowLegacyImages
+    {
+        // setter 经 AppSettingsService 触发 LegacyVisibilityChanged，
+        // GalleryViewModel 订阅后自动重查（无需此处直接依赖画廊）。
+        get => _settings.ShowLegacyImages;
+        set => _settings.ShowLegacyImages = value;
+    }
+
     // ─── A5 关于 / 旧版导入 / 诊断 ─────────────────────────────────────────
 
     public string VersionText => $"v{AppInfo.Version}";

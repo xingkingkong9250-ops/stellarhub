@@ -142,7 +142,9 @@ public partial class App : Application
             var colorAnalysis = new ColorAnalysisService(_database, WriteLog);
             var watcher = new FileWatcherService(settings, importService, imageQuery, notifications, WriteLog,
                 colorAnalysis);
-            var legacyImporter = new LegacyPythonImporter(_database);
+            // M11-F: Python 旧版库导入同样写入 CAS 托管库（库未配置时回落直存）。
+            var legacyImporter = new LegacyPythonImporter(
+                _database, settings.LibraryRootPath);
             IAiService aiService = AiServiceFactory.Create(settings, log: WriteLog);
             // v0.9.0 (W2/AI): backendResolver 支持导入对话框按次选择云端/本地，
             // 不改写全局设置；解析失败（Disabled）时 RunBatchAsync 会发布不可用通知。

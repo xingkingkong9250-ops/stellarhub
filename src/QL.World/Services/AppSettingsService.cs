@@ -147,13 +147,30 @@ public sealed class AppSettingsService
             next => _settings.LegacyDataSkipped = next);
     }
 
-    /// <summary>M11: W3/A1「显示未托管图」开关（默认 false）。</summary>
+    /// <summary>
+    /// M11: W3/A1「显示未托管图」开关（默认 false）。专用事件（而非通用
+    /// Changed）让画廊只在该开关翻转时重查，避免其他设置项引发多余刷新。
+    /// </summary>
+    public event Action? LegacyVisibilityChanged;
+
     public bool ShowLegacyImages
     {
         get => _settings.ShowLegacyImages;
-        set => SetAndSave(value,
-            () => _settings.ShowLegacyImages,
-            next => _settings.ShowLegacyImages = next);
+        set
+        {
+            bool previous = _settings.ShowLegacyImages;
+            if (previous == value) return;
+            _settings.ShowLegacyImages = value;
+            if (TrySaveNow())
+            {
+                Changed?.Invoke();
+                LegacyVisibilityChanged?.Invoke();
+            }
+            else
+            {
+                _settings.ShowLegacyImages = previous;
+            }
+        }
     }
 
     /// <summary>

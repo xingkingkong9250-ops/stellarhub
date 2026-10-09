@@ -43,6 +43,10 @@ public sealed class GalleryViewModel : ObservableObject
             "Browse" => "Browse",
             _ => "Grid",
         };
+
+        // M11-F: W3/A1「显示未托管图」翻转后画廊立即按新谓词重查。
+        settings.LegacyVisibilityChanged +=
+            () => _ = RefreshAsync();
     }
 
     public IReadOnlyList<GallerySortOption> SortOptions { get; } =

@@ -51,6 +51,32 @@
                     <CheckBox Content="每次启动时检查缺失文件与数据库结构"
                               Margin="0,4,0,0"
                               IsChecked="{Binding CheckIntegrityOnStartup}" />
+
+                    <!-- M11 W3/A1：素材库托管（库目录首启向导后不可改） -->
+                    <Border Margin="0,22,0,0" Padding="12,10"
+                            Background="{DynamicResource SurfaceBrush}"
+                            BorderBrush="{DynamicResource BorderSubtleBrush}"
+                            BorderThickness="1" CornerRadius="6">
+                        <StackPanel>
+                            <TextBlock Text="素材库托管目录（M11）"
+                                       Style="{StaticResource SectionCaptionStyle}" />
+                            <DockPanel Margin="0,6,0,0">
+                                <Button Content="修改…" Width="72" Margin="8,0,0,0"
+                                        DockPanel.Dock="Right"
+                                        Style="{StaticResource SubtleButtonStyle}"
+                                        IsEnabled="False"
+                                        ToolTip="当前版本暂不支持迁移库目录；如需更换请先退出并手动迁移数据" />
+                                <TextBox IsReadOnly="True"
+                                         Text="{Binding LibraryRootDisplayText}"
+                                         VerticalContentAlignment="Center" />
+                            </DockPanel>
+                            <CheckBox Margin="0,8,0,0"
+                                      Content="显示未托管的旧版图片"
+                                      IsEnabled="{Binding CanToggleLegacyVisibility}"
+                                      IsChecked="{Binding ShowLegacyImages}"
+                                      ToolTip="首次启动选择「跳过迁移」后，未托管旧图默认从画廊隐藏；打开此开关可重新显示（可逆）" />
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
                 </ScrollViewer>
             </TabItem>
