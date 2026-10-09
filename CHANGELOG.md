@@ -9,6 +9,51 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.13.3] — 2026-10-09 UI：B1-1 二级分类标签改气泡 chips 自动换行
+
+### 变更
+
+- **B1-1 素材库树展开后的二级标签布局改版**：分类（如「角色」21 个标签）
+  展开后原为整行纵列树节点，21 个标签占 21 行、纵向空间浪费严重；现改为
+  圆角气泡 chips + `WrapPanel` 自动换行（新样式 `TreeTagChipStyle`，
+  圆角 8、未选 SurfaceVariant 底+描边、hover/选中 Accent 高亮），视觉与
+  B1-5 属性筛选气泡统一，侧栏 240–300px 下每行容纳 3–4 个标签。
+- 纯布局改动，筛选语义不变（仍写 `Filter.Tag` 单标签筛选，与 B1-3 热门
+  标签 chips 活跃态三处同步）；分类行本身的 ▸/▾ 展开箭头与计数不受影响。
+- `docs/UI_NUMBERING.md` B1-1 条目同步。
+
+### 测试
+
+- 无逻辑改动，781 项测试保持全绿；Release 0 警告 0 错误。
+
+## [0.13.2] — 2026-10-09 CLIP 词表 v2 落地：本地模型零样本对齐新标签体系
+
+### 变更
+
+- **重新生成 CLIP 文本嵌入 JSON（v1 → v2）**：用内置打包的
+  `AiModels/text_model.onnx`（Xenova clip-vit-base-patch32，254 MB，
+  无需重新下载）经 ClipSpike `gen` 生成，词表从旧「10 分类 + 4 组」换为
+  M12 体系的 **6 分类 + 11 组 168 标签（共 174 条零样本向量，均 512 维）**，
+  覆盖 6 个分类组与美术风格/画面构图/灯光氛围/题材气质/状态形容 5 个
+  筛选组；文件格式走 `format` 列、色彩倾向走色板，不进 CLIP 词表。
+- `ClipTextIndex.ExpectedPromptTemplateVersion` **1 → 2**：老用户
+  dataRoot/models 下的 v1 JSON 启动时自动被内嵌 v2 覆盖（v0.9.0 的
+  EnsureDistributed 版本校验机制）；用户自制 ≥v2 文件仍保留。
+- 同步替换两处分发副本：内嵌资源 `Assets/Ml/text-embeddings-clip-vit-b32.json`
+  与离线打包目录 `AiModels/`（发布时复制到 exe 同目录 models\）。
+- 生成工具沿用既有 `tools/spike/ClipSpike`（`gen`/`sanity` 命令，
+  Vocab.cs 已含 M12 v2 中英文 prompt 词表），未另建 ClipVocabGen 工程
+  （避免重复代码）；模型经同卷硬链接接入 tools/spike/models（gitignored）。
+
+### 测试
+
+- 新增 `Embedded_resource_matches_TagTaxonomy_vocabulary`：守卫内嵌 JSON
+  与 `TagTaxonomy` 锁步——6 分类名/顺序、11 组组名、每组标签名/顺序、
+  512 维、174 条目总数，词表漂移会直接红。
+- 既有 EnsureDistributed 幂等测试与 LocalAiService 合成词表 fixture 的
+  版本号同步为 2（v1 现在语义上就是过期文件）。
+- 测试总数 **780 → 781**；Release 0 警告 0 错误。
+
 ## [0.13.1] — 2026-10-09 M12 补齐：手动标签重推导分类接通 + 旧分类 UI 残留清理
 
 ### 修复（M12-F/Z 复核发现的遗漏）
@@ -106,34 +151,6 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
   `text_model.onnx` 重新生成（6 分类 + 11 组 168 标签，174 条目）。
   后续若再升级 `text_model.onnx`，重跑 ClipSpike `gen` 并同步
   `ExpectedPromptTemplateVersion` 常量。
-
-## [0.13.2] — 2026-10-09 CLIP 词表 v2 落地：本地模型零样本对齐新标签体系
-
-### 变更
-
-- **重新生成 CLIP 文本嵌入 JSON（v1 → v2）**：用内置打包的
-  `AiModels/text_model.onnx`（Xenova clip-vit-base-patch32，254 MB，
-  无需重新下载）经 ClipSpike `gen` 生成，词表从旧「10 分类 + 4 组」换为
-  M12 体系的 **6 分类 + 11 组 168 标签（共 174 条零样本向量，均 512 维）**，
-  覆盖 6 个分类组与美术风格/画面构图/灯光氛围/题材气质/状态形容 5 个
-  筛选组；文件格式走 `format` 列、色彩倾向走色板，不进 CLIP 词表。
-- `ClipTextIndex.ExpectedPromptTemplateVersion` **1 → 2**：老用户
-  dataRoot/models 下的 v1 JSON 启动时自动被内嵌 v2 覆盖（v0.9.0 的
-  EnsureDistributed 版本校验机制）；用户自制 ≥v2 文件仍保留。
-- 同步替换两处分发副本：内嵌资源 `Assets/Ml/text-embeddings-clip-vit-b32.json`
-  与离线打包目录 `AiModels/`（发布时复制到 exe 同目录 models\）。
-- 生成工具沿用既有 `tools/spike/ClipSpike`（`gen`/`sanity` 命令，
-  Vocab.cs 已含 M12 v2 中英文 prompt 词表），未另建 ClipVocabGen 工程
-  （避免重复代码）；模型经同卷硬链接接入 tools/spike/models（gitignored）。
-
-### 测试
-
-- 新增 `Embedded_resource_matches_TagTaxonomy_vocabulary`：守卫内嵌 JSON
-  与 `TagTaxonomy` 锁步——6 分类名/顺序、11 组组名、每组标签名/顺序、
-  512 维、174 条目总数，词表漂移会直接红。
-- 既有 EnsureDistributed 幂等测试与 LocalAiService 合成词表 fixture 的
-  版本号同步为 2（v1 现在语义上就是过期文件）。
-- 测试总数 **780 → 781**；Release 0 警告 0 错误。
 
 ## [0.12.3] — 2026-10-09 UI 调整：瀑布流默认 + 视图切换迁移 + 底部署名
 
