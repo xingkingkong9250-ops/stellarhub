@@ -1,0 +1,103 @@
+<Window x:Class="QL.World.Views.FirstRunWizardWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:conv="clr-namespace:QL.World.Views.Converters"
+        xmlns:vm="clr-namespace:QL.World.ViewModels"
+        mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance Type=vm:FirstRunWizardViewModel}"
+        Width="540" Height="500"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource SurfaceBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
+        Title="首次设置 — 千星汇图">
+
+    <Window.Resources>
+        <conv:BoolToVisibilityConverter x:Key="BoolVis" />
+        <conv:BoolToVisibilityConverter x:Key="InverseBoolVis" Parameter="Invert" />
+    </Window.Resources>
+
+    <Grid Background="{DynamicResource BackgroundBrush}">
+        <Grid Margin="32,26">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- W7-1 标题与说明 -->
+            <StackPanel Grid.Row="0">
+                <TextBlock Text="设置图片库目录" FontSize="20" FontWeight="Bold"
+                           Foreground="{DynamicResource AccentBrush}" />
+                <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" FontSize="12"
+                           Foreground="{DynamicResource TextMutedBrush}"
+                           Text="导入的图片将统一复制到该目录，由千星汇图托管：物理文件按内容去重存储，并按一级分类建立硬链接视图。目录必须与数据目录位于同一 NTFS 盘符。" />
+            </StackPanel>
+
+            <!-- W7-2 库目录选择 -->
+            <TextBlock Grid.Row="1" Margin="0,18,0,0" FontSize="12"
+                       Text="图片库目录" Foreground="{DynamicResource TextSecondaryBrush}" />
+            <Grid Grid.Row="2" Margin="0,24,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0" Height="30"
+                         Text="{Binding SelectedLibraryPath, UpdateSourceTrigger=PropertyChanged}"
+                         Foreground="{DynamicResource TextPrimaryBrush}" />
+                <Button Grid.Column="1" Margin="8,0,0,0" MinWidth="88" Height="30"
+                        Content="浏览…"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        Command="{Binding BrowseCommand}" />
+            </Grid>
+            <TextBlock Grid.Row="3" Margin="0,8,0,0" FontSize="11" TextWrapping="Wrap"
+                       Text="{Binding ValidationError}"
+                       Foreground="{DynamicResource DangerBrush}"
+                       Visibility="{Binding HasValidationError, Converter={StaticResource BoolVis}}" />
+
+            <!-- W7-3 迁移说明与进度 -->
+            <StackPanel Grid.Row="4" VerticalAlignment="Bottom" Margin="0,0,0,8">
+                <TextBlock TextWrapping="Wrap" FontSize="12"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           Visibility="{Binding HasLegacyData, Converter={StaticResource BoolVis}}">
+                    检测到旧版本数据。可立即把已有图片迁移进托管库；选择「跳过」则画廊暂不显示未托管的老图片（数据不会删除，稍后可在设置中放行显示）。
+                </TextBlock>
+                <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" FontSize="12"
+                           Foreground="{DynamicResource TextMutedBrush}"
+                           Text="迁移在后台逐张复制，耗时取决于图片数量；NAS 远程图片本次跳过。"
+                           Visibility="{Binding HasLegacyData, Converter={StaticResource BoolVis}}" />
+                <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" FontSize="12"
+                           Foreground="{DynamicResource AccentBrush}"
+                           Text="{Binding MigrationStatus}"
+                           Visibility="{Binding HasMigrationStatus, Converter={StaticResource BoolVis}}" />
+            </StackPanel>
+
+            <!-- W7-4 操作按钮 -->
+            <Grid Grid.Row="5">
+                <!-- 老用户：立即迁移 / 跳过 -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                            Visibility="{Binding HasLegacyData, Converter={StaticResource BoolVis}}">
+                    <Button MinWidth="110" Height="32" Margin="0,0,10,0"
+                            Content="跳过"
+                            Style="{StaticResource SubtleButtonStyle}"
+                            Command="{Binding SkipCommand}" />
+                    <Button MinWidth="130" Height="32"
+                            Content="立即迁移"
+                            Style="{StaticResource AccentButtonStyle}"
+                            Command="{Binding MigrateNowCommand}" />
+                </StackPanel>
+                <!-- 新安装：开始使用 -->
+                <Button HorizontalAlignment="Right" MinWidth="130" Height="32"
+                        Content="开始使用"
+                        Style="{StaticResource AccentButtonStyle}"
+                        Command="{Binding ConfirmCommand}"
+                        Visibility="{Binding HasLegacyData, Converter={StaticResource InverseBoolVis}}" />
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

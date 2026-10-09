@@ -100,19 +100,42 @@ public partial class App : Application
             var settings = new AppSettingsService(dataRoot, WriteLog);
             settings.Load();
 
+            // M11-E: W7 向导需要在 v9 schema 就位后执行老数据迁移（迁移器
+            // 写 library_files / images 新列），故先初始化 DB 再弹向导；
+            // 是否为老用户以初始化前 DB 文件是否存在判断（新安装无第二步）。
+            bool legacyDatabasePresent = File.Exists(
+                Path.Combine(dataRoot, AppDataRootResolver.DatabaseFileName));
+
             _database = new DatabaseService(dataRoot);
             _database.Initialize();
+
+            if (!settings.IsLibraryRootConfigured)
+            {
+                var wizardViewModel = new ViewModels.FirstRunWizardViewModel(
+                    settings, _database, dataRoot, legacyDatabasePresent,
+                    folderPicker: null, WriteLog);
+                var wizard = new Views.FirstRunWizardWindow(wizardViewModel);
+                if (wizard.ShowDialog() != true)
+                {
+                    // 用户中途关窗：未选库目录无法继续，干净退出。
+                    WriteLog("[BOOT] First-run wizard cancelled; exiting.");
+                    Shutdown();
+                    return;
+                }
+            }
 
             var inspector = new ImageInspector();
             var pbrGrouping = new PbrGroupingService(_database, settings, WriteLog);
             // M11: 传入 W7 向导选定的托管库根目录（未配置时 ImportService
-            // 回落 legacy 模式；向导在 L100-L102 之间介入，此时值已定）。
+            // 回落 legacy 模式；向导已在此前完成，此时值已定）。
             var importService = new ImportService(
                 _database, inspector, pbrGrouping, settings.LibraryRootPath);
             _thumbnails = new ThumbnailService(dataRoot, settings);
             _thumbnailCache = new ThumbnailCacheService(dataRoot, settings);
             _thumbnailCache.Start();
-            var imageQuery = new ImageQueryService(_database);
+            // M11: W7「跳过」且 W3/A1 未放行时，画廊过滤未托管老行（可逆）。
+            var imageQuery = new ImageQueryService(
+                _database, () => settings.LegacyDataSkipped && !settings.ShowLegacyImages);
             var tagService = new TagService(_database);
             var collectionService = new CollectionService(_database);
             var notifications = new NotificationService();

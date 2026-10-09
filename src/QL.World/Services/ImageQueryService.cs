@@ -14,8 +14,19 @@ namespace QL.World.Services;
 public sealed class ImageQueryService
 {
     private readonly DatabaseService _db;
+    private readonly Func<bool>? _isLegacyHidden;
 
-    public ImageQueryService(DatabaseService db) => _db = db;
+    /// <param name="isLegacyHidden">
+    /// M11: when the predicate returns true (W7 chose 跳过 AND W3/A1
+    /// 「显示未托管图」is off), gallery queries exclude rows whose bytes
+    /// have not been migrated into the managed library
+    /// (library_path IS NULL). Null/default = no filtering.
+    /// </param>
+    public ImageQueryService(DatabaseService db, Func<bool>? isLegacyHidden = null)
+    {
+        _db = db;
+        _isLegacyHidden = isLegacyHidden;
+    }
 
     public int TotalCount() => _db.Run(conn =>
     {
@@ -45,6 +56,8 @@ public sealed class ImageQueryService
     {
         ArgumentNullException.ThrowIfNull(filter);
 
+        bool legacyHidden = _isLegacyHidden?.Invoke() == true;
+
         return _db.Run(conn =>
         {
             var sql = new StringBuilder("""
@@ -70,7 +83,7 @@ public sealed class ImageQueryService
                 """);
 
             var parameters = new List<(string Name, object? Value)>();
-            AppendClauses(sql, parameters, filter);
+            AppendClauses(sql, parameters, filter, legacyHidden);
             sql.Append(' ').Append(GetOrderBy(filter.Sort));
             if (filter.Limit is int limit)
             {
@@ -124,11 +137,13 @@ public sealed class ImageQueryService
     {
         ArgumentNullException.ThrowIfNull(filter);
 
+        bool legacyHidden = _isLegacyHidden?.Invoke() == true;
+
         return _db.Run(conn =>
         {
             var sql = new StringBuilder("SELECT COUNT(*)\nFROM images i");
             var parameters = new List<(string Name, object? Value)>();
-            AppendClauses(sql, parameters, filter);
+            AppendClauses(sql, parameters, filter, legacyHidden);
 
             using var command = conn.CreateCommand();
             command.CommandText = sql.ToString();
@@ -457,8 +472,14 @@ public sealed class ImageQueryService
     private static void AppendClauses(
         StringBuilder sql,
         List<(string Name, object? Value)> parameters,
-        LibraryFilter filter)
+        LibraryFilter filter,
+        bool legacyHidden)
     {
+        // M11: soft-skip of unmigrated legacy rows (W7 「跳过」). Applied
+        // first so it also constrains the semantic-result early returns.
+        if (legacyHidden)
+            sql.Append("\nWHERE i.library_path IS NOT NULL");
+
         // Semantic results take precedence: restrict to pre-computed id list.
         // Other filters (Text/Tag/Category) are intentionally ignored — the
         // semantic query already defines the result set.
