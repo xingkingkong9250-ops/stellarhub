@@ -169,9 +169,14 @@ public sealed class LocalAiService : IAiService
             float[] embedding = await Task.Run(() => RunInference(tensor), cancellationToken);
             ClipRankResult rank = RankAgainstVocabulary(embedding);
 
+            // M12-D: tag-driven classification — DeriveCategory takes priority
+            // over CLIP's RankCategory; falls back when tags don't map to a
+            // category group (e.g. old-vocab JSON or only filter tags).
+            string? derivedCategory = TaxonomyService.DeriveCategory(rank.Tags);
+
             return new AiAnalysisResult
             {
-                PrimaryCategory = rank.PrimaryCategory,
+                PrimaryCategory = derivedCategory ?? rank.PrimaryCategory,
                 Tags = rank.Tags,
                 Embedding = embedding,
                 ModelId = ModelManifest.ModelId,

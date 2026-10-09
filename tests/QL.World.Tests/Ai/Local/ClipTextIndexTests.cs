@@ -104,12 +104,38 @@ public sealed class ClipTextIndexTests
         {
             Directory.CreateDirectory(dir);
             string first = ClipTextIndex.EnsureDistributed(dir);
-            // Create a "user-provided" file to prove it is not overwritten.
-            File.WriteAllText(first, "{}");
+            // Overwrite with a valid v1 file to prove it is not re-extracted.
+            string userJson = """{"promptTemplateVersion":1,"categories":[],"tagGroups":{}}""";
+            File.WriteAllText(first, userJson);
             string second = ClipTextIndex.EnsureDistributed(dir);
 
             Assert.Equal(first, second);
-            Assert.Equal("{}", File.ReadAllText(second));
+            Assert.Equal(userJson, File.ReadAllText(second));
+        }
+        finally
+        {
+            try { Directory.Delete(dir, recursive: true); }
+            catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void EnsureDistributed_re_extracts_outdated_version()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "ql-world-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            string target = Path.Combine(dir, "text-embeddings-clip-vit-b32.json");
+            // Write an outdated v0 file — below ExpectedPromptTemplateVersion.
+            File.WriteAllText(target, """{"promptTemplateVersion":0,"categories":[],"tagGroups":{}}""");
+
+            string path = ClipTextIndex.EnsureDistributed(dir);
+
+            Assert.Equal(target, path);
+            // Re-extracted from embedded resource: real categories present.
+            using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(path));
+            Assert.True(doc.RootElement.GetProperty("categories").GetArrayLength() > 0);
         }
         finally
         {

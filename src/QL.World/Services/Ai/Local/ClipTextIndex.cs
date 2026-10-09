@@ -15,7 +15,7 @@ public sealed record ClipRankResult(string? PrimaryCategory, IReadOnlyList<AiTag
 /// <summary>
 /// Loads the precomputed CLIP text embeddings JSON (distributed as an embedded
 /// resource and unpacked into {dataRoot}\models\) and ranks an image embedding
-/// against the 10-category and 4-tag-group vocabularies with pure cosine
+/// against the category and tag-group vocabularies with pure cosine
 /// similarity — no ONNX involved. The JSON uses camelCase keys.
 /// </summary>
 public sealed class ClipTextIndex
@@ -43,16 +43,38 @@ public sealed class ClipTextIndex
     public const string ResourceName = "QL.World.Assets.Ml.text-embeddings-clip-vit-b32.json";
 
     /// <summary>
-    /// Copies the embedded text-embeddings JSON into the models directory the
-    /// first time it is needed and returns the target path. Skipped when the
-    /// file already exists (so a newer user-provided file wins).
+    /// Expected prompt template version. Tracks the version of the embedded
+    /// JSON resource. When the JSON is regenerated via ClipSpike <c>gen</c>
+    /// and the new resource is embedded, bump this constant — EnsureDistributed
+    /// will re-extract outdated on-disk files. Currently 1 (embedded JSON v1).
+    /// </summary>
+    public const int ExpectedPromptTemplateVersion = 1;
+
+    /// <summary>
+    /// Copies the embedded text-embeddings JSON into the models directory when
+    /// missing, outdated, or corrupt. Returns the target path. A user-provided
+    /// file at or above <see cref="ExpectedPromptTemplateVersion"/> is preserved.
     /// </summary>
     public static string EnsureDistributed(string modelsDirectory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(modelsDirectory);
         string target = Path.Combine(modelsDirectory, ModelManifest.TextEmbeddingsFileName);
+
         if (File.Exists(target))
-            return target;
+        {
+            // Preserve a user-provided file at the expected version; re-extract
+            // when the on-disk file is outdated or unparseable.
+            try
+            {
+                ClipTextIndex existing = LoadFromFile(target);
+                if (existing.PromptTemplateVersion >= ExpectedPromptTemplateVersion)
+                    return target;
+            }
+            catch
+            {
+                // Corrupt or unparseable — fall through and re-extract.
+            }
+        }
 
         Directory.CreateDirectory(modelsDirectory);
         Assembly assembly = typeof(ClipTextIndex).Assembly;
@@ -100,7 +122,7 @@ public sealed class ClipTextIndex
     public ClipRankResult Rank(float[] imageEmbedding) =>
         new(RankCategory(imageEmbedding), RankTags(imageEmbedding));
 
-    /// <summary>Argmax over the 10 categories; null when the best score is below threshold.</summary>
+    /// <summary>Argmax over the categories; null when the best score is below threshold.</summary>
     public string? RankCategory(float[] imageEmbedding)
     {
         ArgumentNullException.ThrowIfNull(imageEmbedding);

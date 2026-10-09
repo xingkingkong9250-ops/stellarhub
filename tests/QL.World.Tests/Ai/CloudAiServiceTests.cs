@@ -1,6 +1,7 @@
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using QL.World.Interop;
@@ -93,9 +94,10 @@ public sealed class CloudAiServiceTests
     }
 
     [Fact]
-    public async Task AnalyzeImage_parses_tags_and_category()
+    public async Task AnalyzeImage_parses_tags_only()
     {
-        string json = "{\"category\":\"角色\",\"tags\":[{\"tag\":\"硬表面\",\"confidence\":0.92},{\"tag\":\"机械\",\"confidence\":0.78}]}";
+        // M12-D: cloud no longer outputs category; derived from tags downstream.
+        string json = "{\"tags\":[{\"tag\":\"金属\",\"confidence\":0.92},{\"tag\":\"骑士\",\"confidence\":0.78}]}";
         var response = new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent("{\"choices\":[{\"message\":{\"content\":\"" + json.Replace("\"", "\\\"") + "\"}}]}"),
@@ -112,11 +114,56 @@ public sealed class CloudAiServiceTests
             var result = await ai.AnalyzeImageAsync(path, CancellationToken.None);
 
             Assert.False(result.IsError);
-            Assert.Equal("角色", result.PrimaryCategory);
+            Assert.Null(result.PrimaryCategory);
             Assert.Equal(2, result.Tags.Count);
-            Assert.Equal("硬表面", result.Tags[0].Tag);
+            Assert.Equal("金属", result.Tags[0].Tag);
             Assert.Equal(0.92, result.Tags[0].Confidence, 2);
-            Assert.Equal("机械", result.Tags[1].Tag);
+            Assert.Equal("骑士", result.Tags[1].Tag);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task AnalyzeImage_system_prompt_lists_new_taxonomy_tags()
+    {
+        // M12-D: system prompt is built from TagTaxonomy — must list new 6
+        // category tags and omit old categories (概念图/UI图标/etc.).
+        string? capturedBody = null;
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"choices\":[{\"message\":{\"content\":\"{\\\"tags\\\":[]}\"}}]}"),
+        };
+        var handler = new StubHttpHandler(req =>
+        {
+            // Read inside the handler — the request is disposed after SendAsync returns.
+            // Capture only the first (chat/completions) request, not embeddings.
+            capturedBody ??= req.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return response;
+        });
+        var ai = new CloudAiService(MakeConfig(), handler);
+
+        string path = Path.Combine(Path.GetTempPath(), $"ql-ai-test-{Guid.NewGuid():N}.png");
+        await File.WriteAllBytesAsync(path, [137, 80, 78, 71, 13, 10, 26, 10]);
+
+        try
+        {
+            await ai.AnalyzeImageAsync(path, CancellationToken.None);
+
+            Assert.NotNull(capturedBody);
+            // JSON escapes non-ASCII as \uXXXX — parse to get the decoded content.
+            using JsonDocument doc = JsonDocument.Parse(capturedBody);
+            string systemContent = doc.RootElement
+                .GetProperty("messages")[0]
+                .GetProperty("content")
+                .GetString()!;
+            Assert.Contains("骑士", systemContent);      // 角色 group
+            Assert.Contains("森林", systemContent);      // 场景 group
+            Assert.Contains("金属", systemContent);      // 质感 group
+            Assert.DoesNotContain("概念图", systemContent);  // old category removed
+            Assert.DoesNotContain("UI图标", systemContent);  // old category removed
         }
         finally
         {

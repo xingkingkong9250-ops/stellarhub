@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using QL.World.Models;
 using QL.World.Models.Ai;
+using QL.World.Models.Taxonomy;
 
 namespace QL.World.Services.Ai;
 
@@ -39,6 +40,39 @@ public sealed class CloudAiService : IAiService
         !string.IsNullOrWhiteSpace(_config.ModelName) &&
         !string.IsNullOrWhiteSpace(_config.EncryptedApiKey);
     public bool SupportsEmbeddings => !string.IsNullOrWhiteSpace(_config.EmbeddingModelName);
+
+    /// <summary>
+    /// M12-D: System prompt built from <see cref="TagTaxonomy"/>. Lists all
+    /// category and filter tag groups (文件格式/色彩倾向 handled locally). No
+    /// category output — derived from tags via TaxonomyService downstream.
+    /// </summary>
+    private static readonly string SystemPrompt = BuildSystemPrompt();
+
+    private static string BuildSystemPrompt()
+    {
+        var sb = new StringBuilder();
+        sb.Append("你是 3D 美术图片标签助手。分析图片，从下方词表中识别匹配的标签，");
+        sb.Append("输出 JSON：{\"tags\":[{\"tag\":\"标签名\",\"confidence\":0.0-1.0}]}。");
+        sb.Append("\n- 只能使用词表中列出的标签，不要编造。");
+        sb.Append("\n- 每组最多选 3 个最匹配的标签，confidence 为匹配置信度（0.0-1.0）。");
+        sb.Append("\n- 不要输出 category 字段；分类由本地根据标签推导。");
+        sb.Append("\n- 只输出 JSON，无多余文字。\n\n");
+        sb.Append("标签词表（按组）：\n");
+
+        foreach (string group in TagTaxonomy.AllGroups)
+        {
+            // 文件格式由本地从图片元数据识别；色彩倾向走色板提取。
+            if (group == TagTaxonomy.GroupFileFormat || group == TagTaxonomy.GroupColorTone)
+                continue;
+            if (!TagTaxonomy.TagsByGroup.TryGetValue(group, out var tags) || tags.Count == 0)
+                continue;
+            sb.Append(group).Append("：").Append(string.Join(", ", tags)).Append('\n');
+        }
+
+        sb.Append("\n文件格式由本地从图片元数据自动识别，无需输出。");
+        sb.Append("\n色彩倾向由本地色板提取，无需输出。");
+        return sb.ToString();
+    }
 
     public async Task<bool> TestConnectionAsync(CancellationToken cancellationToken)
     {
@@ -76,7 +110,7 @@ public sealed class CloudAiService : IAiService
                 new
                 {
                     role = "system",
-                    content = "你是 3D 美术图片分类助手。分析图片，输出 JSON：{\"category\":\"类别\",\"tags\":[{\"tag\":\"标签\",\"confidence\":0.0-1.0}]}。类别从：角色/场景/道具/材质/概念图/参考图/UI图标/其他。标签包含风格、题材、材质、色调。只输出 JSON，无多余文字。",
+                    content = SystemPrompt,
                 },
                 new
                 {
@@ -109,7 +143,6 @@ public sealed class CloudAiService : IAiService
             string content = json.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString()!;
 
             var parsed = JsonSerializer.Deserialize<JsonElement>(content);
-            string? category = parsed.TryGetProperty("category", out var cat) ? cat.GetString() : null;
 
             var tags = new List<AiTag>();
             if (parsed.TryGetProperty("tags", out var tagsEl) && tagsEl.ValueKind == JsonValueKind.Array)
@@ -129,9 +162,7 @@ public sealed class CloudAiService : IAiService
             {
                 try
                 {
-                    string input = string.IsNullOrWhiteSpace(category)
-                        ? string.Join(" ", tags.Select(t => t.Tag))
-                        : $"{category} {string.Join(" ", tags.Select(t => t.Tag))}";
+                    string input = string.Join(" ", tags.Select(t => t.Tag));
                     embedding = await GetEmbeddingAsync(input, cancellationToken);
                 }
                 catch
@@ -140,9 +171,11 @@ public sealed class CloudAiService : IAiService
                 }
             }
 
+            // M12-D: category is derived from tags downstream (AiAnalysisService
+            // calls TaxonomyService.DeriveCategory). Cloud no longer outputs it.
             return new AiAnalysisResult
             {
-                PrimaryCategory = category,
+                PrimaryCategory = null,
                 Tags = tags,
                 Embedding = embedding,
                 ModelId = _config.ModelName,

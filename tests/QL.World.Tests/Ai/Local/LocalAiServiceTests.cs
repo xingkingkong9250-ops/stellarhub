@@ -143,6 +143,47 @@ public sealed class LocalAiServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task AnalyzeImage_derives_category_overrides_clip_ranking()
+    {
+        // M12-D: DeriveCategory takes priority over CLIP's RankCategory.
+        // CLIP ranks 角色 highest (aligned), but the 金属 tag (in 质感
+        // category group) forces DeriveCategory to return 质感.
+        WriteModelFile(MiniOnnx.BuildClipStubModel());
+        string imagePath = WriteGradientImage();
+
+        float[] direction = Normalize(ClipPreprocessor.FromFile(imagePath)[..512]);
+        float[] orthogonal = new float[512];
+        orthogonal[0] = 1f;
+
+        var payload = new
+        {
+            promptTemplateVersion = 1,
+            categories = new object[]
+            {
+                new { name = "角色", prompt = "p", embedding = direction },
+                new { name = "质感", prompt = "p", embedding = orthogonal },
+            },
+            tagGroups = new
+            {
+                质感 = new object[]
+                {
+                    new { name = "金属", prompt = "p", embedding = direction },
+                },
+            },
+        };
+        string target = Path.Combine(ModelsDir, ModelManifest.TextEmbeddingsFileName);
+        File.WriteAllText(target, JsonSerializer.Serialize(payload));
+
+        var ai = new LocalAiService(ModelsDir);
+        AiAnalysisResult result = await ai.AnalyzeImageAsync(imagePath, CancellationToken.None);
+
+        Assert.False(result.IsError, result.ErrorMessage);
+        // DeriveCategory([金属]) → 质感, overriding CLIP's 角色.
+        Assert.Equal("质感", result.PrimaryCategory);
+        Assert.Contains(result.Tags, t => t.Tag == "金属");
+    }
+
+    [Fact]
     public async Task TestConnection_respects_injected_state_check()
     {
         var ready = new LocalAiService(ModelsDir, localStateCheck: () => LocalModelState.Ready);
