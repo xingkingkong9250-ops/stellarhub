@@ -87,6 +87,20 @@ public sealed class AppSettings
     /// <summary>Path to the local ONNX model file (M3-D). Null when not downloaded.</summary>
     public string? LocalModelPath { get; set; }
 
+    // ─── AI multi-backend (v0.12.0) ────────────────────────────────────────
+
+    /// <summary>
+    /// v0.12.0: 用户配置的 AI 后端列表（内置 Local + 用户添加的 Cloud/Local）。
+    /// 首次加载为空时由 <c>NormalizeAiBackends</c> 种子内置 Local backend。
+    /// </summary>
+    public List<AiBackendConfig> AiBackends { get; set; } = [];
+
+    /// <summary>
+    /// v0.12.0: 当前活跃 AI 后端 Id。null = 禁用 AI。指向 <see cref="AiBackends"/>
+    /// 中的某项；加载时校验孤儿 Id → 归零为 null。
+    /// </summary>
+    public int? ActiveAiBackendId { get; set; }
+
     // ─── PBR grouping (M4) ──────────────────────────────────────────────────
 
     /// <summary>

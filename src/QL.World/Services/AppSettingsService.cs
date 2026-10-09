@@ -46,6 +46,8 @@ public sealed class AppSettingsService
         _settingsExistedAtStartup =
             File.Exists(_settingsPath) ||
             File.Exists(AtomicTextFile.GetBackupPath(_settingsPath));
+        // v0.12.0: 构造后即种子内置 backend，保证 Load() 前也可正常读写 AiMode。
+        NormalizeAiBackends();
     }
 
     /// <summary>The QL World data root this settings file lives in (e.g. for the models directory).</summary>
@@ -362,12 +364,35 @@ public sealed class AppSettingsService
 
     // ─── AI (M3) ────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// v0.12.0: AiMode 现为计算属性——由 <see cref="ActiveAiBackendId"/> 派生。
+    /// getter: null→Disabled，Local backend→Local，Cloud backend→Cloud。
+    /// setter: 向后兼容桥——Disabled→active=null；Local/Cloud→选首个对应 Kind
+    /// 的 backend。新代码应直接读写 <see cref="ActiveAiBackendId"/>。
+    /// </summary>
     public AiMode AiMode
     {
-        get => _settings.AiMode;
-        set => SetAndSave(value,
-            () => _settings.AiMode,
-            next => _settings.AiMode = next);
+        get
+        {
+            int? id = _settings.ActiveAiBackendId;
+            if (id is not { } bid) return AiMode.Disabled;
+            AiBackendConfig? backend = _settings.AiBackends.FirstOrDefault(b => b.Id == bid);
+            if (backend is null) return AiMode.Disabled;
+            return backend.Kind == AiBackendKind.Local ? AiMode.Local : AiMode.Cloud;
+        }
+        set
+        {
+            int? newActiveId = value switch
+            {
+                AiMode.Disabled => null,
+                AiMode.Local => _settings.AiBackends.FirstOrDefault(b => b.Kind == AiBackendKind.Local)?.Id,
+                AiMode.Cloud => _settings.AiBackends.FirstOrDefault(b => b.Kind == AiBackendKind.Cloud)?.Id,
+                _ => null,
+            };
+            if (_settings.ActiveAiBackendId == newActiveId) return;
+            _settings.ActiveAiBackendId = newActiveId;
+            if (TrySaveNow()) Changed?.Invoke();
+        }
     }
 
     public string CloudBaseUrl
@@ -460,6 +485,144 @@ public sealed class AppSettingsService
         set => SetAndSave(value,
             () => _settings.LocalModelPath,
             next => _settings.LocalModelPath = next);
+    }
+
+    // ─── AI backends (v0.12.0 multi-backend) ────────────────────────────────
+
+    /// <summary>Read-only view of persisted AI backends; mutations go through the dedicated methods below.</summary>
+    public IReadOnlyList<AiBackendConfig> AiBackends => _settings.AiBackends;
+
+    /// <summary>Id of the active AI backend; null = disabled.</summary>
+    public int? ActiveAiBackendId
+    {
+        get => _settings.ActiveAiBackendId;
+        set
+        {
+            if (_settings.ActiveAiBackendId == value) return;
+            _settings.ActiveAiBackendId = value;
+            if (TrySaveNow()) Changed?.Invoke();
+        }
+    }
+
+    /// <summary>Returns the active backend config, or null when disabled.</summary>
+    public AiBackendConfig? GetActiveAiBackend()
+    {
+        int? id = _settings.ActiveAiBackendId;
+        if (id is not { } bid) return null;
+        return _settings.AiBackends.FirstOrDefault(b => b.Id == bid);
+    }
+
+    /// <summary>Finds a backend by id; null when absent.</summary>
+    public AiBackendConfig? GetAiBackend(int id) =>
+        _settings.AiBackends.FirstOrDefault(b => b.Id == id);
+
+    /// <summary>
+    /// Adds a backend. Assigns a strictly monotonic id (max existing id + 1,
+    /// or 1 for the first; deleted ids are never reused). Stamps
+    /// <see cref="AiBackendConfig.CreatedAt"/>/<see cref="AiBackendConfig.UpdatedAt"/>.
+    /// Returns the assigned id (also written back to <paramref name="backend"/>.Id).
+    /// </summary>
+    public int AddAiBackend(AiBackendConfig backend)
+    {
+        ArgumentNullException.ThrowIfNull(backend);
+        int nextId = _settings.AiBackends.Count == 0
+            ? 1
+            : _settings.AiBackends.Max(b => b.Id) + 1;
+        backend.Id = nextId;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        backend.CreatedAt = now;
+        backend.UpdatedAt = now;
+        _settings.AiBackends.Add(backend);
+        if (TrySaveNow()) Changed?.Invoke();
+        return nextId;
+    }
+
+    /// <summary>
+    /// Updates an existing backend by id. Copies editable fields onto the
+    /// existing instance and stamps <see cref="AiBackendConfig.UpdatedAt"/>.
+    /// Preserves <see cref="AiBackendConfig.EncryptedApiKey"/> and
+    /// <see cref="AiBackendConfig.CreatedAt"/> — the API key is handled
+    /// separately via <see cref="SetAiBackendApiKey"/>. Throws when the id
+    /// is unknown. Refuses to change <see cref="AiBackendConfig.Kind"/> or
+    /// <see cref="AiBackendConfig.IsBundled"/>.
+    /// </summary>
+    public void UpdateAiBackend(AiBackendConfig backend)
+    {
+        ArgumentNullException.ThrowIfNull(backend);
+        AiBackendConfig? existing = _settings.AiBackends.FirstOrDefault(b => b.Id == backend.Id);
+        if (existing is null)
+            throw new ArgumentException($"No AI backend with id {backend.Id}.", nameof(backend));
+        existing.Name = backend.Name;
+        // Cloud fields
+        existing.BaseUrl = backend.BaseUrl;
+        existing.ModelName = backend.ModelName;
+        existing.EmbeddingModelName = backend.EmbeddingModelName;
+        // Local fields
+        existing.ModelPath = backend.ModelPath;
+        existing.UpdatedAt = DateTimeOffset.UtcNow;
+        if (TrySaveNow()) Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Removes the backend with the given id. Refuses to delete a bundled
+    /// backend (<see cref="AiBackendConfig.IsBundled"/>=true). Clears
+    /// <see cref="ActiveAiBackendId"/> if it pointed at the deleted id.
+    /// No-op (not an error) when the id is absent.
+    /// </summary>
+    public void DeleteAiBackend(int id)
+    {
+        AiBackendConfig? existing = _settings.AiBackends.FirstOrDefault(b => b.Id == id);
+        if (existing is null) return;
+        if (existing.IsBundled)
+            throw new InvalidOperationException("The bundled AI backend cannot be deleted.");
+        _settings.AiBackends.RemoveAll(b => b.Id == id);
+        if (_settings.ActiveAiBackendId == id)
+            _settings.ActiveAiBackendId = null;
+        if (TrySaveNow()) Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Encrypts <paramref name="plaintext"/> via DPAPI (CurrentUser) and
+    /// stores it on the backend with the given id. Null/empty clears the
+    /// stored key. The plaintext never appears in config.json or logs.
+    /// </summary>
+    public void SetAiBackendApiKey(int id, string? plaintext)
+    {
+        AiBackendConfig? backend = _settings.AiBackends.FirstOrDefault(b => b.Id == id);
+        if (backend is null) return;
+        if (string.IsNullOrEmpty(plaintext))
+        {
+            backend.EncryptedApiKey = string.Empty;
+        }
+        else
+        {
+            string? encrypted = DpApiProtector.Protect(plaintext);
+            if (encrypted is null)
+            {
+                _log($"[SETTINGS] DPAPI protect failed for AI backend {id}; API key not saved.");
+                return;
+            }
+            backend.EncryptedApiKey = encrypted;
+        }
+        if (TrySaveNow()) Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Decrypts and returns the stored API key for the backend. Returns null
+    /// when not set or decryption fails. Callers must never log the result.
+    /// </summary>
+    public string? GetAiBackendApiKey(int id)
+    {
+        AiBackendConfig? backend = _settings.AiBackends.FirstOrDefault(b => b.Id == id);
+        if (backend is null) return null;
+        return DpApiProtector.Unprotect(backend.EncryptedApiKey);
+    }
+
+    /// <summary>True when the backend has a stored (encrypted) API key.</summary>
+    public bool HasAiBackendApiKey(int id)
+    {
+        AiBackendConfig? backend = _settings.AiBackends.FirstOrDefault(b => b.Id == id);
+        return backend is not null && !string.IsNullOrEmpty(backend.EncryptedApiKey);
     }
 
     // ─── PBR grouping (M4) ──────────────────────────────────────────────────
@@ -650,6 +813,8 @@ public sealed class AppSettingsService
             Report("Settings recovery snapshot could not be loaded.", backupError);
 
         _settings = new AppSettings();
+        // v0.12.0: 全新默认（文件缺失/损坏）也需种子内置 backend + 校验。
+        NormalizeLoadedSettings();
     }
 
     public bool TrySaveNow()
@@ -703,6 +868,9 @@ public sealed class AppSettingsService
         if (!Uri.TryCreate(_settings.CloudAi.BaseUrl, UriKind.Absolute, out Uri? u) ||
             u!.Scheme != Uri.UriSchemeHttps)
             _settings.CloudAi.BaseUrl = string.Empty;
+
+        // v0.12.0: 多后端迁移 + 内置种子 + 活跃 Id 校验
+        NormalizeAiBackends();
 
         // M11: 空白库目录视为未配置；已配置的规范化为绝对路径（失败保留原值，
         // 由向导/库服务在真正访问时暴露问题）。
@@ -789,6 +957,95 @@ public sealed class AppSettingsService
         {
             // 无 Primary：第一项设为 Primary（与 v0.2.1 行为一致）
             _settings.NasConnections[0].Role = NasRole.Primary;
+        }
+    }
+
+    /// <summary>
+    /// v0.12.0: 多后端 AI 迁移 + 内置种子 + 活跃 Id 校验。
+    /// <para>首次加载（AiBackends 为空）：</para>
+    /// <list type="bullet">
+    /// <item>种子内置 Local backend（Id=1, IsBundled=true）。</item>
+    /// <item>若旧 CloudAi 有实质内容 → 追加为 Cloud backend（Id=2）。</item>
+    /// <item>新装（!_settingsExistedAtStartup）→ ActiveAiBackendId=1（Local 即用）。</item>
+    /// <item>旧装升级 → 按旧 AiMode 决定活跃 backend（Cloud→云端, Local→内置, Disabled→null）。</item>
+    /// </list>
+    /// <para>已迁移（AiBackends 非空）：校验 ActiveAiBackendId 指向存在的 backend，孤儿→null。</para>
+    /// </summary>
+    private void NormalizeAiBackends()
+    {
+        _settings.AiBackends ??= [];
+
+        if (_settings.AiBackends.Count == 0)
+        {
+            // 内置 Local backend（Id=1，不可删除）
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            var bundled = new AiBackendConfig
+            {
+                Id = 1,
+                Name = "内置模型",
+                Kind = AiBackendKind.Local,
+                ModelPath = null,
+                IsBundled = true,
+                CreatedAt = now,
+                UpdatedAt = now,
+            };
+            _settings.AiBackends.Add(bundled);
+
+            // 旧 CloudAi 有实质内容 → 迁移为 Cloud backend（Id=2）
+            int? migratedCloudId = null;
+            bool hasCloudConfig = !string.IsNullOrWhiteSpace(_settings.CloudAi.BaseUrl)
+                || !string.IsNullOrWhiteSpace(_settings.CloudAi.ModelName)
+                || !string.IsNullOrEmpty(_settings.CloudAi.EncryptedApiKey);
+            if (hasCloudConfig)
+            {
+                var cloud = new AiBackendConfig
+                {
+                    Id = 2,
+                    Name = string.IsNullOrWhiteSpace(_settings.CloudAi.ModelName)
+                        ? "云端 AI" : _settings.CloudAi.ModelName,
+                    Kind = AiBackendKind.Cloud,
+                    BaseUrl = _settings.CloudAi.BaseUrl,
+                    ModelName = _settings.CloudAi.ModelName,
+                    EncryptedApiKey = _settings.CloudAi.EncryptedApiKey,
+                    EmbeddingModelName = _settings.CloudAi.EmbeddingModelName,
+                    CreatedAt = now,
+                    UpdatedAt = now,
+                };
+                _settings.AiBackends.Add(cloud);
+                migratedCloudId = 2;
+            }
+
+            // 决定活跃 backend
+            if (!_settingsExistedAtStartup)
+            {
+                // 新装：默认内置 Local（即用）
+                _settings.ActiveAiBackendId = 1;
+            }
+            else
+            {
+                // 旧装升级：按旧 AiMode
+                _settings.ActiveAiBackendId = _settings.AiMode switch
+                {
+                    AiMode.Cloud => migratedCloudId,
+                    AiMode.Local => 1,
+                    _ => null, // Disabled
+                };
+            }
+        }
+        else
+        {
+            // 已迁移：校验活跃 Id，孤儿→null
+            if (_settings.ActiveAiBackendId is { } aid &&
+                _settings.AiBackends.All(b => b.Id != aid))
+            {
+                _settings.ActiveAiBackendId = null;
+            }
+            // 防御性：补全缺失时间戳（旧存档可能无）
+            foreach (AiBackendConfig b in _settings.AiBackends)
+            {
+                if (b.CreatedAt == default) b.CreatedAt = DateTimeOffset.UtcNow;
+                if (b.UpdatedAt == default) b.UpdatedAt = b.CreatedAt;
+            }
         }
     }
 

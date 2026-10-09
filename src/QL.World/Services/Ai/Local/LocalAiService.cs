@@ -15,6 +15,7 @@ namespace QL.World.Services.Ai.Local;
 public sealed class LocalAiService : IAiService
 {
     private readonly string _modelsDirectory;
+    private readonly string? _modelFileOverride;
     private readonly Action<string> _log;
     private readonly Func<string, InferenceSession> _sessionFactory;
     private readonly Func<string, InferenceSession>? _textSessionFactory;
@@ -34,11 +35,21 @@ public sealed class LocalAiService : IAiService
     private ClipTextIndex? _textIndex;
     private bool _textIndexFailed;
 
-    public LocalAiService(AppSettingsService settings, Action<string>? log = null)
+    public LocalAiService(AppSettingsService settings, Action<string>? log = null, string? modelPath = null)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        // 优先从打包位置（exe 同目录 models\）加载，无则回落到 dataRoot\models\。
-        _modelsDirectory = ResolveModelsDirectory(settings.DataRoot);
+        if (modelPath is null)
+        {
+            // 优先从打包位置（exe 同目录 models\）加载，无则回落到 dataRoot\models\。
+            _modelsDirectory = ResolveModelsDirectory(settings.DataRoot);
+            _modelFileOverride = null;
+        }
+        else
+        {
+            // v0.12.0: 用户自加本地模型——直接用该文件路径。
+            _modelFileOverride = modelPath;
+            _modelsDirectory = Path.GetDirectoryName(modelPath) ?? modelPath;
+        }
         _log = log ?? (_ => { });
         _sessionFactory = CreateSession;
         _textSessionFactory = null; // production: text session uses the same CreateSession
@@ -67,13 +78,15 @@ public sealed class LocalAiService : IAiService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(modelsDirectory);
         _modelsDirectory = modelsDirectory;
+        _modelFileOverride = null;
         _log = log ?? (_ => { });
         _sessionFactory = sessionFactory ?? CreateSession;
         _textSessionFactory = textSessionFactory; // null falls back to _sessionFactory
         _localStateCheck = localStateCheck ?? DefaultLocalStateCheck;
     }
 
-    public string ModelFilePath => Path.Combine(_modelsDirectory, ModelManifest.ModelFileName);
+    public string ModelFilePath =>
+        _modelFileOverride ?? Path.Combine(_modelsDirectory, ModelManifest.ModelFileName);
     public string TextModelFilePath => Path.Combine(_modelsDirectory, ModelManifest.TextModelFileName);
 
     public string Mode => "Local";
