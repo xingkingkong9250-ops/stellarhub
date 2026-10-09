@@ -169,7 +169,7 @@ try {
             $tLibrary.GetSupportedPatterns() -contains [System.Windows.Automation.TogglePattern]::Pattern) '不支持 TogglePattern'
     }
 
-    # ── 2. 折叠素材库 → 计数文本 (12) ───────────────────────────
+    # ── 2. 折叠素材库 → 计数文本 (8) ───────────────────────────
     Write-Host '[Smoke] Step 2: collapse 素材库 shows count text'
     if ($null -ne $tLibrary) {
         ($tLibrary.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)).Toggle()
@@ -178,7 +178,8 @@ try {
         Assert-Step '折叠后 ToggleState = Off' ($state -eq [System.Windows.Automation.ToggleState]::Off) "实际 $state"
         $tLibrary = Find-FirstByName $mainWin '素材库' ([System.Windows.Automation.ControlType]::Button)
         $header = Get-HeaderText $tLibrary
-        Assert-Step '折叠态标题显示「素材库 (12)」' ($header -eq '素材库 (12)') "实际「$header」（12 = 全部+10分类+未分类）"
+        # M12-F: 全部 + 6 新分类 + 未分类 = 8
+        Assert-Step '折叠态标题显示「素材库 (8)」' ($header -eq '素材库 (8)') "实际「$header」（8 = 全部+6分类+未分类）"
     }
 
     # ── 3. 展开属性筛选 → chips 出现 ────────────────────────────
@@ -196,6 +197,19 @@ try {
                 [System.Windows.Automation.ControlType]::Button)))
         $allChips = $mainWin.FindAll([System.Windows.Automation.TreeScope]::Descendants, $allCond)
         Assert-Step '四维各含「全部」chip（≥4）' ($allChips.Count -ge 4) "实际 $($allChips.Count) 个"
+    }
+
+    # ── 3b. M12-F: 展开筛选标签组 → 美术风格 chips 出现 ────────
+    Write-Host '[Smoke] Step 3b: expand 筛选标签组 shows art-style chips (B1-6)'
+    $tFilterGroups = Find-FirstByName $mainWin '筛选标签组' ([System.Windows.Automation.ControlType]::Button)
+    Assert-Step '筛选标签组 ToggleButton 存在 (B1-6)' ($null -ne $tFilterGroups) '未找到 B1-6 分区标题'
+    if ($null -ne $tFilterGroups) {
+        ($tFilterGroups.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)).Toggle()
+        Start-Sleep -Milliseconds 800
+        $chipRealistic = Find-FirstByName $mainWin '写实' ([System.Windows.Automation.ControlType]::Button)
+        Assert-Step '美术风格 chip「写实」出现 (B1-6-1)' ($null -ne $chipRealistic) '未找到 Name="写实" 的 chip 按钮'
+        $chipPng = Find-FirstByName $mainWin 'PNG' ([System.Windows.Automation.ControlType]::Button)
+        Assert-Step '文件格式 chip「PNG」出现 (B1-6-2)' ($null -ne $chipPng) '未找到 Name="PNG" 的 chip 按钮'
     }
 
     # ── 4. 设置 A1 取消勾选完整性检查 ───────────────────────────
@@ -250,7 +264,7 @@ try {
         Assert-Step '重启后素材库保持折叠（Off）' (
             $state2 -eq [System.Windows.Automation.ToggleState]::Off) "实际 $state2"
         $header2 = Get-HeaderText $tLibrary2
-        Assert-Step '重启后标题仍为「素材库 (12)」' ($header2 -eq '素材库 (12)') "实际「$header2」"
+        Assert-Step '重启后标题仍为「素材库 (8)」' ($header2 -eq '素材库 (8)') "实际「$header2」"
     }
     $tCollect2 = Find-FirstByName $mainWin '收藏夹' ([System.Windows.Automation.ControlType]::Button)
     if ($null -ne $tCollect2) {

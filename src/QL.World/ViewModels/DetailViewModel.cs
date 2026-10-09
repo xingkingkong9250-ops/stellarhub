@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Threading;
 using QL.World.Helpers;
 using QL.World.Models;
+using QL.World.Models.Taxonomy;
 using QL.World.Services;
 
 namespace QL.World.ViewModels;
@@ -50,7 +51,8 @@ public sealed class DetailViewModel : ObservableObject
         {
             new("未分类", null),
         };
-        foreach (string category in Categories.All)
+        // M12 (v0.13.0): 分类体系换为标签驱动的 6 个一级分类。
+        foreach (string category in TagTaxonomy.Categories)
             CategoryOptions.Add(new CategoryOption(category, category));
         _selectedCategory = CategoryOptions[0];
 
@@ -245,6 +247,8 @@ public sealed class DetailViewModel : ObservableObject
         if (!IsSingle || Record is null || string.IsNullOrWhiteSpace(NewTagText)) return;
 
         _tags.AddTags([Record.Id], [NewTagText], TagSource.Manual);
+        // M12: 手动加标签后按标签词表重新推导一级分类（标签决定分类）。
+        _tags.RecomputeCategoryForImage(Record.Id);
         NewTagText = string.Empty;
         _ = ReloadSingleAsync(Record.Id);
         _ = _gallery.RefreshCurrentAsync();
@@ -254,6 +258,8 @@ public sealed class DetailViewModel : ObservableObject
     {
         if (Record is null || parameter is not DetailTagViewModel tag) return;
         _tags.RemoveTag(Record.Id, tag.Tag);
+        // M12: 标签被删可能使该图不再命中任何分类组 → 重推导（可能回落未分类）。
+        _tags.RecomputeCategoryForImage(Record.Id);
         _ = ReloadSingleAsync(Record.Id);
         _ = _gallery.RefreshCurrentAsync();
     }
@@ -263,6 +269,9 @@ public sealed class DetailViewModel : ObservableObject
         if (!IsBatch || string.IsNullOrWhiteSpace(BatchAddTagsText)) return;
         List<long> ids = SelectedIds();
         _tags.AddTags(ids, [BatchAddTagsText], TagSource.Manual);
+        // M12: 逐图重推导分类。
+        foreach (long id in ids)
+            _tags.RecomputeCategoryForImage(id);
         BatchAddTagsText = string.Empty;
         _ = _gallery.RefreshCurrentAsync();
     }
@@ -271,11 +280,15 @@ public sealed class DetailViewModel : ObservableObject
     {
         if (!IsBatch || string.IsNullOrWhiteSpace(BatchRemoveTagsText)) return;
         List<long> ids = SelectedIds();
-        foreach (string raw in BatchRemoveTagsText.Split(
+        string[] rawTags = BatchRemoveTagsText.Split(
                      [',', '，', '、', ';', '；', '\r', '\n'],
-                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        // M12: 先完成全部删除，再逐图只重推导一次（避免逐标签重复推导）。
+        foreach (string raw in rawTags)
             foreach (long id in ids)
                 _tags.RemoveTag(id, raw);
+        foreach (long id in ids)
+            _tags.RecomputeCategoryForImage(id);
         BatchRemoveTagsText = string.Empty;
         _ = _gallery.RefreshCurrentAsync();
     }

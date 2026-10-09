@@ -147,9 +147,10 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
     public AppSettingsService Settings => _services.Settings;
 
-    /// <summary>B2 context menu category submenu.</summary>
+    /// <summary>B2 context menu category submenu. M12: 标签驱动 6 新分类。</summary>
     public IReadOnlyList<CategoryMenuItemOption> CategoryMenuOptions { get; } =
-        [new("未分类", null), .. Categories.All.Select(c => new CategoryMenuItemOption(c, c))];
+        [new("未分类", null), .. Models.Taxonomy.TagTaxonomy.Categories
+            .Select(c => new CategoryMenuItemOption(c, c))];
 
     /// <summary>B2 context menu rating submenu.</summary>
     public IReadOnlyList<RatingMenuItemOption> RatingMenuOptions { get; } =
