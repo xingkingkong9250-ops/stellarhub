@@ -20,7 +20,7 @@ public sealed class ImportViewModel : ObservableObject
     private string _sourceSummary = "尚未选择";
     private bool _recurse = true;
     private bool _skipHidden = true;
-    private AiMode _importAiMode = AiMode.Disabled;
+    private int? _importBackendId;
     private bool _isRunning;
     private bool _isFinished;
     private int _scannedTotal;
@@ -31,11 +31,16 @@ public sealed class ImportViewModel : ObservableObject
     private string _resultSummary = string.Empty;
     private ImportReport? _lastReport;
 
-    public ImportViewModel(ImportService import, Func<string>? getSuggestedFolder = null)
+    public ImportViewModel(ImportService import, Func<string>? getSuggestedFolder = null,
+        IEnumerable<AiBackendConfig>? aiBackends = null)
     {
         _import = import;
         _getSuggestedFolder = getSuggestedFolder ?? (() => Environment.GetFolderPath(
             Environment.SpecialFolder.MyPictures));
+
+        if (aiBackends is not null)
+            foreach (var b in aiBackends)
+                AiBackendsList.Add(b);
 
         foreach (string ext in ImportOptions.SupportedExtensions.Order())
             ExtensionToggles.Add(new ExtensionToggle(ext, enabled: true));
@@ -52,6 +57,8 @@ public sealed class ImportViewModel : ObservableObject
     public ObservableCollection<string> SourcePaths { get; } = [];
     public ObservableCollection<ExtensionToggle> ExtensionToggles { get; } = [];
     public ObservableCollection<string> LogLines { get; } = [];
+    /// <summary>v0.12.0: 可用 AI 后端列表（供导入对话框下拉选择）。</summary>
+    public ObservableCollection<AiBackendConfig> AiBackendsList { get; } = [];
 
     public RelayCommand PickFolderCommand { get; }
     public RelayCommand PickFilesCommand { get; }
@@ -63,22 +70,22 @@ public sealed class ImportViewModel : ObservableObject
     public event Action<int>? RequestClose;
 
     /// <summary>
-    /// W2/AI (v0.9.0): 导入运行成功结束后触发（新增数 &gt; 0 且选择了 AI 模式）。
-    /// ShellViewModel 订阅后按所选后端对本次新增图执行作用域 AI 分析，
+    /// v0.12.0: 导入运行成功结束后触发（新增数 &gt; 0 且选择了 AI 后端）。
+    /// ShellViewModel 订阅后按所选后端 id 对本次新增图执行作用域 AI 分析，
     /// 进度反映到底部信息提示栏。
     /// </summary>
-    public event Action<IReadOnlyList<long>, AiMode>? ImportAnalysisRequested;
+    public event Action<IReadOnlyList<long>, int>? ImportAnalysisRequested;
 
     public int AddedOnClose { get; private set; }
 
     /// <summary>
-    /// W2/AI (v0.9.0): 导入后自动 AI 分析的后端选择（关闭/云端/本地）。
+    /// v0.12.0: 导入后自动 AI 分析的后端 id。null = 关闭 AI（默认）。
     /// 每次打开对话框默认「关闭 AI」，避免无意消耗云端额度。
     /// </summary>
-    public AiMode ImportAiMode
+    public int? ImportBackendId
     {
-        get => _importAiMode;
-        set => SetProperty(ref _importAiMode, value);
+        get => _importBackendId;
+        set => SetProperty(ref _importBackendId, value);
     }
 
     /// <summary>最近一次导入运行新增的图片 ID（作用域分析用）。</summary>
@@ -258,10 +265,10 @@ public sealed class ImportViewModel : ObservableObject
             if (report.LogLines.Count > 0)
                 CurrentFile = string.Empty;
 
-            // W2/AI (v0.9.0): 导入完成后按所选后端自动分析本次新增图
+            // v0.12.0: 导入完成后按所选后端自动分析本次新增图
             //（取消的导入只分析已入库部分；关闭 AI 则不触发）。
-            if (AddedOnClose > 0 && ImportAiMode != AiMode.Disabled)
-                ImportAnalysisRequested?.Invoke(AddedIds, ImportAiMode);
+            if (AddedOnClose > 0 && ImportBackendId is { } backendId)
+                ImportAnalysisRequested?.Invoke(AddedIds, backendId);
         }
         catch (Exception ex)
         {

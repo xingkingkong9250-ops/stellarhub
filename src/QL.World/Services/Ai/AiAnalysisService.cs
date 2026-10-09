@@ -20,7 +20,7 @@ public sealed class AiAnalysisService
     private readonly TagService _tags;
     private readonly NotificationService _notifications;
     private readonly Action<string> _log;
-    private readonly Func<AiMode, IAiService>? _backendResolver;
+    private readonly Func<int, IAiService>? _backendResolver;
     private readonly AiLearningService? _learning;
     private readonly Func<bool>? _learningEnabled;
     private readonly object _lock = new();
@@ -32,7 +32,7 @@ public sealed class AiAnalysisService
         TagService tags,
         NotificationService notifications,
         Action<string>? log = null,
-        Func<AiMode, IAiService>? backendResolver = null,
+        Func<int, IAiService>? backendResolver = null,
         AiLearningService? learning = null,
         Func<bool>? learningEnabled = null)
     {
@@ -70,25 +70,25 @@ public sealed class AiAnalysisService
     /// <param name="onlyImageIds">
     /// 作用域限定（W2 导入后自动分析：仅本次新增图）。null = 全库按规则取。
     /// </param>
-    /// <param name="modeOverride">
-    /// 按次指定后端（W2/AI：云端/本地），经构造时的 backendResolver 解析；
-    /// null = 使用默认后端（跟随 W3/A3 设置）。
+    /// <param name="backendIdOverride">
+    /// v0.12.0: 按次指定后端 id（W2 导入对话框选择），经构造时的
+    /// backendResolver 解析；null = 使用默认后端（跟随 W3/A3 活跃后端）。
     /// </param>
     public async Task<int> RunBatchAsync(
         int batchSize = 100,
         CancellationToken cancellationToken = default,
         IReadOnlyList<long>? onlyImageIds = null,
-        AiMode? modeOverride = null)
+        int? backendIdOverride = null)
     {
-        IAiService backend = modeOverride is { } requested && requested != AiMode.Disabled
-            ? (_backendResolver?.Invoke(requested) ?? _ai)
+        IAiService backend = backendIdOverride is { } bid
+            ? (_backendResolver?.Invoke(bid) ?? _ai)
             : _ai;
         if (!backend.IsAvailable)
         {
             _notifications.Publish(
                 NotificationKind.AiBatchCompleted,
                 "AI 分析未运行",
-                modeOverride is null
+                backendIdOverride is null
                     ? "AI 服务不可用，请在设置中启用并配置云端或本地模型。"
                     : "所选 AI 后端不可用：请先在 设置 → AI 分析 中完成对应配置。");
             return 0;

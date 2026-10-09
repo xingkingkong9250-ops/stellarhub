@@ -7,8 +7,8 @@ using QL.World.ViewModels;
 namespace QL.World.Tests;
 
 /// <summary>
-/// W2/AI (v0.9.0) 回归：导入对话框 AI 模式选择与「导入完成后自动分析」
-/// 事件——默认关闭不触发；选云端/本地时携带本次新增图 ID 触发。
+/// v0.12.0 回归：导入对话框 AI 后端选择与「导入完成后自动分析」
+/// 事件——默认关闭不触发；选了后端时携带本次新增图 ID 触发。
 /// </summary>
 public sealed class ImportViewModelTests : IDisposable
 {
@@ -23,7 +23,7 @@ public sealed class ImportViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task ImportAiMode_defaults_to_disabled_and_event_not_fired()
+    public async Task ImportBackendId_defaults_to_null_and_event_not_fired()
     {
         string source = Path.Combine(_lib.DirectoryRoot, "source");
         TestImageFactory.CreatePng(source, "a.png");
@@ -35,32 +35,32 @@ public sealed class ImportViewModelTests : IDisposable
         await vm.StartCommand.ExecuteAsync();
 
         Assert.Equal(1, vm.Added);
-        Assert.Equal(AiMode.Disabled, vm.ImportAiMode);
+        Assert.Null(vm.ImportBackendId);
         Assert.False(fired);
     }
 
     [Fact]
-    public async Task ImportAnalysisRequested_fires_with_ids_and_mode_when_cloud_selected()
+    public async Task ImportAnalysisRequested_fires_with_ids_and_backend_id_when_selected()
     {
         string source = Path.Combine(_lib.DirectoryRoot, "source");
         TestImageFactory.CreatePng(source, "a.png");
         var vm = CreateVm();
         vm.SourcePaths.Add(source);
-        vm.ImportAiMode = AiMode.Cloud;
+        vm.ImportBackendId = 7;
 
         IReadOnlyList<long>? raisedIds = null;
-        AiMode raisedMode = AiMode.Disabled;
-        vm.ImportAnalysisRequested += (ids, mode) =>
+        int raisedBackendId = 0;
+        vm.ImportAnalysisRequested += (ids, backendId) =>
         {
             raisedIds = ids;
-            raisedMode = mode;
+            raisedBackendId = backendId;
         };
         await vm.StartCommand.ExecuteAsync();
 
         Assert.Equal(1, vm.Added);
         Assert.NotNull(raisedIds);
         Assert.Single(raisedIds);
-        Assert.Equal(AiMode.Cloud, raisedMode);
+        Assert.Equal(7, raisedBackendId);
         Assert.Single(vm.AddedIds);
     }
 }

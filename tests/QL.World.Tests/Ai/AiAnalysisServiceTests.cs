@@ -198,11 +198,11 @@ public sealed class AiAnalysisServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task RunBatch_mode_override_uses_resolved_backend()
+    public async Task RunBatch_backend_id_override_uses_resolved_backend()
     {
         _lib.InsertImage();
 
-        AiMode? resolvedMode = null;
+        int? resolvedBackendId = null;
         var cloudBackend = new FakeAiService
         {
             AnalyzeFunc = _ => new AiAnalysisResult { Tags = [new AiTag("云", 1.0)] },
@@ -211,17 +211,17 @@ public sealed class AiAnalysisServiceTests : IDisposable
         var tags = new TagService(_lib.Db);
         var analysis = new AiAnalysisService(
             new FakeAiService(), _lib.Db, tags, notifications,
-            backendResolver: mode =>
+            backendResolver: id =>
             {
-                resolvedMode = mode;
+                resolvedBackendId = id;
                 return cloudBackend;
             });
 
-        // W2/AI：按次指定云端后端，不经全局设置。
-        int count = await analysis.RunBatchAsync(modeOverride: AiMode.Cloud);
+        // v0.12.0: 按次指定后端 id，不经全局设置。
+        int count = await analysis.RunBatchAsync(backendIdOverride: 42);
 
         Assert.Equal(1, count);
-        Assert.Equal(AiMode.Cloud, resolvedMode);
+        Assert.Equal(42, resolvedBackendId);
     }
 
     [Fact]

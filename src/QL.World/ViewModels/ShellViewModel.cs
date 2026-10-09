@@ -606,10 +606,11 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         TopBar.IsImporting = true;
         try
         {
-            var vm = new ImportViewModel(_services.Import, GetSuggestedImportFolder);
-            // W2/AI (v0.9.0): 导入完成后按所选后端自动分析本次新增图。
+            var vm = new ImportViewModel(_services.Import, GetSuggestedImportFolder,
+                Settings.AiBackends);
+            // v0.12.0: 导入完成后按所选后端自动分析本次新增图。
             vm.ImportAnalysisRequested +=
-                (ids, mode) => _ = RunImportAiAnalysisAsync(ids, mode);
+                (ids, backendId) => _ = RunImportAiAnalysisAsync(ids, backendId);
             ShowImportDialog?.Invoke(vm);
 
             // The dialog drives completion; reopen guards are handled there.
@@ -644,17 +645,17 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// W2/AI (v0.9.0): 导入完成后按所选后端（云端/本地）对本次新增图执行
-    /// 作用域 AI 分析。进度经 AiAnalysisService.BatchProgress 事件反映到
-    /// 底部信息提示栏；完成/取消通知由服务发布（v0.8.1 节流收敛语义）。
+    /// v0.12.0: 导入完成后按所选后端 id 对本次新增图执行作用域 AI 分析。
+    /// 进度经 AiAnalysisService.BatchProgress 事件反映到底部信息提示栏；
+    /// 完成/取消通知由服务发布（v0.8.1 节流收敛语义）。
     /// </summary>
-    private async Task RunImportAiAnalysisAsync(IReadOnlyList<long> imageIds, AiMode mode)
+    private async Task RunImportAiAnalysisAsync(IReadOnlyList<long> imageIds, int backendId)
     {
-        if (imageIds.Count == 0 || mode == AiMode.Disabled) return;
+        if (imageIds.Count == 0) return;
         try
         {
             await _services.AiAnalysis.RunBatchAsync(
-                onlyImageIds: imageIds, modeOverride: mode);
+                onlyImageIds: imageIds, backendIdOverride: backendId);
             await Gallery.RefreshAsync();
         }
         catch (OperationCanceledException)
