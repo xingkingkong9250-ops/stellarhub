@@ -115,6 +115,47 @@ public sealed class AppSettingsService
             next => _settings.ShowSourceBadge = next);
     }
 
+    // ─── M11: 软件托管图片库 ──────────────────────────────────────────────
+
+    /// <summary>M11: 软件托管图片库根目录；null=W7 向导尚未配置。</summary>
+    public string? LibraryRootPath => _settings.LibraryRootPath;
+
+    /// <summary>M11: W7 向导是否已完成库目录选择。</summary>
+    public bool IsLibraryRootConfigured =>
+        !string.IsNullOrWhiteSpace(_settings.LibraryRootPath);
+
+    /// <summary>
+    /// M11: 由 W7 向导调用，持久化用户选择的库目录（规范化为绝对路径）。
+    /// 同卷校验在向导层通过 <see cref="LibraryRootResolver.ValidateSameVolume"/>
+    /// 完成；这里只做空值防御与路径规范化。M11 不支持改库，故无公开 setter。
+    /// </summary>
+    public void ConfigureLibraryRoot(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        string full = Path.GetFullPath(path.Trim());
+        SetAndSave(full,
+            () => _settings.LibraryRootPath,
+            next => _settings.LibraryRootPath = next);
+    }
+
+    /// <summary>M11: 老用户在 W7 选择「跳过」迁移的软跳过标志位。</summary>
+    public bool LegacyDataSkipped
+    {
+        get => _settings.LegacyDataSkipped;
+        set => SetAndSave(value,
+            () => _settings.LegacyDataSkipped,
+            next => _settings.LegacyDataSkipped = next);
+    }
+
+    /// <summary>M11: W3/A1「显示未托管图」开关（默认 false）。</summary>
+    public bool ShowLegacyImages
+    {
+        get => _settings.ShowLegacyImages;
+        set => SetAndSave(value,
+            () => _settings.ShowLegacyImages,
+            next => _settings.ShowLegacyImages = next);
+    }
+
     /// <summary>
     /// v0.10.0: AI 自适应学习开关（W3/A3）。默认 true。
     /// 关闭后本地分析跳过学习精排，训练数据快照仍写入（留存最大化）。
@@ -626,6 +667,21 @@ public sealed class AppSettingsService
         if (!Uri.TryCreate(_settings.CloudAi.BaseUrl, UriKind.Absolute, out Uri? u) ||
             u!.Scheme != Uri.UriSchemeHttps)
             _settings.CloudAi.BaseUrl = string.Empty;
+
+        // M11: 空白库目录视为未配置；已配置的规范化为绝对路径（失败保留原值，
+        // 由向导/库服务在真正访问时暴露问题）。
+        if (string.IsNullOrWhiteSpace(_settings.LibraryRootPath))
+        {
+            _settings.LibraryRootPath = null;
+        }
+        else
+        {
+            try { _settings.LibraryRootPath = Path.GetFullPath(_settings.LibraryRootPath.Trim()); }
+            catch (Exception ex)
+            {
+                Report($"Configured LibraryRootPath is not a valid path; keeping raw value.", ex);
+            }
+        }
 
         // NAS fields
         _settings.NasConnections ??= [];

@@ -112,6 +112,28 @@ public sealed class AppSettings
     /// </summary>
     public bool ShowSourceBadge { get; set; } = false;
 
+    // ─── M11: 软件托管图片库 ───────────────────────────────────────────────
+
+    /// <summary>
+    /// M11: 软件托管图片库根目录（W7 首次启动向导选择）。
+    /// 物理文件落 {root}\files\，分类硬链接落 {root}\<一级分类>\。
+    /// null = 尚未配置（W7 未完成）。M11 不支持修改，W3 仅只读显示。
+    /// </summary>
+    public string? LibraryRootPath { get; set; }
+
+    /// <summary>
+    /// M11: 老用户在 W7 向导选择「跳过」迁移后置 true。软跳过语义：
+    /// 不清空 images 表，画廊默认仅显示 library_hash 非空且已托管的行，
+    /// 由 <see cref="ShowLegacyImages"/> 开关控制是否可见。可逆。
+    /// </summary>
+    public bool LegacyDataSkipped { get; set; }
+
+    /// <summary>
+    /// M11: W3/A1「显示未托管图」开关。默认 false——跳过老数据后画廊
+    /// 不显示未托管行；开启后画廊 SQL 放行 library_hash 过滤。
+    /// </summary>
+    public bool ShowLegacyImages { get; set; }
+
     // ─── Login (W5) ────────────────────────────────────────────────────────
 
     /// <summary>

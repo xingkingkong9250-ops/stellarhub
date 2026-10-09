@@ -168,4 +168,77 @@ public sealed class AppSettingsServiceTests : IDisposable
         third.Load();
         Assert.False(third.HasRememberedLoginPassword);
     }
+
+    // ─── M11: 软件托管图片库 ───────────────────────────────────────────────
+
+    [Fact]
+    public void Library_settings_default_to_unconfigured_and_legacy_visible_flags_off()
+    {
+        var settings = new AppSettingsService(_directory);
+        settings.Load();
+
+        Assert.Null(settings.LibraryRootPath);
+        Assert.False(settings.IsLibraryRootConfigured);
+        Assert.False(settings.LegacyDataSkipped);
+        Assert.False(settings.ShowLegacyImages);
+    }
+
+    [Fact]
+    public void ConfigureLibraryRoot_persists_absolute_path_and_marks_configured()
+    {
+        var first = new AppSettingsService(_directory);
+        first.Load();
+        string library = Path.Combine(_directory, "Pictures", "Library");
+        first.ConfigureLibraryRoot(library);
+        Assert.True(first.LastSaveSucceeded);
+        Assert.True(first.IsLibraryRootConfigured);
+        Assert.Equal(Path.GetFullPath(library), first.LibraryRootPath);
+
+        var second = new AppSettingsService(_directory);
+        second.Load();
+        Assert.True(second.IsLibraryRootConfigured);
+        Assert.Equal(Path.GetFullPath(library), second.LibraryRootPath);
+    }
+
+    [Fact]
+    public void ConfigureLibraryRoot_rejects_blank_path()
+    {
+        var settings = new AppSettingsService(_directory);
+        settings.Load();
+        Assert.Throws<ArgumentException>(() => settings.ConfigureLibraryRoot("   "));
+        Assert.False(settings.IsLibraryRootConfigured);
+    }
+
+    [Fact]
+    public void Legacy_skip_and_show_legacy_flags_round_trip()
+    {
+        var first = new AppSettingsService(_directory);
+        first.Load();
+        first.LegacyDataSkipped = true;
+        first.ShowLegacyImages = true;
+
+        var second = new AppSettingsService(_directory);
+        second.Load();
+        Assert.True(second.LegacyDataSkipped);
+        Assert.True(second.ShowLegacyImages);
+
+        second.LegacyDataSkipped = false;
+        var third = new AppSettingsService(_directory);
+        third.Load();
+        Assert.False(third.LegacyDataSkipped);
+        Assert.True(third.ShowLegacyImages);
+    }
+
+    [Fact]
+    public void Blank_library_root_in_config_is_normalized_to_null_on_load()
+    {
+        File.WriteAllText(
+            Path.Combine(_directory, "config.json"),
+            "{\"libraryRootPath\":\"   \"}");
+
+        var settings = new AppSettingsService(_directory);
+        settings.Load();
+        Assert.Null(settings.LibraryRootPath);
+        Assert.False(settings.IsLibraryRootConfigured);
+    }
 }
