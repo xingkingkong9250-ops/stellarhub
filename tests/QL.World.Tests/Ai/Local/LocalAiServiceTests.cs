@@ -157,7 +157,7 @@ public sealed class LocalAiServiceTests : IDisposable
 
         var payload = new
         {
-            promptTemplateVersion = 1,
+            promptTemplateVersion = 2,
             categories = new object[]
             {
                 new { name = "角色", prompt = "p", embedding = direction },
@@ -282,7 +282,7 @@ public sealed class LocalAiServiceTests : IDisposable
     {
         var payload = new
         {
-            promptTemplateVersion = 1,
+            promptTemplateVersion = 2,
             categories = new object[]
             {
                 new { name = "贴图/纹理", prompt = "p", embedding = direction },

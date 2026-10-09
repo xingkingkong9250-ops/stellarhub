@@ -46,9 +46,11 @@ public sealed class ClipTextIndex
     /// Expected prompt template version. Tracks the version of the embedded
     /// JSON resource. When the JSON is regenerated via ClipSpike <c>gen</c>
     /// and the new resource is embedded, bump this constant — EnsureDistributed
-    /// will re-extract outdated on-disk files. Currently 1 (embedded JSON v1).
+    /// will re-extract outdated on-disk files. Currently 2 (M12 tag-driven
+    /// taxonomy: 6 categories + 11 tag groups; regenerated from the bundled
+    /// text_model.onnx with ClipSpike Vocab v2).
     /// </summary>
-    public const int ExpectedPromptTemplateVersion = 1;
+    public const int ExpectedPromptTemplateVersion = 2;
 
     /// <summary>
     /// Copies the embedded text-embeddings JSON into the models directory when
