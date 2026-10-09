@@ -38,6 +38,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         CollectionTree = new CollectionTreeViewModel(Gallery, services.Collections);
         PbrGroupTree = new PbrGroupTreeViewModel(Gallery, services.PbrGrouping);
         AttributeFilter = new AttributeFilterViewModel(Gallery, services.Settings);
+        FilterGroups = new FilterGroupsPanelViewModel(Gallery, services.Settings);
         Detail = new DetailViewModel(services.ImageQuery, services.Tags, Gallery, services.SemanticSearch);
         StatusBar = new StatusBarViewModel(services.Thumbnails, services.Settings);
         // U2-A: surface AI/import running state on C1 progress bar without coupling StatusBar to those services.
@@ -168,6 +169,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public CollectionTreeViewModel CollectionTree { get; }
     public PbrGroupTreeViewModel PbrGroupTree { get; }
     public AttributeFilterViewModel AttributeFilter { get; }
+    public FilterGroupsPanelViewModel FilterGroups { get; }
     public DetailViewModel Detail { get; }
     public StatusBarViewModel StatusBar { get; }
 
@@ -1011,12 +1013,21 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         Gallery.Filter.ResolutionBucket = null;
         Gallery.Filter.FileSizeBucket = null;
         Gallery.Filter.RatingBucket = null;
+        // M12-F: reset B1-6 筛选标签组 dimensions.
+        Gallery.Filter.ArtStyleTags = null;
+        Gallery.Filter.CompositionTags = null;
+        Gallery.Filter.LightingTags = null;
+        Gallery.Filter.ThemeTags = null;
+        Gallery.Filter.ConditionTags = null;
+        Gallery.Filter.FileFormats = null;
+        Gallery.Filter.ColorPaletteHexes = null;
         TopBar.ClearSearchText();
         TopBar.ClearRecentImport();
         TagTree.ResetSelection();
         CollectionTree.ResetSelection();
         PbrGroupTree.ResetSelection();
         AttributeFilter.ResetSelection();
+        FilterGroups.ResetSelection();
         _ = Gallery.RefreshAsync();
     }
 

@@ -215,6 +215,81 @@
             </Style.Triggers>
         </Style>
 
+        <!-- M12-F (v0.13.0): B1-1 tree expander arrow (▸ collapsed / ▾ expanded) -->
+        <Style x:Key="TreeExpanderStyle" TargetType="ToggleButton">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="16" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+            <Setter Property="FontSize" Value="9" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border Background="{TemplateBinding Background}">
+                            <TextBlock x:Name="arrow" Text="▸"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="arrow" Property="Text" Value="▾" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- M12-F: B1-6-3 色板色块 — 22×22 方块，激活态 Accent 描边 -->
+        <Style x:Key="ColorSwatchStyle" TargetType="Button">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Margin" Value="0,0,4,4" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" CornerRadius="4" BorderThickness="2"
+                                BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                Background="{Binding Brush}" />
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush"
+                                        Value="{DynamicResource AccentBrush}" />
+                            </DataTrigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Opacity" Value="0.8" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- M12-F: B1-6 筛选标签组模板（组名 + 多选 chips WrapPanel） -->
+        <DataTemplate x:Key="FilterGroupTemplate">
+            <StackPanel>
+                <TextBlock Text="{Binding GroupName}" Margin="2,2,0,0" FontSize="11"
+                           Foreground="{DynamicResource TextMutedBrush}" />
+                <ItemsControl ItemsSource="{Binding Chips}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Style="{StaticResource FilterChipStyle}"
+                                    Content="{Binding Tag}"
+                                    Command="{Binding SelectCommand}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </DataTemplate>
+
         <!-- U3-B (§4.C.1): B2-3-ACT hover action button on the thumbnail overlay -->
         <Style x:Key="CardActionButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
@@ -795,26 +870,57 @@
                                       AutomationProperties.Name="素材库"
                                       IsChecked="{Binding SidebarLibraryExpanded}"
                                       Content="{Binding LibraryHeaderText}" />
+                        <!-- M12-F (v0.13.0): B1-1 树改为 6 个新分类，可展开显示该分类的
+                             标签作为二级节点；点击分类行筛选 primary_category，
+                             点击二级标签按单标签筛选（Filter.Tag） -->
                         <ItemsControl ItemsSource="{Binding TagTree.CategoryNodes}"
                                       Visibility="{Binding SidebarLibraryExpanded, Converter={StaticResource BoolVis}}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <ToggleButton Style="{StaticResource TreeToggleStyle}"
-                                                  AutomationProperties.Name="{Binding DisplayName}"
-                                                  IsChecked="{Binding IsSelected, Mode=OneWay}"
-                                                  Command="{Binding SelectCommand}">
+                                    <StackPanel>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="{Binding DisplayName}" VerticalAlignment="Center" />
-                                            <TextBlock Grid.Column="1" Margin="6,0,0,0" FontSize="11"
-                                                       VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource TextMutedBrush}"
-                                                       Text="{Binding Count}" />
+                                            <ToggleButton Grid.Column="0"
+                                                          Style="{StaticResource TreeExpanderStyle}"
+                                                          IsChecked="{Binding IsExpanded}"
+                                                          Visibility="{Binding HasChildren, Converter={StaticResource BoolVis}}" />
+                                            <ToggleButton Grid.Column="1"
+                                                          Style="{StaticResource TreeToggleStyle}"
+                                                          AutomationProperties.Name="{Binding DisplayName}"
+                                                          IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                                          Command="{Binding SelectCommand}">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{Binding DisplayName}" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="1" Margin="6,0,0,0" FontSize="11"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource TextMutedBrush}"
+                                                               Text="{Binding Count}" />
+                                                </Grid>
+                                            </ToggleButton>
                                         </Grid>
-                                    </ToggleButton>
+                                        <!-- 二级标签节点（分类组词表） -->
+                                        <ItemsControl Margin="22,0,0,0"
+                                                      ItemsSource="{Binding Children}"
+                                                      Visibility="{Binding IsExpanded, Converter={StaticResource BoolVis}}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <ToggleButton Style="{StaticResource TreeToggleStyle}"
+                                                                  AutomationProperties.Name="{Binding Tag}"
+                                                                  IsChecked="{Binding IsActive, Mode=OneWay}"
+                                                                  Command="{Binding SelectCommand}">
+                                                        <TextBlock Text="{Binding Tag}" FontSize="12" />
+                                                    </ToggleButton>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -1010,6 +1116,42 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                        </StackPanel>
+
+                        <!-- M12-F (v0.13.0): B1-6 筛选标签组（默认收起，折叠态持久化）。
+                             7 个子组：美术风格/文件格式（chips）→ 色彩倾向（色板）→
+                             画面构图/灯光氛围/题材气质/状态形容（chips）；
+                             组内 OR、组间 AND（LibraryFilter 各字段） -->
+                        <ToggleButton Margin="2,16,0,0"
+                                      Style="{StaticResource SidebarSectionHeaderStyle}"
+                                      AutomationProperties.Name="筛选标签组"
+                                      IsChecked="{Binding FilterGroups.IsExpanded}"
+                                      Content="筛选标签组" />
+                        <StackPanel Margin="2,0,0,0"
+                                    Visibility="{Binding FilterGroups.IsExpanded, Converter={StaticResource BoolVis}}">
+                            <!-- B1-6-1 美术风格 / B1-6-2 文件格式 -->
+                            <ItemsControl ItemsSource="{Binding FilterGroups.GroupsBeforePalette}"
+                                          ItemTemplate="{StaticResource FilterGroupTemplate}" />
+                            <!-- B1-6-3 色彩倾向（色板多选） -->
+                            <TextBlock Text="色彩倾向" Margin="2,2,0,0" FontSize="11"
+                                       Foreground="{DynamicResource TextMutedBrush}" />
+                            <ItemsControl ItemsSource="{Binding FilterGroups.Palette.Swatches}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource ColorSwatchStyle}"
+                                                Command="{Binding SelectCommand}"
+                                                ToolTip="{Binding Hex}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <!-- B1-6-4 画面构图 / B1-6-5 灯光氛围 / B1-6-6 题材气质 / B1-6-7 状态形容 -->
+                            <ItemsControl ItemsSource="{Binding FilterGroups.GroupsAfterPalette}"
+                                          ItemTemplate="{StaticResource FilterGroupTemplate}" />
                         </StackPanel>
                     </StackPanel>
                 </ScrollViewer>

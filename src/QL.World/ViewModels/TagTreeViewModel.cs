@@ -1,11 +1,16 @@
 using System.Collections.ObjectModel;
 using QL.World.Helpers;
 using QL.World.Models;
+using QL.World.Models.Taxonomy;
 using QL.World.Services;
 
 namespace QL.World.ViewModels;
 
-/// <summary>B1-1 library tree (全部/10 categories/未分类) and B1-3 top tags.</summary>
+/// <summary>
+/// B1-1 library tree (全部/M12 新 6 分类/未分类) and B1-3 top tags.
+/// M12-F: 分类节点可展开显示该分类组的标签作为二级节点（TagTaxonomy.TagsOfCategory）；
+/// 点击二级标签即按单标签筛选（与 B1-3 chips 同语义，Filter.Tag）。
+/// </summary>
 public sealed class TagTreeViewModel
 {
     private readonly GalleryViewModel _gallery;
@@ -22,8 +27,13 @@ public sealed class TagTreeViewModel
         _tags = tags;
 
         CategoryNodes.Add(new CategoryNodeViewModel("全部", null, uncategorized: false, SelectNode));
-        foreach (string category in Categories.All)
-            CategoryNodes.Add(new CategoryNodeViewModel(category, category, false, SelectNode));
+        foreach (string category in TagTaxonomy.Categories)
+        {
+            CategoryNodeViewModel node = new(category, category, false, SelectNode);
+            foreach (string tag in TagTaxonomy.TagsOfCategory(category))
+                node.Children.Add(new TagNodeViewModel(tag, 0, SelectTag));
+            CategoryNodes.Add(node);
+        }
         CategoryNodes.Add(new CategoryNodeViewModel("未分类", null, uncategorized: true, SelectNode));
     }
 
@@ -42,9 +52,9 @@ public sealed class TagTreeViewModel
         int uncategorized = counts.FirstOrDefault(c => c.Category is null)?.Count ?? 0;
 
         CategoryNodes[0].Count = total; // 全部
-        for (int i = 0; i < Categories.All.Count; i++)
+        for (int i = 0; i < TagTaxonomy.Categories.Count; i++)
         {
-            string category = Categories.All[i];
+            string category = TagTaxonomy.Categories[i];
             CategoryNodes[i + 1].Count =
                 counts.FirstOrDefault(c => c.Category == category)?.Count ?? 0;
         }
@@ -126,6 +136,11 @@ public sealed class TagTreeViewModel
 
         foreach (TagNodeViewModel node in TopTagNodes)
             node.IsActive = _gallery.Filter.Tag == node.Tag;
+
+        // M12-F: 二级标签节点与 B1-3 chips 共用 Filter.Tag，活跃态一并同步。
+        foreach (CategoryNodeViewModel category in CategoryNodes)
+            foreach (TagNodeViewModel child in category.Children)
+                child.IsActive = _gallery.Filter.Tag == child.Tag;
     }
 
     public void ResetSelection()
@@ -136,11 +151,12 @@ public sealed class TagTreeViewModel
     public void RaiseClearFilters() => ClearFiltersRequested?.Invoke();
 }
 
-/// <summary>B1-1 tree node.</summary>
+/// <summary>B1-1 tree node. M12-F: 可展开显示该分类组的标签作为二级节点。</summary>
 public sealed class CategoryNodeViewModel : ObservableObject
 {
     private int _count;
     private bool _isSelected;
+    private bool _isExpanded;
 
     public CategoryNodeViewModel(
         string displayName,
@@ -158,6 +174,18 @@ public sealed class CategoryNodeViewModel : ObservableObject
     public string? Category { get; }
     public bool IsUncategorized { get; }
     public RelayCommand SelectCommand { get; }
+
+    /// <summary>二级标签节点（分类组的标签词表；全部/未分类为空）。</summary>
+    public ObservableCollection<TagNodeViewModel> Children { get; } = [];
+
+    public bool HasChildren => Children.Count > 0;
+
+    /// <summary>二级展开态；默认收起，箭头 ToggleButton TwoWay 绑定。</summary>
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set => SetProperty(ref _isExpanded, value);
+    }
 
     public int Count
     {

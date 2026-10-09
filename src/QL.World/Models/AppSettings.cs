@@ -45,6 +45,9 @@ public sealed class AppSettings
     /// <summary>U3-A (§4.B.2): B1-5 attribute filter section expanded (default collapsed).</summary>
     public bool SidebarAttributeFilterExpanded { get; set; }
 
+    /// <summary>M12-F: B1-6 筛选标签组 section expanded (default collapsed).</summary>
+    public bool SidebarFilterGroupsExpanded { get; set; }
+
     // ─── U3-C (§4.E.3): B1-COL sidebar section collapse states (default all expanded) ──
     // 默认 true 的 bool 必须 Never 忽略：WhenWritingDefault 会吞掉 false，导致重载回落 true。
 

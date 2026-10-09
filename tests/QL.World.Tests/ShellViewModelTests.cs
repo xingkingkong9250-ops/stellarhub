@@ -206,8 +206,9 @@ public sealed class ShellViewModelTests : IDisposable
         _viewModel.SidebarTopTagsExpanded = false;
         _viewModel.SidebarPbrGroupsExpanded = false;
 
-        // Collapsed: name + child count. Category tree = 全部 + 10 分类 + 未分类 = 12.
-        Assert.Equal("素材库 (12)", _viewModel.LibraryHeaderText);
+        // Collapsed: name + child count. Category tree = 全部 + 6 新分类 + 未分类 = 8 (M12-F).
+        Assert.Equal($"素材库 ({QL.World.Models.Taxonomy.TagTaxonomy.Categories.Count + 2})",
+            _viewModel.LibraryHeaderText);
         Assert.Equal("收藏夹 (0)", _viewModel.CollectionsHeaderText);
         Assert.Equal("热门标签（Top 50） (0)", _viewModel.TopTagsHeaderText);
         Assert.Equal("贴图组 (0)", _viewModel.PbrGroupsHeaderText);

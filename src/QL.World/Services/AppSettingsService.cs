@@ -311,6 +311,15 @@ public sealed class AppSettingsService
             next => _settings.SidebarAttributeFilterExpanded = next);
     }
 
+    /// <summary>M12-F: B1-6 筛选标签组 section expanded.</summary>
+    public bool SidebarFilterGroupsExpanded
+    {
+        get => _settings.SidebarFilterGroupsExpanded;
+        set => SetAndSave(value,
+            () => _settings.SidebarFilterGroupsExpanded,
+            next => _settings.SidebarFilterGroupsExpanded = next);
+    }
+
     // ─── U3-C (§4.E.3): B1-COL sidebar section collapse states ─────────────
 
     public bool SidebarLibraryExpanded

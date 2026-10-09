@@ -353,7 +353,24 @@ public sealed class GalleryViewModel : ObservableObject
             parts.Add(AttributeFilterDisplay.FileSize(filter.FileSizeBucket));
         if (!string.IsNullOrEmpty(filter.RatingBucket))
             parts.Add(AttributeFilterDisplay.Rating(filter.RatingBucket));
+        // M12-F: B1-6 筛选标签组维度摘要。
+        AppendTagGroupSummary(parts, "风格", filter.ArtStyleTags);
+        AppendTagGroupSummary(parts, "构图", filter.CompositionTags);
+        AppendTagGroupSummary(parts, "灯光", filter.LightingTags);
+        AppendTagGroupSummary(parts, "题材", filter.ThemeTags);
+        AppendTagGroupSummary(parts, "状态", filter.ConditionTags);
+        if (filter.FileFormats is { Count: > 0 })
+            parts.Add($"格式 {string.Join("/", filter.FileFormats)}");
+        if (filter.ColorPaletteHexes is { Count: > 0 })
+            parts.Add($"色彩 ×{filter.ColorPaletteHexes.Count}");
         return string.Join(" · ", parts);
+    }
+
+    private static void AppendTagGroupSummary(
+        List<string> parts, string label, IReadOnlyList<string>? tags)
+    {
+        if (tags is { Count: > 0 })
+            parts.Add($"{label} {string.Join("/", tags)}");
     }
 
     private static GallerySort ParseSort(string? value) =>
