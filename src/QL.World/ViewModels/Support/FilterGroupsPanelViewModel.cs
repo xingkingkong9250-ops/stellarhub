@@ -15,6 +15,8 @@ namespace QL.World.ViewModels.Support;
 /// 色板 hex 经 ColorFamily.HexToFamily 映射为色族后匹配 i.color_family。
 /// v0.13.5：原 B1-5 属性筛选三维（分辨率/文件大小/评分）并入本面板尾部
 /// （B1-6-8/9/10，单选桶，点已选项取消），B1-5 整个分区作废。
+/// v0.13.7：质感由 B1-1 分类树移入本面板（B1-6-11，多选标签组 TextureTags），
+/// 视觉位于状态形容之后、属性桶之前；B1-1 树只剩 5 个分类。
 /// </summary>
 public sealed class FilterGroupsPanelViewModel : ObservableObject
 {
@@ -55,6 +57,12 @@ public sealed class FilterGroupsPanelViewModel : ObservableObject
                 TagTaxonomy.GroupCondition,
                 TagTaxonomy.TagsByGroup[TagTaxonomy.GroupCondition],
                 list => ApplyAndRefresh(() => _gallery.Filter.ConditionTags = list)),
+            // v0.13.7 (B1-6-11)：质感由 B1-1 分类树移入——仍是分类组词表
+            // （DeriveCategory 不变），UI 上按标签多选筛选（TextureTags）。
+            new FilterGroupViewModel(
+                TagTaxonomy.GroupTexture,
+                TagTaxonomy.TagsByGroup[TagTaxonomy.GroupTexture],
+                list => ApplyAndRefresh(() => _gallery.Filter.TextureTags = list)),
         ];
         Palette = new ColorPaletteViewModel(
             PaletteHexes,

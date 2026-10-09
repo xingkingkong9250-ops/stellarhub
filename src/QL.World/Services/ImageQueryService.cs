@@ -544,12 +544,14 @@ public sealed class ImageQueryService
         }
 
         // M12-E (§4.B.1): 标签组筛选。组内任一标签命中即通过（OR），
-        // 组与组之间 AND。美术风格/画面构图/灯光氛围/题材气质/状态形容。
+        // 组与组之间 AND。美术风格/画面构图/灯光氛围/题材气质/状态形容；
+        // v0.13.7 起质感（原 B1-1 分类）作为 B1-6-11 标签组同构参与。
         AppendTagGroupClause(sql, parameters, "$artStyle", filter.ArtStyleTags);
         AppendTagGroupClause(sql, parameters, "$composition", filter.CompositionTags);
         AppendTagGroupClause(sql, parameters, "$lighting", filter.LightingTags);
         AppendTagGroupClause(sql, parameters, "$theme", filter.ThemeTags);
         AppendTagGroupClause(sql, parameters, "$condition", filter.ConditionTags);
+        AppendTagGroupClause(sql, parameters, "$texture", filter.TextureTags);
 
         // M12-E: 文件格式筛选（与 i.format 不区分大小写比对）。
         if (filter.FileFormats is { Count: > 0 } formats)

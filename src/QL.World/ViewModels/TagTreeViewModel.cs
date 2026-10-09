@@ -7,9 +7,11 @@ using QL.World.Services;
 namespace QL.World.ViewModels;
 
 /// <summary>
-/// B1-1 library tree (全部/M12 新 6 分类/未分类) and B1-3 top tags.
+/// B1-1 library tree (全部/树展示分类/未分类) and B1-3 top tags.
 /// M12-F: 分类节点可展开显示该分类组的标签作为二级节点（TagTaxonomy.TagsOfCategory）；
 /// 点击二级标签即按单标签筛选（与 B1-3 chips 同语义，Filter.Tag）。
+/// v0.13.7: 树展示分类取自 TagTaxonomy.TreeCategories（质感移至 B1-6-11，
+/// 不再出现在树中）；全部 6 分类仍参与 DeriveCategory 与持久化。
 /// </summary>
 public sealed class TagTreeViewModel
 {
@@ -27,7 +29,7 @@ public sealed class TagTreeViewModel
         _tags = tags;
 
         CategoryNodes.Add(new CategoryNodeViewModel("全部", null, uncategorized: false, SelectNode));
-        foreach (string category in TagTaxonomy.Categories)
+        foreach (string category in TagTaxonomy.TreeCategories)
         {
             CategoryNodeViewModel node = new(category, category, false, SelectNode);
             foreach (string tag in TagTaxonomy.TagsOfCategory(category))
@@ -52,11 +54,12 @@ public sealed class TagTreeViewModel
         int uncategorized = counts.FirstOrDefault(c => c.Category is null)?.Count ?? 0;
 
         CategoryNodes[0].Count = total; // 全部
-        for (int i = 0; i < TagTaxonomy.Categories.Count; i++)
+        // v0.13.7: 树节点与分类不再按索引一一对应（质感已移出树），按分类名映射计数。
+        foreach (CategoryNodeViewModel node in CategoryNodes)
         {
-            string category = TagTaxonomy.Categories[i];
-            CategoryNodes[i + 1].Count =
-                counts.FirstOrDefault(c => c.Category == category)?.Count ?? 0;
+            if (node.Category is null)
+                continue; // 全部 / 未分类
+            node.Count = counts.FirstOrDefault(c => c.Category == node.Category)?.Count ?? 0;
         }
         CategoryNodes[^1].Count = uncategorized; // 未分类
 

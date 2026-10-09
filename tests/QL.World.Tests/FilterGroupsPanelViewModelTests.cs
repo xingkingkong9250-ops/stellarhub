@@ -30,21 +30,25 @@ public sealed class FilterGroupsPanelViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Panel_builds_six_chip_groups_and_palette()
+    public void Panel_builds_seven_chip_groups_and_palette()
     {
         Assert.Equal(2, _panel.GroupsBeforePalette.Count);
         Assert.Equal(TagTaxonomy.GroupArtStyle, _panel.GroupsBeforePalette[0].GroupName);
         Assert.Equal(TagTaxonomy.GroupFileFormat, _panel.GroupsBeforePalette[1].GroupName);
-        Assert.Equal(4, _panel.GroupsAfterPalette.Count);
+        Assert.Equal(5, _panel.GroupsAfterPalette.Count);
         Assert.Equal(
             [TagTaxonomy.GroupComposition, TagTaxonomy.GroupLighting,
-             TagTaxonomy.GroupTheme, TagTaxonomy.GroupCondition],
+             TagTaxonomy.GroupTheme, TagTaxonomy.GroupCondition,
+             TagTaxonomy.GroupTexture],
             _panel.GroupsAfterPalette.Select(g => g.GroupName));
 
         Assert.Equal(TagTaxonomy.TagsByGroup[TagTaxonomy.GroupArtStyle].Count,
             _panel.GroupsBeforePalette[0].Chips.Count);
         Assert.Equal(TagTaxonomy.TagsByGroup[TagTaxonomy.GroupFileFormat].Count,
             _panel.GroupsBeforePalette[1].Chips.Count);
+        // v0.13.7: 质感组（B1-6-11）chips 与词表逐条一致。
+        Assert.Equal(TagTaxonomy.TagsByGroup[TagTaxonomy.GroupTexture],
+            _panel.GroupsAfterPalette[^1].Chips.Select(c => c.Tag));
         Assert.Equal(FilterGroupsPanelViewModel.PaletteHexes.Count,
             _panel.Palette.Swatches.Count);
     }
@@ -116,6 +120,24 @@ public sealed class FilterGroupsPanelViewModelTests : IDisposable
     }
 
     [Fact]
+    public void Toggle_texture_chip_writes_texture_tags()
+    {
+        // v0.13.7 (B1-6-11)：质感由 B1-1 移入，多选写 TextureTags。
+        FilterTagChipViewModel metal =
+            _panel.GroupsAfterPalette[^1].Chips.First(c => c.Tag == "金属");
+
+        metal.SelectCommand.Execute(null);
+
+        Assert.True(metal.IsActive);
+        Assert.Equal(["金属"], _gallery.Filter.TextureTags);
+
+        metal.SelectCommand.Execute(null);
+
+        Assert.False(metal.IsActive);
+        Assert.Null(_gallery.Filter.TextureTags);
+    }
+
+    [Fact]
     public void Toggle_format_chip_writes_file_formats()
     {
         FilterTagChipViewModel png = _panel.GroupsBeforePalette[1].Chips.First(c => c.Tag == "PNG");
@@ -144,11 +166,13 @@ public sealed class FilterGroupsPanelViewModelTests : IDisposable
     {
         _panel.GroupsBeforePalette[0].Chips[0].SelectCommand.Execute(null);
         _panel.GroupsAfterPalette[0].Chips[0].SelectCommand.Execute(null);
+        _panel.GroupsAfterPalette[^1].Chips[0].SelectCommand.Execute(null); // 质感
         _panel.Palette.Swatches[0].SelectCommand.Execute(null);
         _panel.AttributeGroups[0].Chips[0].SelectCommand.Execute(null);
         _panel.AttributeGroups[2].Chips[0].SelectCommand.Execute(null);
         Assert.NotNull(_gallery.Filter.ArtStyleTags);
         Assert.NotNull(_gallery.Filter.CompositionTags);
+        Assert.NotNull(_gallery.Filter.TextureTags);
         Assert.NotNull(_gallery.Filter.ColorPaletteHexes);
         Assert.NotNull(_gallery.Filter.ResolutionBucket);
         Assert.NotNull(_gallery.Filter.RatingBucket);
@@ -160,6 +184,7 @@ public sealed class FilterGroupsPanelViewModelTests : IDisposable
         Assert.Null(_gallery.Filter.LightingTags);
         Assert.Null(_gallery.Filter.ThemeTags);
         Assert.Null(_gallery.Filter.ConditionTags);
+        Assert.Null(_gallery.Filter.TextureTags);
         Assert.Null(_gallery.Filter.FileFormats);
         Assert.Null(_gallery.Filter.ColorPaletteHexes);
         Assert.Null(_gallery.Filter.ResolutionBucket);

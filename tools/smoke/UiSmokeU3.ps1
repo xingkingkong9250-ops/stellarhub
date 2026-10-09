@@ -7,7 +7,8 @@
 #       config.json false 显式写入、同数据根重启后折叠态保持；W1/B1-6 筛选标签组展开后标签/格式/属性桶 chips 存在性；
 #       W3/A1 完整性复选框取消勾选后的持久化。
 # 注：v0.13.5 起原 B1-5 属性筛选分区作废，分辨率/文件大小/评分并入 B1-6-8/9/10；
-#     v0.13.6 起 B1-2 收藏夹 / B1-3 热门标签 / B1-4 贴图组三分区头暂隐藏（功能预留）。
+#     v0.13.6 起 B1-2 收藏夹 / B1-3 热门标签 / B1-4 贴图组三分区头暂隐藏（功能预留）；
+#     v0.13.7 起质感分类自 B1-1 移入 B1-6-11 标签组（素材库节点 8→7）。
 # 未覆盖：W1/B2-3-ACT hover 操作组（空库无卡片，且 IsMouseOver 需真实光标，留待人工验收）。
 
 $ErrorActionPreference = 'Stop'
@@ -167,12 +168,15 @@ try {
     Assert-Step '「属性筛选」分区头已移除 (B1-5 v0.13.5 作废)' ($null -eq $tAttr) '仍存在「属性筛选」标题'
     Assert-Step '收藏夹/热门标签/贴图组分区头暂隐藏 (v0.13.6)' (
         $null -eq $tCollect -and $null -eq $tTopTags -and $null -eq $tPbr) '仍存在应隐藏的分区标题'
+    # v0.13.7: 质感分类行移出 B1-1（质感在 B1-6 是 TextBlock 组名，不是 Button）
+    $tTextureCat = Find-FirstByName $mainWin '质感' ([System.Windows.Automation.ControlType]::Button)
+    Assert-Step '素材库树无「质感」分类行 (v0.13.7 移至 B1-6-11)' ($null -eq $tTextureCat) '树中仍存在质感分类按钮'
     if ($null -ne $tLibrary) {
         Assert-Step '素材库标题支持 TogglePattern' (
             $tLibrary.GetSupportedPatterns() -contains [System.Windows.Automation.TogglePattern]::Pattern) '不支持 TogglePattern'
     }
 
-    # ── 2. 折叠素材库 → 计数文本 (8) ───────────────────────────
+    # ── 2. 折叠素材库 → 计数文本 (7) ───────────────────────────
     Write-Host '[Smoke] Step 2: collapse 素材库 shows count text'
     if ($null -ne $tLibrary) {
         ($tLibrary.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)).Toggle()
@@ -181,8 +185,8 @@ try {
         Assert-Step '折叠后 ToggleState = Off' ($state -eq [System.Windows.Automation.ToggleState]::Off) "实际 $state"
         $tLibrary = Find-FirstByName $mainWin '素材库' ([System.Windows.Automation.ControlType]::Button)
         $header = Get-HeaderText $tLibrary
-        # M12-F: 全部 + 6 新分类 + 未分类 = 8
-        Assert-Step '折叠态标题显示「素材库 (8)」' ($header -eq '素材库 (8)') "实际「$header」（8 = 全部+6分类+未分类）"
+        # v0.13.7: 全部 + 5 树展示分类 + 未分类 = 7（质感移至 B1-6-11）
+        Assert-Step '折叠态标题显示「素材库 (7)」' ($header -eq '素材库 (7)') "实际「$header」（7 = 全部+5分类+未分类；质感在 B1-6-11）"
     }
 
     # ── 3. 旧属性 chips 存在性（v0.13.5：B1-5 整块删除，「全部」chip 不应再出现） ──
@@ -212,6 +216,9 @@ try {
         Assert-Step '分辨率桶 chip「<1024」出现 (B1-6-8)' ($null -ne $chipRes) '未找到 Name="<1024" 的 chip 按钮'
         $chipRating = Find-FirstByName $mainWin '未评分' ([System.Windows.Automation.ControlType]::Button)
         Assert-Step '评分桶 chip「未评分」出现 (B1-6-10)' ($null -ne $chipRating) '未找到 Name="未评分" 的 chip 按钮'
+        # v0.13.7：质感组自 B1-1 移入（B1-6-11），「金属」为其首个标签 chip
+        $chipMetal = Find-FirstByName $mainWin '金属' ([System.Windows.Automation.ControlType]::Button)
+        Assert-Step '质感 chip「金属」出现 (B1-6-11)' ($null -ne $chipMetal) '未找到 Name="金属" 的质感 chip 按钮'
     }
 
     # ── 4. 设置 A1 取消勾选完整性检查 ───────────────────────────
@@ -266,7 +273,7 @@ try {
         Assert-Step '重启后素材库保持折叠（Off）' (
             $state2 -eq [System.Windows.Automation.ToggleState]::Off) "实际 $state2"
         $header2 = Get-HeaderText $tLibrary2
-        Assert-Step '重启后标题仍为「素材库 (8)」' ($header2 -eq '素材库 (8)') "实际「$header2」"
+        Assert-Step '重启后标题仍为「素材库 (7)」' ($header2 -eq '素材库 (7)') "实际「$header2」"
     }
     $tCollect2 = Find-FirstByName $mainWin '收藏夹' ([System.Windows.Automation.ControlType]::Button)
     Assert-Step '重启后收藏夹头仍隐藏 (v0.13.6)' ($null -eq $tCollect2) '收藏夹不应可见'

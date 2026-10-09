@@ -206,8 +206,9 @@ public sealed class ShellViewModelTests : IDisposable
         _viewModel.SidebarTopTagsExpanded = false;
         _viewModel.SidebarPbrGroupsExpanded = false;
 
-        // Collapsed: name + child count. Category tree = 全部 + 6 新分类 + 未分类 = 8 (M12-F).
-        Assert.Equal($"素材库 ({QL.World.Models.Taxonomy.TagTaxonomy.Categories.Count + 2})",
+        // Collapsed: name + child count. Category tree = 全部 + 5 树展示分类 + 未分类 = 7
+        // (v0.13.7: 质感移至 B1-6-11，TreeCategories 不含质感).
+        Assert.Equal($"素材库 ({QL.World.Models.Taxonomy.TagTaxonomy.TreeCategories.Count + 2})",
             _viewModel.LibraryHeaderText);
         Assert.Equal("收藏夹 (0)", _viewModel.CollectionsHeaderText);
         Assert.Equal("热门标签（Top 50） (0)", _viewModel.TopTagsHeaderText);

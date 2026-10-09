@@ -9,6 +9,34 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.13.7] — 2026-10-09 UI 迁移：质感分类自 B1-1 移入 B1-6 筛选标签组（B1-6-11）
+
+### 变更
+
+- **质感从素材库分类树移至筛选标签组**：按用户要求，质感不再作为 B1-1
+  分类树节点（树收敛为 全部 + 5 分类 + 未分类 = 7 行，折叠计数 8→7），
+  改在 B1-6 尾部新增「质感」多选标签组（编号 B1-6-11，17 个标签 chips：
+  金属/石材/锈蚀/磨损…，视觉位于状态形容之后、三个属性桶之前），
+  点击按标签 EXISTS 筛选，组内 OR、与其它筛选组 AND。
+- **分类体系真源不变**：质感仍是 TagTaxonomy 6 分类之一，DeriveCategory
+  照常产出 primary_category='质感'；新增树展示真源
+  `TagTaxonomy.TreeCategories`（Categories 去掉质感），B1-1 树与折叠
+  计数改由它驱动，树节点计数改为按分类名映射（不再依赖索引对齐）。
+  图卡右键「设置分类」与详情栏分类下拉保留全部 6 分类（编辑操作不受影响）。
+- 筛选链路：`LibraryFilter.TextureTags`（新字段，Clone 同步）+
+  `ImageQueryService.AppendTagGroupClause("$texture", …)` +
+  ClearFilters 显式重置 + FilterGroupsPanel 质感组（ResetSelection 覆盖）。
+- `docs/UI_NUMBERING.md`：B1-1 改 5 分类；新增 B1-6-11；B1-6 改 11 项；
+  B1-COL 计数 7。冒烟脚本 UiSmokeU3 同步：树无质感分类按钮、
+  折叠计数 (7)、展开 B1-6 后质感 chip「金属」存在、重启持久化。
+
+### 测试
+
+- 新增 2 项：`Tree_excludes_texture_category_after_move_to_filter_groups`、
+  `Toggle_texture_chip_writes_texture_tags`；既有树结构/计数/折叠头/
+  Clone/ResetSelection 断言同步。测试总数 783 → 785，全绿
+  （1 例 NAS 远程缩略图测试首跑网络偶发失败，单跑通过）。
+
 ## [0.13.6] — 2026-10-09 UI 隐藏：B1-2 收藏夹 / B1-3 热门标签 / B1-4 贴图组（功能预留）
 
 ### 变更

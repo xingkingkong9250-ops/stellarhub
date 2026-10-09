@@ -17,9 +17,17 @@ public static class TagTaxonomy
     public const string Texture = "质感";
     public const string Asset = "素材";
 
-    /// <summary>新 6 个一级分类（B1-1 树展示顺序）。</summary>
+    /// <summary>新 6 个一级分类（推导/持久化真源，顺序亦为旧 B1-1 树顺序）。</summary>
     public static readonly IReadOnlyList<string> Categories =
     [Character, Creature, Scene, Prop, Texture, Asset];
+
+    /// <summary>
+    /// B1-1 素材库树实际展示的分类（v0.13.7：5 个）。质感（Texture）按用户
+    /// 要求移至 B1-6-11 筛选标签组——树中不再有该分类入口，但质感仍是
+    /// Categories/分类推导的一部分（图片 primary_category 仍可能为质感）。
+    /// </summary>
+    public static readonly IReadOnlyList<string> TreeCategories =
+        Categories.Where(c => c != Texture).ToList();
 
     // ─── 6 个分类组（标签命中即参与分类推导） ────────────────────
 

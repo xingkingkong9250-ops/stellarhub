@@ -1017,6 +1017,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         Gallery.Filter.LightingTags = null;
         Gallery.Filter.ThemeTags = null;
         Gallery.Filter.ConditionTags = null;
+        Gallery.Filter.TextureTags = null; // v0.13.7: 质感（B1-6-11）
         Gallery.Filter.FileFormats = null;
         Gallery.Filter.ColorPaletteHexes = null;
         TopBar.ClearSearchText();

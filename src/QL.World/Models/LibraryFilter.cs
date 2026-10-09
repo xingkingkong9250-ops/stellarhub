@@ -72,6 +72,13 @@ public sealed class LibraryFilter
     /// <summary>状态形容标签（多选）。</summary>
     public IReadOnlyList<string>? ConditionTags { get; set; }
 
+    /// <summary>
+    /// 质感标签（多选，v0.13.7）。质感原为 B1-1 一级分类，按用户要求移至
+    /// B1-6-11 筛选标签组——按标签 EXISTS 筛选（组内 OR）；DeriveCategory
+    /// 仍可能产出 primary_category='质感'，只是分类树不再提供该入口。
+    /// </summary>
+    public IReadOnlyList<string>? TextureTags { get; set; }
+
     /// <summary>文件格式（多选，如 "png"/"jpg"；与 i.format 不区分大小写比对）。</summary>
     public IReadOnlyList<string>? FileFormats { get; set; }
 
@@ -114,6 +121,7 @@ public sealed class LibraryFilter
         LightingTags = LightingTags,
         ThemeTags = ThemeTags,
         ConditionTags = ConditionTags,
+        TextureTags = TextureTags,
         FileFormats = FileFormats,
         ColorPaletteHexes = ColorPaletteHexes,
         SimilarToImageId = SimilarToImageId,

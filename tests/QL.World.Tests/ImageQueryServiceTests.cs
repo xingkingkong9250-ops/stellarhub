@@ -618,6 +618,7 @@ public sealed class ImageQueryServiceTests
             LightingTags = ["夜景"],
             ThemeTags = ["科幻"],
             ConditionTags = ["破损"],
+            TextureTags = ["金属", "锈蚀"], // v0.13.7: 质感（B1-6-11）
             FileFormats = ["png"],
             ColorPaletteHexes = ["#FF0000"],
         };
@@ -629,6 +630,7 @@ public sealed class ImageQueryServiceTests
         Assert.Same(filter.LightingTags, clone.LightingTags);
         Assert.Same(filter.ThemeTags, clone.ThemeTags);
         Assert.Same(filter.ConditionTags, clone.ConditionTags);
+        Assert.Same(filter.TextureTags, clone.TextureTags);
         Assert.Same(filter.FileFormats, clone.FileFormats);
         Assert.Same(filter.ColorPaletteHexes, clone.ColorPaletteHexes);
     }
