@@ -54,7 +54,8 @@ public sealed class AiServiceFactoryTests : IDisposable
         Assert.IsType<LocalAiService>(ai);
         Assert.Equal("Local", ai.Mode);
         Assert.True(ai.SupportsEmbeddings);
-        // No model file in the temp data root → not available.
-        Assert.False(ai.IsAvailable);
+        // 模型已打包到输出目录 models\ → IsAvailable 跟随打包位置。
+        // 若打包位置无模型文件则 IsAvailable=false（开发环境可能如此）。
+        // 此处只验证类型与模式，不硬断言 IsAvailable（取决于打包位置是否存在模型）。
     }
 }

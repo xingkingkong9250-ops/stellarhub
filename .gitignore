@@ -9,4 +9,5 @@ artifacts/
 TestResults/
 .manual-test/
 tools/spike/models/
+src/QL.World/AiModels/
 tools/spike/spike-images/

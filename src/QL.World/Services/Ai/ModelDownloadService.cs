@@ -39,9 +39,29 @@ public sealed class ModelDownloadService
         string dataRoot,
         Action<string>? log = null,
         HttpMessageHandler? httpHandler = null)
-        : this(dataRoot, BuildDefaultBundle(), log, httpHandler)
+        : this(ResolveDataRootForBundled(dataRoot), BuildDefaultBundle(), log, httpHandler)
     {
     }
+
+    /// <summary>
+    /// 若打包位置（exe 同目录 models\vision_model.onnx）存在，返回其父目录
+    /// 使 <c>Path.Combine(dataRoot, "models")</c> 指向打包位置；否则原样返回。
+    /// </summary>
+    private static string ResolveDataRootForBundled(string dataRoot)
+    {
+        string bundled = Path.Combine(AppContext.BaseDirectory, "models");
+        if (File.Exists(Path.Combine(bundled, ModelManifest.ModelFileName)))
+            return Directory.GetParent(bundled)!.FullName;
+        return dataRoot;
+    }
+
+    private static IReadOnlyList<ModelFileSpec> BuildDefaultBundle() =>
+    [
+        new(ModelManifest.ModelFileName, ModelManifest.ModelSha256, ModelManifest.ModelSizeBytes,
+            ModelManifest.SourceUrl, ModelManifest.MirrorUrl),
+        new(ModelManifest.TextModelFileName, ModelManifest.TextModelSha256, ModelManifest.TextModelSizeBytes,
+            ModelManifest.TextModelSourceUrl, ModelManifest.TextModelMirrorUrl),
+    ];
 
     /// <summary>Test constructor: overrides the expected digest and size for a single (vision) file.</summary>
     internal ModelDownloadService(
@@ -74,14 +94,6 @@ public sealed class ModelDownloadService
             ? new HttpClient { Timeout = HttpTimeout }
             : new HttpClient(httpHandler) { Timeout = HttpTimeout };
     }
-
-    private static IReadOnlyList<ModelFileSpec> BuildDefaultBundle() =>
-    [
-        new(ModelManifest.ModelFileName, ModelManifest.ModelSha256, ModelManifest.ModelSizeBytes,
-            ModelManifest.SourceUrl, ModelManifest.MirrorUrl),
-        new(ModelManifest.TextModelFileName, ModelManifest.TextModelSha256, ModelManifest.TextModelSizeBytes,
-            ModelManifest.TextModelSourceUrl, ModelManifest.TextModelMirrorUrl),
-    ];
 
     /// <summary>Path of the primary (vision) model file — first spec in the bundle.</summary>
     public string ModelFilePath => Path.Combine(_modelsDirectory, _specs[0].FileName);

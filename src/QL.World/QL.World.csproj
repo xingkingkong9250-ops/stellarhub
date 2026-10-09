@@ -53,6 +53,14 @@
     <Resource Include="Assets\app.ico" />
   </ItemGroup>
 
+  <!-- 本地 AI 模型（离线打包，无需联网下载；发布时复制到输出目录 models\） -->
+  <ItemGroup>
+    <Content Include="AiModels\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>models\%(RecursiveDir)%(FileName)%(Extension)</Link>
+    </Content>
+  </ItemGroup>
+
   <!-- ImageSharp 3.1.x 分支已停止安全维护，下列 5 条通告的修复版本均为 v4.1.2；
        升 4.x 需 Six Labors Split License key（Release 构建硬校验），暂不引入。
        风险论证（2026-10-08 逐条核对 PoC 触发条件，GHSA-jjfr-j3p4-j9gm = High）：

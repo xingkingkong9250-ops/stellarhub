@@ -37,11 +37,24 @@ public sealed class LocalAiService : IAiService
     public LocalAiService(AppSettingsService settings, Action<string>? log = null)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        _modelsDirectory = Path.Combine(settings.DataRoot, "models");
+        // 优先从打包位置（exe 同目录 models\）加载，无则回落到 dataRoot\models\。
+        _modelsDirectory = ResolveModelsDirectory(settings.DataRoot);
         _log = log ?? (_ => { });
         _sessionFactory = CreateSession;
         _textSessionFactory = null; // production: text session uses the same CreateSession
         _localStateCheck = DefaultLocalStateCheck;
+    }
+
+    /// <summary>
+    /// 优先返回打包位置（AppContext.BaseDirectory\models）——若该目录存在
+    /// vision_model.onnx 则视为已打包，直接使用；否则回落到 dataRoot\models。
+    /// </summary>
+    private static string ResolveModelsDirectory(string dataRoot)
+    {
+        string bundled = Path.Combine(AppContext.BaseDirectory, "models");
+        if (File.Exists(Path.Combine(bundled, ModelManifest.ModelFileName)))
+            return bundled;
+        return Path.Combine(dataRoot, "models");
     }
 
     /// <summary>Test constructor: injects session factories and/or a state check.</summary>
