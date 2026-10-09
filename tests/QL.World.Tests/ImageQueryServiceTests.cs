@@ -363,6 +363,7 @@ public sealed class ImageQueryServiceTests
     [Fact]
     public void Color_family_filter_matches_only_that_family()
     {
+        // v0.13.4：色族单选 chips 已并入 B1-6-3 色板（hex→HexToFamily→color_family）。
         using var library = new TestLibrary();
         var query = new ImageQueryService(library.Db);
         long red = library.InsertImage(filePath: @"X:\red.png");
@@ -371,12 +372,12 @@ public sealed class ImageQueryServiceTests
         SetAttributes(library, red, colorFamily: "red");
         SetAttributes(library, gray, colorFamily: "gray");
 
-        var result = query.QueryGallery(new LibraryFilter { ColorFamily = "red" });
+        var result = query.QueryGallery(new LibraryFilter { ColorPaletteHexes = ["#FF0000"] });
         Assert.Single(result);
         Assert.Equal(red, result[0].Id);
 
         // 未分析颜色（color_family NULL）的图片不匹配任何色族，不报错。
-        Assert.Empty(query.QueryGallery(new LibraryFilter { ColorFamily = "blue" }));
+        Assert.Empty(query.QueryGallery(new LibraryFilter { ColorPaletteHexes = ["#0000FF"] }));
     }
 
     [Fact]
@@ -471,13 +472,13 @@ public sealed class ImageQueryServiceTests
         Assert.Equal(five, query.QueryGallery(
             new LibraryFilter { RatingBucket = RatingBuckets.Eq5 }).Single().Id);
 
-        // AND 叠加：≥4★ 且 gray 色族。
+        // AND 叠加：≥4★ 且 gray 色族（经色板 hex 映射）。
         SetAttributes(library, four, colorFamily: "gray");
         SetAttributes(library, five, colorFamily: "red");
         var combined = query.QueryGallery(new LibraryFilter
         {
             RatingBucket = RatingBuckets.Ge4,
-            ColorFamily = "gray",
+            ColorPaletteHexes = ["#808080"],
         });
         Assert.Single(combined);
         Assert.Equal(four, combined[0].Id);

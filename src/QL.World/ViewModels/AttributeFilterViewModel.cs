@@ -1,12 +1,12 @@
 using QL.World.Helpers;
 using QL.World.Models;
 using QL.World.Services;
-using QL.World.Services.Colors;
 
 namespace QL.World.ViewModels;
 
 /// <summary>
-/// U3-A (§4.B.2): B1-5 attribute filter group — 颜色 / 分辨率 / 大小 / 评分.
+/// B1-5 attribute filter group — 分辨率 / 大小 / 评分（v0.13.4 起三维；
+/// 原「颜色」维度与 B1-6-3 色彩倾向色板重叠，已合并，B1-5-1 编号作废）。
 /// Each dimension is a single-select chip row with 「全部」; selection writes
 /// Gallery.Filter and refreshes. The section's expanded state persists in
 /// settings (default collapsed).
@@ -21,13 +21,6 @@ public sealed class AttributeFilterViewModel : ObservableObject
         _gallery = gallery;
         _settings = settings;
 
-        ColorOptions = BuildOptions(
-        [
-            ("全部", null),
-            ("红", ColorFamily.Red), ("橙", ColorFamily.Orange), ("黄", ColorFamily.Yellow),
-            ("绿", ColorFamily.Green), ("青", ColorFamily.Cyan), ("蓝", ColorFamily.Blue),
-            ("紫", ColorFamily.Purple), ("品红", ColorFamily.Magenta), ("灰", ColorFamily.Gray),
-        ], v => ApplyColor(v));
         ResolutionOptions = BuildOptions(
         [
             ("全部", null),
@@ -56,7 +49,6 @@ public sealed class AttributeFilterViewModel : ObservableObject
         SyncActiveStates();
     }
 
-    public IReadOnlyList<AttributeFilterOption> ColorOptions { get; }
     public IReadOnlyList<AttributeFilterOption> ResolutionOptions { get; }
     public IReadOnlyList<AttributeFilterOption> FileSizeOptions { get; }
     public IReadOnlyList<AttributeFilterOption> RatingOptions { get; }
@@ -84,14 +76,6 @@ public sealed class AttributeFilterViewModel : ObservableObject
         [.. defs.Select(d => new AttributeFilterOption(d.Display, d.Value, apply))];
 
     // Clicking the active non-全部 chip again clears that dimension.
-    private void ApplyColor(string? value)
-    {
-        _gallery.Filter.ColorFamily =
-            value is not null && _gallery.Filter.ColorFamily == value ? null : value;
-        SyncActiveStates();
-        _ = _gallery.RefreshAsync();
-    }
-
     private void ApplyResolution(string? value)
     {
         _gallery.Filter.ResolutionBucket =
@@ -118,8 +102,6 @@ public sealed class AttributeFilterViewModel : ObservableObject
 
     private void SyncActiveStates()
     {
-        foreach (AttributeFilterOption o in ColorOptions)
-            o.IsActive = o.Value == _gallery.Filter.ColorFamily;
         foreach (AttributeFilterOption o in ResolutionOptions)
             o.IsActive = o.Value == _gallery.Filter.ResolutionBucket;
         foreach (AttributeFilterOption o in FileSizeOptions)
@@ -158,20 +140,6 @@ public sealed class AttributeFilterOption : ObservableObject
 /// <summary>Filter-value → display-string mapping for the B2-1 filter summary.</summary>
 internal static class AttributeFilterDisplay
 {
-    public static string Color(string family) => family switch
-    {
-        ColorFamily.Red => "红",
-        ColorFamily.Orange => "橙",
-        ColorFamily.Yellow => "黄",
-        ColorFamily.Green => "绿",
-        ColorFamily.Cyan => "青",
-        ColorFamily.Blue => "蓝",
-        ColorFamily.Purple => "紫",
-        ColorFamily.Magenta => "品红",
-        ColorFamily.Gray => "灰",
-        _ => family,
-    };
-
     public static string Resolution(string bucket) => bucket switch
     {
         ResolutionBuckets.Lt1024 => "<1024",

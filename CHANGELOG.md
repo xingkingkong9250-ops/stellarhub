@@ -9,6 +9,30 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.13.4] — 2026-10-09 UI 合并：颜色色族筛选并入色彩倾向色板
+
+### 变更
+
+- **B1-5 属性筛选移除「颜色」维度（B1-5-1 作废）**：原 9 色族单选 chips
+  （红/橙/黄/绿/青/蓝/紫/品红/灰）与 B1-6-3「色彩倾向」19 色色板功能
+  重叠——两者底层都筛 `images.color_family`，色板经 `HexToFamily` 映射
+  后覆盖全部色族且支持多选，是严格超集。现色彩筛选统一收口到 B1-6-3
+  色板，属性筛选收敛为三维（分辨率/文件大小/评分）。
+- 同步删除冗余链路：`LibraryFilter.ColorFamily` 字段及其 `Clone()` 项、
+  `ImageQueryService` 的 `color_family = $colorFamily` 单选子句、
+  `AttributeFilterViewModel.ColorOptions/ApplyColor`、筛选摘要的色族片段、
+  `ClearFilters` 重置项。色族判定服务 `Services.Colors.ColorFamily`
+  保留（色板映射、dominant_colors 回填仍在用）。
+- `docs/UI_NUMBERING.md`：B1-5-1 标记**已作废永不复用**；B1-6-3 注明为
+  唯一色彩筛选入口；B1-5 改三维。冒烟脚本 UiSmokeU3 同步（断言「品红」
+  chip 已消失、「全部」chip 恰 3 个）。
+
+### 测试
+
+- `ImageQueryServiceTests` 两处色族用例改走色板路径
+  （`ColorPaletteHexes`：#FF0000→red / #0000FF→blue / #808080→gray）。
+- 781 项测试保持全绿；Release 0 警告 0 错误。
+
 ## [0.13.3] — 2026-10-09 UI：B1-1 二级分类标签改气泡 chips 自动换行
 
 ### 变更

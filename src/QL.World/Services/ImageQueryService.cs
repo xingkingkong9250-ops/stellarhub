@@ -604,14 +604,8 @@ public sealed class ImageQueryService
             parameters.Add(("$pbrGroup", pbrGroupId));
         }
 
-        // U3-A (§4.B.2): B1-5 attribute filters. Unknown bucket keys are ignored.
-        if (!string.IsNullOrEmpty(filter.ColorFamily))
-        {
-            sql.Append(HasWhere(sql) ? "\n  AND " : "\nWHERE ");
-            sql.Append("i.color_family = $colorFamily");
-            parameters.Add(("$colorFamily", filter.ColorFamily));
-        }
-
+        // B1-5 attribute filters. Unknown bucket keys are ignored.
+        // （v0.13.4 起色族筛选由 M12-E 色板子句 ColorPaletteHexes 统一承担）
         if (!string.IsNullOrEmpty(filter.ResolutionBucket))
         {
             // Long edge MAX(width,height); NULL dimensions match no bucket.

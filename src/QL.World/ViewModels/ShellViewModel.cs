@@ -1009,8 +1009,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         Gallery.Filter.SimilarToImageId = null;
         // U2-B: 清除全部筛选 also resets the 最近入库 dropdown.
         Gallery.Filter.ImportedWithinDays = null;
-        // U3-A: reset the four attribute filter dimensions.
-        Gallery.Filter.ColorFamily = null;
+        // U3-A: reset the three attribute filter dimensions.
         Gallery.Filter.ResolutionBucket = null;
         Gallery.Filter.FileSizeBucket = null;
         Gallery.Filter.RatingBucket = null;

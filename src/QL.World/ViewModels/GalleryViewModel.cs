@@ -345,8 +345,6 @@ public sealed class GalleryViewModel : ObservableObject
         if (filter.ImportedWithinDays is int days && days > 0)
             parts.Add(days == 1 ? "今天" : $"近 {days} 天");
         // U3-A: attribute filter dimensions.
-        if (!string.IsNullOrEmpty(filter.ColorFamily))
-            parts.Add(AttributeFilterDisplay.Color(filter.ColorFamily));
         if (!string.IsNullOrEmpty(filter.ResolutionBucket))
             parts.Add(AttributeFilterDisplay.Resolution(filter.ResolutionBucket));
         if (!string.IsNullOrEmpty(filter.FileSizeBucket))

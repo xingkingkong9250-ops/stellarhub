@@ -1098,23 +1098,8 @@
                                       Content="属性筛选" />
                         <StackPanel Margin="2,0,0,0"
                                     Visibility="{Binding AttributeFilter.IsExpanded, Converter={StaticResource BoolVis}}">
-                            <!-- B1-5-1 颜色 -->
-                            <TextBlock Text="颜色" Margin="2,2,0,0" FontSize="11"
-                                       Foreground="{DynamicResource TextMutedBrush}" />
-                            <ItemsControl ItemsSource="{Binding AttributeFilter.ColorOptions}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Button Style="{StaticResource FilterChipStyle}"
-                                                Content="{Binding Display}"
-                                                Command="{Binding SelectCommand}" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <!-- v0.13.4: 原 B1-5-1「颜色」色族筛选与 B1-6-3 色彩倾向色板
+                                 功能重叠（均筛 color_family），已合并进 B1-6-3，编号作废不复用 -->
                             <!-- B1-5-2 分辨率 -->
                             <TextBlock Text="分辨率（长边）" Margin="2,2,0,0" FontSize="11"
                                        Foreground="{DynamicResource TextMutedBrush}" />

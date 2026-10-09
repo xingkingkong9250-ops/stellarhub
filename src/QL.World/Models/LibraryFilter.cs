@@ -39,9 +39,6 @@ public sealed class LibraryFilter
 
     // ─── U3-A (§4.B.2): B1-5 attribute filters; null = 全部 ───────────────
 
-    /// <summary>Color family key (see Services.Colors.ColorFamily), e.g. "red".</summary>
-    public string? ColorFamily { get; set; }
-
     /// <summary>Resolution bucket key on the long edge (see <see cref="ResolutionBuckets"/>).</summary>
     public string? ResolutionBucket { get; set; }
 
@@ -108,7 +105,6 @@ public sealed class LibraryFilter
         Sort = Sort,
         ImportedWithinDays = ImportedWithinDays,
         OnlyMissing = OnlyMissing,
-        ColorFamily = ColorFamily,
         ResolutionBucket = ResolutionBucket,
         FileSizeBucket = FileSizeBucket,
         RatingBucket = RatingBucket,

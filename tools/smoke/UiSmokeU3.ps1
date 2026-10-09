@@ -182,13 +182,14 @@ try {
         Assert-Step '折叠态标题显示「素材库 (8)」' ($header -eq '素材库 (8)') "实际「$header」（8 = 全部+6分类+未分类）"
     }
 
-    # ── 3. 展开属性筛选 → chips 出现 ────────────────────────────
+    # ── 3. 展开属性筛选 → chips 出现（v0.13.4 起三维：颜色已并入 B1-6-3 色板） ──
     Write-Host '[Smoke] Step 3: expand 属性筛选 shows chips'
     if ($null -ne $tAttr) {
         ($tAttr.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)).Toggle()
         Start-Sleep -Milliseconds 800
+        # B1-5-1「颜色/品红」已删除：属性筛选内不应再出现色族 chip。
         $chipMagenta = Find-FirstByName $mainWin '品红' ([System.Windows.Automation.ControlType]::Button)
-        Assert-Step '颜色 chip「品红」出现 (B1-5-1)' ($null -ne $chipMagenta) '未找到 Name="品红" 的 chip 按钮'
+        Assert-Step '色族 chip「品红」已移除 (B1-5-1 作废)' ($null -eq $chipMagenta) '属性筛选中仍存在「品红」chip'
         $allCond = New-Object System.Windows.Automation.AndCondition(
             (New-Object System.Windows.Automation.PropertyCondition(
                 [System.Windows.Automation.AutomationElement]::NameProperty, '全部')),
@@ -196,7 +197,7 @@ try {
                 [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
                 [System.Windows.Automation.ControlType]::Button)))
         $allChips = $mainWin.FindAll([System.Windows.Automation.TreeScope]::Descendants, $allCond)
-        Assert-Step '四维各含「全部」chip（≥4）' ($allChips.Count -ge 4) "实际 $($allChips.Count) 个"
+        Assert-Step '三维各含「全部」chip（=3）' ($allChips.Count -eq 3) "实际 $($allChips.Count) 个（分辨率/文件大小/评分）"
     }
 
     # ── 3b. M12-F: 展开筛选标签组 → 美术风格 chips 出现 ────────
