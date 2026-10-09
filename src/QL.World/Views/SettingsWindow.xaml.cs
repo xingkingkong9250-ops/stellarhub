@@ -41,8 +41,17 @@ public partial class SettingsWindow : Window
     /// </summary>
     private void OnCloudApiKeyChanged(object sender, RoutedEventArgs e)
     {
-        if (sender is PasswordBox pb)
-            _viewModel.SetCloudApiKeyInput(pb.Password);
+        // v0.12.0: 旧 CloudApiKeyBox 已移除，保留空方法防旧 XAML 残留绑定。
+    }
+
+    /// <summary>
+    /// v0.12.0: 后端 API Key PasswordBox 变更——按选中后端 Id 加密存储。
+    /// 与 NAS 密码同理：key by selected backend id，跨选择切换各自独立。
+    /// </summary>
+    private void OnBackendApiKeyChanged(object sender, RoutedEventArgs e)
+    {
+        if (sender is PasswordBox pb && _viewModel.SelectedAiBackend is { } backend)
+            _viewModel.SetBackendApiKeyInput(backend.Id, pb.Password);
     }
 
     /// <summary>

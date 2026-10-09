@@ -92,6 +92,10 @@ public sealed class SettingsViewModel : ObservableObject
 
         foreach (var c in settings.NasConnections)
             NasConnections.Add(c);
+        // v0.12.0: populate AI backends list
+        foreach (var b in settings.AiBackends)
+            AiBackendsList.Add(b);
+        SelectedAiBackend = AiBackendsList.FirstOrDefault();
 
         RegenerateAllThumbnailsCommand = new RelayCommand(
             RegenerateAllThumbnails);
@@ -106,7 +110,19 @@ public sealed class SettingsViewModel : ObservableObject
         CloseCommand = new RelayCommand(() => RequestClose?.Invoke());
         TestCloudConnectionCommand = new AsyncRelayCommand(
             TestCloudConnectionAsync,
-            () => IsCloudConfigured && !_isTestingConnection);
+            () => SelectedAiBackend is not null && !_isTestingConnection);
+        // v0.12.0: multi-backend commands
+        AddCloudBackendCommand = new RelayCommand(AddCloudBackend);
+        AddLocalBackendCommand = new RelayCommand(AddLocalBackend);
+        DeleteBackendCommand = new RelayCommand(
+            DeleteBackend, () => CanDeleteSelected);
+        SetActiveBackendCommand = new RelayCommand(
+            SetActiveBackend, () => SelectedAiBackend is not null && !IsActiveBackend);
+        SaveBackendCommand = new RelayCommand(
+            SaveBackend, () => SelectedAiBackend is not null);
+        TestBackendConnectionCommand = new AsyncRelayCommand(
+            TestBackendConnectionAsync,
+            () => SelectedAiBackend is not null && !_isTestingConnection);
         DownloadModelCommand = new AsyncRelayCommand(
             DownloadModelAsync,
             () => !_isDownloading && _localModelState != LocalModelState.Ready);
@@ -210,10 +226,66 @@ public sealed class SettingsViewModel : ObservableObject
 
     public RelayCommand RegenerateAllThumbnailsCommand { get; }
 
-    // ─── A3 AI ──────────────────────────────────────────────────────────────
+    // ─── A3 AI（v0.12.0 多后端）─────────────────────────────────────────────
 
-    public IReadOnlyList<AiMode> AiModeOptions { get; } =
-        [AiMode.Disabled, AiMode.Local, AiMode.Cloud];
+    /// <summary>AI 后端列表（内置 Local + 用户添加的 Cloud/Local）。</summary>
+    public ObservableCollection<AiBackendConfig> AiBackendsList { get; } = [];
+
+    private AiBackendConfig? _selectedAiBackend;
+    /// <summary>当前在详情面板中编辑的后端。</summary>
+    public AiBackendConfig? SelectedAiBackend
+    {
+        get => _selectedAiBackend;
+        set
+        {
+            if (SetProperty(ref _selectedAiBackend, value))
+            {
+                OnPropertyChanged(nameof(IsSelectedBackendCloud));
+                OnPropertyChanged(nameof(IsSelectedBackendLocalBundled));
+                OnPropertyChanged(nameof(IsSelectedBackendLocalCustom));
+                OnPropertyChanged(nameof(CanDeleteSelected));
+                OnPropertyChanged(nameof(IsActiveBackend));
+                OnPropertyChanged(nameof(HasSelectedBackendApiKey));
+                TestBackendConnectionCommand?.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    /// <summary>详情面板：选中后端是否为 Cloud。</summary>
+    public bool IsSelectedBackendCloud => SelectedAiBackend?.Kind == AiBackendKind.Cloud;
+    /// <summary>详情面板：选中后端是否为内置 Local（显示下载/导入按钮）。</summary>
+    public bool IsSelectedBackendLocalBundled =>
+        SelectedAiBackend is { Kind: AiBackendKind.Local } b && b.IsBundled;
+    /// <summary>详情面板：选中后端是否为用户自加 Local。</summary>
+    public bool IsSelectedBackendLocalCustom =>
+        SelectedAiBackend is { Kind: AiBackendKind.Local } b && !b.IsBundled;
+
+    /// <summary>选中后端可否删除（内置不可删）。</summary>
+    public bool CanDeleteSelected =>
+        SelectedAiBackend is not null && !SelectedAiBackend.IsBundled;
+
+    /// <summary>选中的后端是否为当前活跃后端。</summary>
+    public bool IsActiveBackend =>
+        SelectedAiBackend is not null &&
+        _settings.ActiveAiBackendId == SelectedAiBackend.Id;
+
+    /// <summary>选中后端是否已保存 API Key（Cloud）。</summary>
+    public bool HasSelectedBackendApiKey =>
+        SelectedAiBackend is not null && _settings.HasAiBackendApiKey(SelectedAiBackend.Id);
+
+    /// <summary>当前活跃 AI 后端 Id（null=关闭）；ComboBox 选择绑定。</summary>
+    public int? ActiveAiBackendId
+    {
+        get => _settings.ActiveAiBackendId;
+        set
+        {
+            if (_settings.ActiveAiBackendId == value) return;
+            _settings.ActiveAiBackendId = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsActiveBackend));
+            OnPropertyChanged(nameof(AiStatusText));
+        }
+    }
 
     /// <summary>W3/A3-LEARN (v0.10.0): AI 自适应学习开关（默认开）。</summary>
     public bool AiLearningEnabled
@@ -227,113 +299,120 @@ public sealed class SettingsViewModel : ObservableObject
         }
     }
 
-    public AiMode SelectedAiMode
-    {
-        get => _settings.AiMode;
-        set
-        {
-            if (_settings.AiMode == value) return;
-            _settings.AiMode = value;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(IsCloudSectionEnabled));
-            OnPropertyChanged(nameof(IsLocalSectionEnabled));
-            OnPropertyChanged(nameof(AiStatusText));
-        }
-    }
-
-    public bool IsCloudSectionEnabled => _settings.AiMode == AiMode.Cloud;
-    public bool IsLocalSectionEnabled => _settings.AiMode == AiMode.Local;
-
-    public string CloudBaseUrl
-    {
-        get => _settings.CloudBaseUrl;
-        set
-        {
-            _settings.CloudBaseUrl = value;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(IsCloudConfigured));
-            OnPropertyChanged(nameof(AiStatusText));
-            TestCloudConnectionCommand.RaiseCanExecuteChanged();
-        }
-    }
-
-    public string CloudModelName
-    {
-        get => _settings.CloudModelName;
-        set
-        {
-            _settings.CloudModelName = value;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(IsCloudConfigured));
-            OnPropertyChanged(nameof(AiStatusText));
-            TestCloudConnectionCommand.RaiseCanExecuteChanged();
-        }
-    }
-
-    public string CloudEmbeddingModelName
-    {
-        get => _settings.CloudEmbeddingModelName;
-        set => _settings.CloudEmbeddingModelName = value;
-    }
-
-    /// <summary>True when base URL, model name and API key are all present.</summary>
-    public bool IsCloudConfigured =>
-        !string.IsNullOrWhiteSpace(_settings.CloudBaseUrl) &&
-        !string.IsNullOrWhiteSpace(_settings.CloudModelName) &&
-        _settings.HasCloudApiKey;
-
-    /// <summary>
-    /// Called by the view's PasswordBox on PasswordChanged. The plaintext
-    /// is encrypted immediately and never stored in the ViewModel.
-    /// </summary>
-    public void SetCloudApiKeyInput(string plaintext)
-    {
-        _settings.SetCloudApiKey(plaintext);
-        OnPropertyChanged(nameof(HasCloudApiKey));
-        OnPropertyChanged(nameof(IsCloudConfigured));
-        TestCloudConnectionCommand.RaiseCanExecuteChanged();
-    }
-
-    public bool HasCloudApiKey => _settings.HasCloudApiKey;
-
     public string AiStatusText
     {
         get
         {
-            return _settings.AiMode switch
-            {
-                AiMode.Cloud => IsCloudConfigured
-                    ? $"AI：云端（{_settings.CloudModelName}）"
-                    : "AI：云端（未完成配置）",
-                AiMode.Local => "AI：本地（M3-D 提供模型下载）",
-                _ => "AI：关闭",
-            };
+            AiBackendConfig? active = _settings.GetActiveAiBackend();
+            if (active is null) return "AI：关闭";
+            return active.Kind == AiBackendKind.Cloud
+                ? $"AI：云端（{active.Name}）"
+                : $"AI：本地（{active.Name}）";
         }
     }
 
+    // ─── A3 后端 CRUD 命令 ──────────────────────────────────────────────────
+
+    public RelayCommand AddCloudBackendCommand { get; }
+    public RelayCommand AddLocalBackendCommand { get; }
+    public RelayCommand DeleteBackendCommand { get; }
+    public RelayCommand SetActiveBackendCommand { get; }
+    public RelayCommand SaveBackendCommand { get; }
+    public AsyncRelayCommand TestBackendConnectionCommand { get; }
+    /// <summary>v0.12.0 之前遗留的云端测试命令（保留供旧绑定兼容）。</summary>
     public AsyncRelayCommand TestCloudConnectionCommand { get; }
 
-    private async Task TestCloudConnectionAsync()
+    private void AddCloudBackend()
     {
+        var backend = new AiBackendConfig
+        {
+            Name = "云端 AI",
+            Kind = AiBackendKind.Cloud,
+            BaseUrl = "https://",
+        };
+        int id = _settings.AddAiBackend(backend);
+        var fresh = _settings.GetAiBackend(id)!;
+        AiBackendsList.Add(fresh);
+        SelectedAiBackend = fresh;
+    }
+
+    private void AddLocalBackend()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "选择本地 ONNX 模型文件",
+            Filter = "ONNX 模型 (*.onnx)|*.onnx|所有文件 (*.*)|*.*",
+        };
+        if (dialog.ShowDialog() != true) return;
+
+        var backend = new AiBackendConfig
+        {
+            Name = Path.GetFileNameWithoutExtension(dialog.FileName),
+            Kind = AiBackendKind.Local,
+            ModelPath = dialog.FileName,
+        };
+        int id = _settings.AddAiBackend(backend);
+        var fresh = _settings.GetAiBackend(id)!;
+        AiBackendsList.Add(fresh);
+        SelectedAiBackend = fresh;
+    }
+
+    private void DeleteBackend()
+    {
+        if (SelectedAiBackend is not { } b) return;
+        if (b.IsBundled) return;
+        int id = b.Id;
+        _settings.DeleteAiBackend(id);
+        RefreshAiBackends();
+        SelectedAiBackend = AiBackendsList.FirstOrDefault();
+        OnPropertyChanged(nameof(AiStatusText));
+    }
+
+    private void SetActiveBackend()
+    {
+        if (SelectedAiBackend is not { } b) return;
+        _settings.ActiveAiBackendId = b.Id;
+        OnPropertyChanged(nameof(IsActiveBackend));
+        OnPropertyChanged(nameof(AiStatusText));
+        SetActiveBackendCommand.RaiseCanExecuteChanged();
+    }
+
+    private void SaveBackend()
+    {
+        if (SelectedAiBackend is not { } b) return;
+        _settings.UpdateAiBackend(b);
+        RefreshAiBackends();
+        // 重新选中刚保存的项
+        SelectedAiBackend = AiBackendsList.FirstOrDefault(x => x.Id == b.Id);
+        OnPropertyChanged(nameof(AiStatusText));
+    }
+
+    /// <summary>
+    /// 由 PasswordBox.PasswordChanged 调用——明文立即 DPAPI 加密，不存 ViewModel。
+    /// </summary>
+    public void SetBackendApiKeyInput(int backendId, string plaintext)
+    {
+        _settings.SetAiBackendApiKey(backendId, plaintext);
+        OnPropertyChanged(nameof(HasSelectedBackendApiKey));
+        TestBackendConnectionCommand.RaiseCanExecuteChanged();
+    }
+
+    private async Task TestBackendConnectionAsync()
+    {
+        if (SelectedAiBackend is not { } b) return;
         if (_isTestingConnection) return;
-        if (!IsCloudConfigured) return;
 
         _isTestingConnection = true;
-        TestCloudConnectionCommand.RaiseCanExecuteChanged();
+        TestBackendConnectionCommand.RaiseCanExecuteChanged();
         LegacyStatusText = "正在测试连接…";
 
         try
         {
-            var config = new CloudAiConfig
-            {
-                BaseUrl = CloudBaseUrl,
-                ModelName = CloudModelName,
-                EncryptedApiKey = _settings.CloudEncryptedApiKey,
-                EmbeddingModelName = CloudEmbeddingModelName,
-            };
-            var cloud = new CloudAiService(config);
-            bool ok = await cloud.TestConnectionAsync(CancellationToken.None);
-            LegacyStatusText = ok ? "连接成功。" : "连接失败（请检查 URL、模型名与 API Key）。";
+            IAiService ai = AiServiceFactory.Create(_settings, b.Id);
+            bool ok = await ai.TestConnectionAsync(CancellationToken.None);
+            LegacyStatusText = ok
+                ? "连接成功。"
+                : "连接失败（请检查配置）。";
         }
         catch (Exception ex)
         {
@@ -342,8 +421,25 @@ public sealed class SettingsViewModel : ObservableObject
         finally
         {
             _isTestingConnection = false;
-            TestCloudConnectionCommand.RaiseCanExecuteChanged();
+            TestBackendConnectionCommand.RaiseCanExecuteChanged();
         }
+    }
+
+    private void RefreshAiBackends()
+    {
+        int? selectedId = SelectedAiBackend?.Id;
+        AiBackendsList.Clear();
+        foreach (var b in _settings.AiBackends)
+            AiBackendsList.Add(b);
+        if (selectedId is { } sid)
+            SelectedAiBackend = AiBackendsList.FirstOrDefault(x => x.Id == sid);
+    }
+
+    // ── 旧 CloudAi 兼容（TestCloudConnectionCommand 保留） ──
+
+    private async Task TestCloudConnectionAsync()
+    {
+        await TestBackendConnectionAsync();
     }
 
     // ─── A3 本地模型 ────────────────────────────────────────────────────────
