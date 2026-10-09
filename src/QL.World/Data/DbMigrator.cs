@@ -11,7 +11,7 @@ namespace QL.World.Data;
 /// </summary>
 internal static class DbMigrator
 {
-    private const int CURRENT_VERSION = 9;
+    private const int CURRENT_VERSION = 10;
 
     public static void Migrate(SqliteConnection connection)
     {
@@ -45,6 +45,12 @@ internal static class DbMigrator
                 // fills library_path / entry_code and moves bytes.
                 if (target == 9)
                     BackfillLibraryHash(connection, transaction);
+
+                // M12-C: v10 adds legacy_primary_category (backup of old 10
+                // categories) and maps them to the new 6 categories. Images
+                // with tags get their category re-derived by TaxonomyService.
+                if (target == 10)
+                    BackfillLegacyCategory(connection, transaction);
 
                 command.CommandText = $"PRAGMA user_version = {target};";
                 command.ExecuteNonQuery();
@@ -120,6 +126,121 @@ internal static class DbMigrator
             WHERE library_hash IS NULL;
             """;
         update.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// M12-C (v0.13.0): 三步迁移旧 10 分类 → 新 6 分类。
+    /// 1) 备份：legacy_primary_category ← primary_category（全量）
+    /// 2) 映射：按映射表 UPDATE primary_category（5 个有干净映射的旧分类）
+    /// 3) 重推导：对有标签的图（无论是否被映射），读标签调 TaxonomyService
+    ///    重新推导。无标签的图保持映射后的值或 NULL。
+    /// </summary>
+    private static void BackfillLegacyCategory(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        // 1) 备份旧值
+        using (var backup = connection.CreateCommand())
+        {
+            backup.Transaction = transaction;
+            backup.CommandText = """
+                UPDATE images
+                SET legacy_primary_category = primary_category
+                WHERE legacy_primary_category IS NULL;
+                """;
+            backup.ExecuteNonQuery();
+        }
+
+        // 2) 映射有干净对应的 5 个旧分类
+        var mappings = new (string Old, string New)[]
+        {
+            ("贴图/纹理", "素材"),
+            ("材质参考", "质感"),
+            ("环境/场景", "场景"),
+            ("雕刻参考", "角色"),
+            ("UI/HUD", "道具"),
+        };
+        foreach ((string old, string @new) in mappings)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.Transaction = transaction;
+            cmd.CommandText = """
+                UPDATE images
+                SET primary_category = $new
+                WHERE legacy_primary_category = $old;
+                """;
+            cmd.Parameters.AddWithValue("$new", @new);
+            cmd.Parameters.AddWithValue("$old", old);
+            cmd.ExecuteNonQuery();
+        }
+
+        // 没有干净映射的旧分类（实拍参考/概念设计/灯光参考/配色参考/动画参考）
+        // 清空为 NULL，让 AI 重分析或用户重标。
+        var unmapped = new[]
+        {
+            "实拍参考", "概念设计", "灯光参考", "配色参考", "动画参考",
+        };
+        foreach (string old in unmapped)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.Transaction = transaction;
+            cmd.CommandText = """
+                UPDATE images
+                SET primary_category = NULL
+                WHERE legacy_primary_category = $old;
+                """;
+            cmd.Parameters.AddWithValue("$old", old);
+            cmd.ExecuteNonQuery();
+        }
+
+        // 3) 对有标签的图重推导分类（TaxonomyService 从标签推导新分类）
+        var taggedRows = new List<(long Id, List<string> Tags)>();
+        using (var query = connection.CreateCommand())
+        {
+            query.Transaction = transaction;
+            query.CommandText = """
+                SELECT i.id, t.tag
+                FROM images i
+                INNER JOIN image_tags t ON t.image_id = i.id
+                ORDER BY i.id, t.tag;
+                """;
+            using var reader = query.ExecuteReader();
+            long currentId = -1;
+            var currentTags = new List<string>();
+            while (reader.Read())
+            {
+                long id = reader.GetInt64(0);
+                string tag = reader.GetString(1);
+                if (id != currentId)
+                {
+                    if (currentTags.Count > 0)
+                        taggedRows.Add((currentId, currentTags));
+                    currentId = id;
+                    currentTags = [];
+                }
+                currentTags.Add(tag);
+            }
+            if (currentTags.Count > 0)
+                taggedRows.Add((currentId, currentTags));
+        }
+
+        foreach ((long id, List<string> tags) in taggedRows)
+        {
+            string? derived = Services.TaxonomyService.DeriveCategory(tags);
+            // 推导成功才覆盖（NULL 推导不覆盖映射后的值）
+            if (derived is not null)
+            {
+                using var update = connection.CreateCommand();
+                update.Transaction = transaction;
+                update.CommandText = """
+                    UPDATE images
+                    SET primary_category = $cat, updated_at = $now
+                    WHERE id = $id;
+                    """;
+                update.Parameters.AddWithValue("$cat", derived);
+                update.Parameters.AddWithValue("$now", DbTime.Now());
+                update.Parameters.AddWithValue("$id", id);
+                update.ExecuteNonQuery();
+            }
+        }
     }
 
     private static int ReadUserVersion(SqliteConnection connection)

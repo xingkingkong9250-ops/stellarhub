@@ -49,7 +49,7 @@ public sealed class DatabaseServiceTests
             command.CommandText = "PRAGMA user_version;";
             return Convert.ToInt32(command.ExecuteScalar());
         });
-        Assert.Equal(9, version);
+        Assert.Equal(10, version);
 
         // Second Initialize must not throw or duplicate anything.
         library.Db.Initialize();
@@ -103,7 +103,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(9, migrated);
+            Assert.Equal(10, migrated);
 
             var (tableCount, imageCount) = db.Run(conn =>
             {
@@ -199,7 +199,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(9, version);
+            Assert.Equal(10, version);
 
             var families = db.Run(conn =>
             {
@@ -313,7 +313,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(9, version);
+            Assert.Equal(10, version);
 
             // source column exists with DEFAULT 'local' and backfilled the v5 row.
             string sourceDefault = db.Run(conn =>
@@ -414,7 +414,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(9, version);
+            Assert.Equal(10, version);
 
             var (libraryHash, originalPath, libraryPath, entryCode) = db.Run(conn =>
             {
@@ -448,5 +448,145 @@ public sealed class DatabaseServiceTests
             try { Directory.Delete(directory, recursive: true); }
             catch (IOException) { }
         }
+    }
+
+    // ─── M12-C (v0.13.0): v10 旧→新分类迁移 ──────────────────────
+
+    [Fact]
+    public void Migration_v10_maps_old_categories_and_backs_up_legacy()
+    {
+        string directory = Path.Combine(
+            Path.GetTempPath(), "ql-world-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string databasePath = Path.Combine(directory, "qlworld.db");
+            using (var bootstrap = new SqliteConnection($"Data Source={databasePath}"))
+            {
+                bootstrap.Open();
+                foreach (int v in new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 })
+                {
+                    using var schema = bootstrap.CreateCommand();
+                    schema.CommandText = DbMigrator.LoadSchemaSql(v);
+                    schema.ExecuteNonQuery();
+                }
+                using var versionCmd = bootstrap.CreateCommand();
+                versionCmd.CommandText = "PRAGMA user_version = 9;";
+                versionCmd.ExecuteNonQuery();
+
+                // Seed rows with old categories + one with tags
+                using var seed = bootstrap.CreateCommand();
+                seed.CommandText = """
+                    INSERT INTO images
+                        (file_path, file_name, sortable_name, file_hash, file_size,
+                         width, height, format, rating, notes, primary_category,
+                         dominant_colors, is_missing, created_at, updated_at)
+                    VALUES
+                        ('C:\a.png', 'a.png', 'a.png', 'h1', 1, 4, 4, 'png', 0, '',
+                         '环境/场景', NULL, 0, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'),
+                        ('C:\b.png', 'b.png', 'b.png', 'h2', 1, 4, 4, 'png', 0, '',
+                         '贴图/纹理', NULL, 0, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'),
+                        ('C:\c.png', 'c.png', 'c.png', 'h3', 1, 4, 4, 'png', 0, '',
+                         '实拍参考', NULL, 0, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'),
+                        ('C:\d.png', 'd.png', 'd.png', 'h4', 1, 4, 4, 'png', 0, '',
+                         '材质参考', NULL, 0, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+                    """;
+                seed.ExecuteNonQuery();
+
+                // Add taxonomy tags to row 1 (环境/场景→场景 mapped, but has "骑士"→角色 tag)
+                using var tagSeed = bootstrap.CreateCommand();
+                tagSeed.CommandText = """
+                    INSERT INTO image_tags (image_id, tag, source, confidence, created_at)
+                    VALUES (1, '骑士', 'manual', NULL, '2026-01-01T00:00:00.000Z');
+                    """;
+                tagSeed.ExecuteNonQuery();
+            }
+
+            using var db = new DatabaseService(directory);
+            db.Initialize();
+
+            // Row 1: 环境/场景 → 场景 (mapped), but has "骑士" tag → 角色 (re-derived)
+            var row1 = db.Run(conn =>
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = """
+                    SELECT primary_category, legacy_primary_category
+                    FROM images WHERE file_hash = 'h1';
+                    """;
+                using var r = cmd.ExecuteReader();
+                r.Read();
+                return (r.IsDBNull(0) ? null : r.GetString(0),
+                        r.IsDBNull(1) ? null : r.GetString(1));
+            });
+            Assert.Equal("角色", row1.Item1);   // re-derived from "骑士" tag
+            Assert.Equal("环境/场景", row1.Item2); // legacy preserved
+
+            // Row 2: 贴图/纹理 → 素材 (mapped, no tags)
+            var row2 = db.Run(conn =>
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = """
+                    SELECT primary_category, legacy_primary_category
+                    FROM images WHERE file_hash = 'h2';
+                    """;
+                using var r = cmd.ExecuteReader();
+                r.Read();
+                return (r.IsDBNull(0) ? null : r.GetString(0),
+                        r.IsDBNull(1) ? null : r.GetString(1));
+            });
+            Assert.Equal("素材", row2.Item1);
+            Assert.Equal("贴图/纹理", row2.Item2);
+
+            // Row 3: 实拍参考 → NULL (unmapped, no tags)
+            var row3 = db.Run(conn =>
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = """
+                    SELECT primary_category, legacy_primary_category
+                    FROM images WHERE file_hash = 'h3';
+                    """;
+                using var r = cmd.ExecuteReader();
+                r.Read();
+                return (r.IsDBNull(0) ? null : r.GetString(0),
+                        r.IsDBNull(1) ? null : r.GetString(1));
+            });
+            Assert.Null(row3.Item1);
+            Assert.Equal("实拍参考", row3.Item2);
+
+            // Row 4: 材质参考 → 质感 (mapped, no tags)
+            var row4 = db.Run(conn =>
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = """
+                    SELECT primary_category, legacy_primary_category
+                    FROM images WHERE file_hash = 'h4';
+                    """;
+                using var r = cmd.ExecuteReader();
+                r.Read();
+                return (r.IsDBNull(0) ? null : r.GetString(0),
+                        r.IsDBNull(1) ? null : r.GetString(1));
+            });
+            Assert.Equal("质感", row4.Item1);
+            Assert.Equal("材质参考", row4.Item2);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            try { Directory.Delete(directory, recursive: true); }
+            catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void Migration_v10_fresh_database_has_legacy_column()
+    {
+        using var lib = new TestLibrary();
+        bool hasColumn = lib.Db.Run(conn =>
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('images') WHERE name='legacy_primary_category';";
+            return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+        });
+        Assert.True(hasColumn);
     }
 }
