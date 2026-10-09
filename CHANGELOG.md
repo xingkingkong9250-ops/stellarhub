@@ -9,6 +9,78 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-10-09 M12 标签驱动分类体系重构（6 新分类 + 11 标签组）
+
+### 核心变更（Breaking：分类体系替换）
+
+- **标签决定分类**：原 10 个固定一级分类（贴图/纹理、实拍参考…动画参考）
+  替换为 **6 个新分类**——角色 / 生物 / 场景 / 道具 / 质感 / 素材。
+  图片标签命中某分类组词表时由 `TaxonomyService.DeriveCategory` 推导
+  `primary_category`（命中标签数最多→平局取置信度和最高）；只命中筛选组
+  标签时分类为 NULL（未分类）。筛选标签共 **7 组**：美术风格 / 文件格式 /
+  色彩倾向 / 画面构图 / 灯光氛围 / 题材气质 / 状态形容，不参与分类推导。
+- **Schema v10 迁移**：`images` 新增 `legacy_primary_category` 列备份原值
+  （只增不删）；旧分类映射（贴图/纹理→素材、材质参考→质感、环境/场景→
+  场景、雕刻参考→角色、UI/HUD→道具；实拍参考/概念设计/灯光参考/配色参考/
+  动画参考→NULL），并对已有人工/AI 标签的图重推导分类。
+- **Cloud AI 提示词为 Breaking Change**：云端分析不再要求输出固定
+  category 字段，改为从标签分类体系动态构建提示词、只输出 tags，
+  `PrimaryCategory` 由下游 `TaxonomyService` 推导。
+
+### 新增
+
+- `Models/Taxonomy/TagTaxonomy.cs`：6 分类 + 11 组（6 分类组+7 筛选组）
+  标签词表（约 166 标签，「锈蚀」等跨组标签分类组优先）、TagToGroup/
+  GroupToCategory 反向映射、IsKnownCategory/GroupOf/CategoryOfTag/
+  TagsOfCategory 查询方法。
+- `Services/TaxonomyService.cs`：DeriveCategory 两个重载（纯标签计数 /
+  带 AI confidence），Local CLIP 与 Cloud 两路统一走标签推导。
+- `TagService.RecomputeCategoryForImage(imageId)`：手动加删标签后重推导
+  分类（直接 UPDATE，不走 AddTags 避免事件循环）。
+- **LibraryFilter 7 个新筛选维度**：ArtStyleTags / CompositionTags /
+  LightingTags / ThemeTags / ConditionTags（组内 OR、组间 AND，
+  `image_tags EXISTS+IN`）、FileFormats（`images.format` 不区分大小写）、
+  ColorPaletteHexes（#RRGGBB 经 ColorFamily.HexToFamily 映射色族后匹配
+  `i.color_family`）。
+- **B1-1 素材库树重构**：全部 + 6 新分类 + 未分类；分类行可展开
+  （▸/▾）显示该分类组词表标签为二级节点，点击二级标签按单标签筛选。
+- **B1-6 筛选标签组折叠区**：5 组多选标签 chips + 文件格式多选 +
+  19 色色彩倾向色板；默认收起，折叠态持久化
+  （`sidebar_filter_groups_expanded`）；筛选摘要（B2-1）同步显示
+  各激活维度；「清除全部筛选」一并重置。
+
+### AI 路径
+
+- `AiAnalysisService.PersistResult`：AddTags 后用推导分类覆盖 AI 原始
+  PrimaryCategory（保留 WHERE IS NULL 契约）；`AiLearningService.RefineAsync`
+  重排后重新推导。
+- `LocalAiService.AnalyzeImageAsync`：先 DeriveCategory(rank.Tags)，
+  null 才回退 CLIP rank.PrimaryCategory；本地 CLIP 标签推导分类优先于
+  CLIP 内置分类排序。
+- `ClipTextIndex.EnsureDistributed`：加 promptTemplateVersion 版本校验
+  （ExpectedPromptTemplateVersion=1），用户本地嵌入文件版本低或损坏时
+  自动从内嵌资源重新生成。
+
+### 测试
+
+- 测试总数 **728 → 774**（M12 各阶段累计 +46）：TaxonomyService 推导
+  用例、schema v10 迁移映射/备份/重推导、LibraryFilter 七维 SQL
+  （单/多选、多组 AND、色板命中、Clone 不丢字段）、B1 树结构与二级标签、
+  B1-6 chips/色板 VM 多选与重置。
+- Release 全解决方案 **0 警告 0 错误**。
+
+### UI 编号同步
+
+- `W1/B1-1`：10 分类 → 6 新分类 + 可展开二级标签节点。
+- 新增 `W1/B1-6` 与 `W1/B1-6-1~7`（美术风格/文件格式/色彩倾向色板/
+  画面构图/灯光氛围/题材气质/状态形容）；计划原列 B1-5-5 色板落地归入
+  B1-6-3，**B1-5-5 编号作废不复用**。
+
+### 已知遗留
+
+- 内嵌 CLIP JSON 仍为 v1；后续升级 `text_model.onnx` 时需重新生成嵌入
+  JSON 并同步 `ExpectedPromptTemplateVersion` 常量。
+
 ## [0.12.3] — 2026-10-09 UI 调整：瀑布流默认 + 视图切换迁移 + 底部署名
 
 ### 变更
