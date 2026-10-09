@@ -67,7 +67,7 @@
                                         IsEnabled="False"
                                         ToolTip="当前版本暂不支持迁移库目录；如需更换请先退出并手动迁移数据" />
                                 <TextBox IsReadOnly="True"
-                                         Text="{Binding LibraryRootDisplayText}"
+                                         Text="{Binding LibraryRootDisplayText, Mode=OneWay}"
                                          VerticalContentAlignment="Center" />
                             </DockPanel>
                             <CheckBox Margin="0,8,0,0"
