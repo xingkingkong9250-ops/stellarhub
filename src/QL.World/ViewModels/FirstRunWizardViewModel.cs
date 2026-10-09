@@ -18,7 +18,7 @@ namespace QL.World.ViewModels;
 public sealed class FirstRunWizardViewModel : ObservableObject
 {
     private readonly AppSettingsService _settings;
-    private readonly DatabaseService _database;
+    private readonly DatabaseService? _database;
     private readonly string _dataRoot;
     private readonly Func<string?> _folderPicker;
     private readonly Action<string> _log;
@@ -30,14 +30,15 @@ public sealed class FirstRunWizardViewModel : ObservableObject
 
     public FirstRunWizardViewModel(
         AppSettingsService settings,
-        DatabaseService database,
+        DatabaseService? database,
         string dataRoot,
         bool hasLegacyData,
         Func<string?>? folderPicker = null,
         Action<string>? log = null)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        _database = database ?? throw new ArgumentNullException(nameof(database));
+        // database 可为 null（首次安装无老数据时，迁移按钮不显示）
+        _database = database;
         if (string.IsNullOrWhiteSpace(dataRoot))
             throw new ArgumentException("Data root is required.", nameof(dataRoot));
         _dataRoot = dataRoot;
@@ -128,9 +129,17 @@ public sealed class FirstRunWizardViewModel : ObservableObject
             return;
         }
 
-        (bool ok, string? error) =
-            LibraryRootResolver.ValidateSameVolume(_selectedLibraryPath, _dataRoot);
-        ValidationError = ok ? string.Empty : (error ?? "路径无效。");
+        // 数据与图片统一路径：不再需要同盘校验（dataRoot 跟随 libraryRoot）。
+        // 仅做基本合法性检查。
+        try
+        {
+            _ = Path.GetFullPath(_selectedLibraryPath.Trim());
+            ValidationError = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            ValidationError = $"路径无效：{ex.Message}";
+        }
         OnPropertyChanged(nameof(HasValidationError));
         RaiseCommands();
     }
@@ -138,6 +147,7 @@ public sealed class FirstRunWizardViewModel : ObservableObject
     private void MigrateNow()
     {
         if (!TryPersistRoot()) return;
+        if (_database is null) return;
 
         IsMigrating = true;
         RaiseCommands();

@@ -122,6 +122,12 @@ public sealed class AppSettings
     public string? LibraryRootPath { get; set; }
 
     /// <summary>
+    /// 用户选定的统一数据与图片存储目录（db/thumbnails/models/files/分类硬链接）。
+    /// null = 退回固定 %APPDATA% 的 configRoot。与 LibraryRootPath 同时赋值且相等。
+    /// </summary>
+    public string? DataRootPath { get; set; }
+
+    /// <summary>
     /// M11: 老用户在 W7 向导选择「跳过」迁移后置 true。软跳过语义：
     /// 不清空 images 表，画廊默认仅显示 library_hash 非空且已托管的行，
     /// 由 <see cref="ShowLegacyImages"/> 开关控制是否可见。可逆。

@@ -58,9 +58,12 @@ public partial class App : Application
         // 启动期间改为显式关闭，主窗口显示后再恢复。
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-        string dataRoot = AppDataRootResolver.ResolveDefault();
-        _logDirectory = Path.Combine(dataRoot, AppDataRootResolver.LogsFolderName);
-        EnsureDataDirectories(dataRoot);
+        // configRoot 固定在 %APPDATA%（存 config.json + logs）；
+        // dataRoot 由用户在 W7 向导中选择（db/thumbnails/models/files/分类），
+        // 未配置时退回 configRoot。logs 始终在 configRoot（便于排查启动问题）。
+        string configRoot = AppDataRootResolver.ResolveDefault();
+        _logDirectory = Path.Combine(configRoot, AppDataRootResolver.LogsFolderName);
+        EnsureConfigDirectory(configRoot);
 
         // ─── Single-instance guard ────────────────────────────────
         bool uiTestMode = DebugUiTestMode.IsWindowTargetingEnabledDefault();
@@ -97,37 +100,54 @@ public partial class App : Application
         {
             WriteLog("[BOOT] QL World starting.");
 
-            var settings = new AppSettingsService(dataRoot, WriteLog);
+            var settings = new AppSettingsService(configRoot, WriteLog);
             settings.Load();
 
-            // M11-E: W7 向导需要在 v9 schema 就位后执行老数据迁移（迁移器
-            // 写 library_files / images 新列），故先初始化 DB 再弹向导；
-            // 是否为老用户以初始化前 DB 文件是否存在判断（新安装无第二步）。
-            bool legacyDatabasePresent = File.Exists(
-                Path.Combine(dataRoot, AppDataRootResolver.DatabaseFileName));
+            // dataRoot = 用户配置的 DataRootPath 或退回 configRoot。
+            // 首次启动未配置 → W7 向导选路径后 dataRoot 更新。
+            string dataRoot = settings.DataRoot;
 
-            _database = new DatabaseService(dataRoot);
-            _database.Initialize();
+            // 老数据检测：configRoot 下是否已有 DB 文件（从旧版升级）。
+            // 有老数据时需在 W7 前初始化 DB（迁移器需要 v9 schema）。
+            bool legacyDatabasePresent = File.Exists(
+                Path.Combine(configRoot, AppDataRootResolver.DatabaseFileName));
+
+            if (legacyDatabasePresent && dataRoot == configRoot)
+            {
+                EnsureDataDirectories(configRoot);
+                _database = new DatabaseService(configRoot);
+                _database.Initialize();
+            }
 
             if (!settings.IsLibraryRootConfigured)
             {
                 var wizardViewModel = new ViewModels.FirstRunWizardViewModel(
-                    settings, _database, dataRoot, legacyDatabasePresent,
+                    settings, _database, configRoot, legacyDatabasePresent,
                     folderPicker: null, WriteLog);
                 var wizard = new Views.FirstRunWizardWindow(wizardViewModel);
                 if (wizard.ShowDialog() != true)
                 {
-                    // 用户中途关窗：未选库目录无法继续，干净退出。
                     WriteLog("[BOOT] First-run wizard cancelled; exiting.");
                     Shutdown();
                     return;
                 }
+                // W7 选完后 dataRoot 可能已改变。
+                dataRoot = settings.DataRoot;
+            }
+
+            // 在最终 dataRoot 下创建数据目录 + 初始化 DB。
+            // 若 dataRoot 与 configRoot 不同（用户选了新路径）且 DB 已在
+            // configRoot 初始化过，此处在新位置重建（老 DB 仍在 configRoot）。
+            EnsureDataDirectories(dataRoot);
+            if (_database is null || dataRoot != configRoot)
+            {
+                _database = new DatabaseService(dataRoot);
+                _database.Initialize();
             }
 
             var inspector = new ImageInspector();
             var pbrGrouping = new PbrGroupingService(_database, settings, WriteLog);
-            // M11: 传入 W7 向导选定的托管库根目录（未配置时 ImportService
-            // 回落 legacy 模式；向导已在此前完成，此时值已定）。
+            // M11: 传入 W7 向导选定的托管库根目录（= dataRoot，统一路径）。
             var importService = new ImportService(
                 _database, inspector, pbrGrouping, settings.LibraryRootPath);
             _thumbnails = new ThumbnailService(dataRoot, settings);
@@ -605,6 +625,13 @@ public partial class App : Application
         };
         window.ShowDialog();
         loginVm.RefreshNasState();
+    }
+
+    private static void EnsureConfigDirectory(string configRoot)
+    {
+        Directory.CreateDirectory(configRoot);
+        Directory.CreateDirectory(
+            Path.Combine(configRoot, AppDataRootResolver.LogsFolderName));
     }
 
     private static void EnsureDataDirectories(string dataRoot)

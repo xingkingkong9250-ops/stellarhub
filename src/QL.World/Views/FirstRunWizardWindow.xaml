@@ -32,16 +32,16 @@
 
             <!-- W7-1 标题与说明 -->
             <StackPanel Grid.Row="0">
-                <TextBlock Text="设置图片库目录" FontSize="20" FontWeight="Bold"
+                <TextBlock Text="设置数据与图片存储目录" FontSize="20" FontWeight="Bold"
                            Foreground="{DynamicResource AccentBrush}" />
                 <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" FontSize="12"
                            Foreground="{DynamicResource TextMutedBrush}"
-                           Text="导入的图片将统一复制到该目录，由千星汇图托管：物理文件按内容去重存储，并按一级分类建立硬链接视图。目录必须与数据目录位于同一 NTFS 盘符。" />
+                           Text="数据库、缩略图、AI 模型与导入的图片将统一存储在该目录下：物理文件按内容去重，并按一级分类建立硬链接视图。可选择任意盘符的目录。" />
             </StackPanel>
 
-            <!-- W7-2 库目录选择 -->
+            <!-- W7-2 存储目录选择 -->
             <TextBlock Grid.Row="1" Margin="0,18,0,0" FontSize="12"
-                       Text="图片库目录" Foreground="{DynamicResource TextSecondaryBrush}" />
+                       Text="数据与图片存储目录" Foreground="{DynamicResource TextSecondaryBrush}" />
             <Grid Grid.Row="2" Margin="0,24,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />

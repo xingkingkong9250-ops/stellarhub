@@ -49,7 +49,10 @@ public sealed class AppSettingsService
     }
 
     /// <summary>The QL World data root this settings file lives in (e.g. for the models directory).</summary>
-    public string DataRoot => _dataRoot;
+    public string DataRoot =>
+        string.IsNullOrWhiteSpace(_settings.DataRootPath)
+            ? _dataRoot
+            : _settings.DataRootPath!;
 
     public event Action? Changed;
 
@@ -125,9 +128,20 @@ public sealed class AppSettingsService
         !string.IsNullOrWhiteSpace(_settings.LibraryRootPath);
 
     /// <summary>
+    /// 用户选定的统一数据与图片存储目录。null = 回落到固定 %APPDATA% configRoot。
+    /// 与 LibraryRootPath 同时赋值且相等（W7 向导保证）。
+    /// </summary>
+    public string? DataRootPath
+    {
+        get => _settings.DataRootPath;
+        set => SetAndSave(value,
+            () => _settings.DataRootPath,
+            next => _settings.DataRootPath = next);
+    }
+
+    /// <summary>
     /// M11: 由 W7 向导调用，持久化用户选择的库目录（规范化为绝对路径）。
-    /// 同卷校验在向导层通过 <see cref="LibraryRootResolver.ValidateSameVolume"/>
-    /// 完成；这里只做空值防御与路径规范化。M11 不支持改库，故无公开 setter。
+    /// 同时写 DataRootPath（两者相等，数据和图片统一路径）。
     /// </summary>
     public void ConfigureLibraryRoot(string path)
     {
@@ -136,6 +150,11 @@ public sealed class AppSettingsService
         SetAndSave(full,
             () => _settings.LibraryRootPath,
             next => _settings.LibraryRootPath = next);
+        // 同步 DataRootPath（若不同则持久化第二次）
+        if (_settings.DataRootPath != full)
+            SetAndSave(full,
+                () => _settings.DataRootPath,
+                next => _settings.DataRootPath = next);
     }
 
     /// <summary>M11: 老用户在 W7 选择「跳过」迁移的软跳过标志位。</summary>
@@ -697,6 +716,20 @@ public sealed class AppSettingsService
             catch (Exception ex)
             {
                 Report($"Configured LibraryRootPath is not a valid path; keeping raw value.", ex);
+            }
+        }
+
+        // DataRootPath 同样规范化；空白归一化为 null。
+        if (string.IsNullOrWhiteSpace(_settings.DataRootPath))
+        {
+            _settings.DataRootPath = null;
+        }
+        else
+        {
+            try { _settings.DataRootPath = Path.GetFullPath(_settings.DataRootPath.Trim()); }
+            catch (Exception ex)
+            {
+                Report($"Configured DataRootPath is not a valid path; keeping raw value.", ex);
             }
         }
 

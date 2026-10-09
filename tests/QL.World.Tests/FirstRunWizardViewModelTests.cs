@@ -80,17 +80,16 @@ public sealed class FirstRunWizardViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Cross_volume_selection_shows_error_and_blocks_completion()
+    public void Any_drive_path_accepted_without_cross_volume_error()
     {
+        // 数据与图片统一路径后不再需要同盘校验，任意盘符路径均通过。
         var vm = CreateVm(false, () => @"D:\ql-wizard-library");
 
         vm.BrowseCommand.Execute(null);
 
-        Assert.True(vm.HasValidationError);
-        Assert.Contains("盘符", vm.ValidationError);
-        Assert.False(vm.CanProceed);
-        Assert.False(vm.ConfirmCommand.CanExecute(null));
-        Assert.False(_settings.IsLibraryRootConfigured);
+        Assert.False(vm.HasValidationError);
+        Assert.True(vm.CanProceed);
+        Assert.True(vm.ConfirmCommand.CanExecute(null));
     }
 
     [Fact]
