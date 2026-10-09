@@ -847,7 +847,7 @@ public sealed class AppSettingsService
             Math.Clamp(_settings.ThumbnailQuality, MIN_THUMBNAIL_QUALITY, MAX_THUMBNAIL_QUALITY);
 
         if (_settings.GalleryViewMode is not ("Grid" or "List" or "Browse"))
-            _settings.GalleryViewMode = "Grid";
+            _settings.GalleryViewMode = "Browse";
 
         if (string.IsNullOrWhiteSpace(_settings.GallerySort))
             _settings.GallerySort = "ImportedDesc";

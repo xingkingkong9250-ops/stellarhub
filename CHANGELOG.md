@@ -9,6 +9,46 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.12.3] — 2026-10-09 UI 调整：瀑布流默认 + 视图切换迁移 + 底部署名
+
+### 变更
+
+- **瀑布流（Browse）设为默认画廊视图**：`AppSettings.GalleryViewMode`
+  默认值从 `"Grid"` 改为 `"Browse"`；`AppSettingsService` 非法值回退
+  同步改为 `"Browse"`。全新安装与重置后开箱即瀑布流；老用户
+  `config.json` 中已持久化的合法三态值（Grid/List/Browse）不受影响。
+- **W1/A1-3 视图切换三按钮迁移至 B2 画廊工具条左侧**：原位于顶部
+  Row 1 工具条右侧的「网格/列表/浏览」三 ToggleButton 整组迁移到
+  B2 工具条左侧「显示计数」原位（位置更贴近画廊、视觉与缩放滑杆/
+  排序下拉同栏）；删除迁移后冗余的 `1×22` 分隔符。
+- **W1/B2-1 显示计数移至 W1/C1-C**：B2 工具条不再重复显示
+  「显示 N 张 / 共 M」——状态栏 C1-C 居中区早已显示同一对计数
+  （`StatusBar.FilteredCount / TotalCount`），移除 B2 重复后无信息
+  损失；B2 左侧仅保留视图切换 + 筛选摘要（`FilterSummary`）。
+- **W1/C1-NAME 底部状态栏追加软件英文名+版本号**：在 C1-R 区
+  AI 档位文本（`StatusBar.AiStatusText`）之后追加 ` · StellarHub vX.Y.Z`
+  署名。新增 `ShellViewModel.AppVersionText` 属性（`{EnglishName} v{Version}`）。
+  顶栏 W1/C1-VER 的品牌化「vX.Y.Z · 里程碑标签」展示保留不变。
+
+### 测试
+
+- `AppSettingsServiceTests`：`New_installation_uses_known_defaults` 与
+  `Unknown_theme_and_view_mode_fall_back_to_defaults` 两处
+  `GalleryViewMode` 期望值 `"Grid"` → `"Browse"`。
+- `ShellViewModelTests.Gallery_starts_empty_with_default_view_mode`：
+  断言从 `IsGridView || IsListView` 扩展为含 `IsBrowseView` 三态之一
+  （原断言默认排除 Browse，新默认为 Browse 必须更新）。
+
+### UI 编号同步
+
+- `W1/A1-3` 视图切换：位置从「顶部 Row 1 工具条右侧」改为
+  「B2 画廊工具条左侧」，编号沿用（功能未变，仅迁移位置）。
+- `W1/A1-T` 工具条行：右侧描述去掉「视图切换三按钮」，仅保留
+  「本地/共享库切换」。
+- `W1/B2-1` 计数条：重命名为「视图切换+筛选摘要」，计数显示
+  职责完全交给 `W1/C1-C`。
+- 新增 `W1/C1-NAME`：底部状态栏 AI 档位后的软件英文名+版本号署名。
+
 ## [0.11.0] — 2026-10-09 M11 图片原始文件统一托管（CAS + NTFS 硬链接分类）
 
 ### 新增

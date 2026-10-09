@@ -759,32 +759,18 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- 右侧：本地/共享库切换 + 视图切换 -->
+                <!-- 右侧：本地/共享库切换（v0.12.3：视图切换三按钮迁移至 B2 工具条左侧） -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                     <!-- U6-A B1-SCOPE: 本地库/共享库切换（仅 NAS 登录可见） -->
-                    <StackPanel Orientation="Horizontal"
-                                Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}">
-                        <ToggleButton Style="{StaticResource CompactScopeToggle}"
-                                      IsChecked="{Binding IsLocalScope}"
-                                      Content="本地库" Tag="💻" ToolTip="本地图片库" />
-                        <ToggleButton Style="{StaticResource CompactScopeToggle}" Margin="4,0,0,0"
-                                      IsChecked="{Binding IsSharedScope, Mode=OneWay}"
-                                      Command="{Binding SwitchToSharedCommand}"
-                                      Content="共享库" Tag="☁️" ToolTip="NAS 共享图库" />
-                        <Border Width="1" Height="22" Margin="12,0"
-                                Background="{DynamicResource BorderSubtleBrush}" />
-                    </StackPanel>
-
-                    <ToggleButton Style="{StaticResource CompactViewToggle}"
-                                  IsChecked="{Binding TopBar.IsGridView}"
-                                  Content="▦ 网格" Tag="▦" ToolTip="网格视图" />
-                    <ToggleButton Style="{StaticResource CompactViewToggle}" Margin="4,0,0,0"
-                                  IsChecked="{Binding Gallery.IsListView}"
-                                  Content="≡ 列表" Tag="≡" ToolTip="列表视图" />
-                    <!-- B2-3-BRW: 浏览（瀑布流）— 图片为主、极少文本 -->
-                    <ToggleButton Style="{StaticResource CompactViewToggle}" Margin="4,0,0,0"
-                                  IsChecked="{Binding TopBar.IsBrowseView}"
-                                  Content="⊞ 浏览" Tag="⊞" ToolTip="浏览视图（瀑布流）" />
+                    <ToggleButton Style="{StaticResource CompactScopeToggle}"
+                                  IsChecked="{Binding IsLocalScope}"
+                                  Content="本地库" Tag="💻" ToolTip="本地图片库"
+                                  Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}" />
+                    <ToggleButton Style="{StaticResource CompactScopeToggle}" Margin="4,0,0,0"
+                                  IsChecked="{Binding IsSharedScope, Mode=OneWay}"
+                                  Command="{Binding SwitchToSharedCommand}"
+                                  Content="共享库" Tag="☁️" ToolTip="NAS 共享图库"
+                                  Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}" />
                 </StackPanel>
             </Grid>
         </Border>
@@ -1038,13 +1024,19 @@
                     <!-- B2 toolbar -->
                     <Grid DockPanel.Dock="Top" Height="40" Margin="14,0">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="显示" VerticalAlignment="Center"
-                                       Foreground="{DynamicResource TextMutedBrush}" FontSize="12" />
-                            <TextBlock Text="{Binding Gallery.FilteredCount}" Margin="6,0,0,0"
-                                       VerticalAlignment="Center" FontWeight="SemiBold" />
-                            <TextBlock Text="张 / 共" Margin="6,0" VerticalAlignment="Center"
-                                       Foreground="{DynamicResource TextMutedBrush}" FontSize="12" />
-                            <TextBlock Text="{Binding Gallery.TotalCount}" VerticalAlignment="Center" />
+                            <!-- W1/A1-3 视图切换三态（v0.12.3：从顶部 Row 1 工具条右侧迁移至此，
+                                 显示计数移至 C1-C 状态栏居中区，本处仅保留视图切换+筛选摘要；
+                                 v0.12.3 起瀑布流（默认）置首位） -->
+                            <!-- B2-3-BRW: 浏览（瀑布流）— 图片为主、极少文本；v0.12.3 起为默认视图 -->
+                            <ToggleButton Style="{StaticResource CompactViewToggle}"
+                                          IsChecked="{Binding TopBar.IsBrowseView}"
+                                          Content="⊞ 浏览" Tag="⊞" ToolTip="浏览视图（瀑布流）" />
+                            <ToggleButton Style="{StaticResource CompactViewToggle}" Margin="4,0,0,0"
+                                          IsChecked="{Binding TopBar.IsGridView}"
+                                          Content="▦ 网格" Tag="▦" ToolTip="网格视图" />
+                            <ToggleButton Style="{StaticResource CompactViewToggle}" Margin="4,0,0,0"
+                                          IsChecked="{Binding Gallery.IsListView}"
+                                          Content="≡ 列表" Tag="≡" ToolTip="列表视图" />
                             <Border Background="{DynamicResource BorderSubtleBrush}"
                                     Width="1" Height="16" Margin="10,0" />
                             <TextBlock Text="{Binding Gallery.FilterSummary}" FontSize="12"
@@ -1635,6 +1627,13 @@
                         <TextBlock Text="{Binding StatusBar.AiStatusText}" FontSize="12"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    VerticalAlignment="Center" />
+                        <!-- W1/C1-NAME (v0.12.3)：AI 档位后追加软件英文名称+版本号 -->
+                        <TextBlock Text=" · " FontSize="11"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding AppVersionText}" FontSize="11"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   VerticalAlignment="Center" Margin="2,0,0,0" />
                     </StackPanel>
                 </Grid>
                 <!-- U2-A: indeterminate brand-gradient loading bar (import / AI / thumbnail generation) -->

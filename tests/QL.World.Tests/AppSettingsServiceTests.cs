@@ -33,7 +33,7 @@ public sealed class AppSettingsServiceTests : IDisposable
         Assert.True(settings.CheckIntegrityOnStartup);
         Assert.Equal(200, settings.ThumbnailSize);
         Assert.Equal(82, settings.ThumbnailQuality);
-        Assert.Equal("Grid", settings.GalleryViewMode);
+        Assert.Equal("Browse", settings.GalleryViewMode);
         Assert.Equal("ImportedDesc", settings.GallerySort);
     }
 
@@ -102,7 +102,7 @@ public sealed class AppSettingsServiceTests : IDisposable
         settings.Load();
 
         Assert.Equal("Dark", settings.Theme);
-        Assert.Equal("Grid", settings.GalleryViewMode);
+        Assert.Equal("Browse", settings.GalleryViewMode);
     }
 
     [Fact]

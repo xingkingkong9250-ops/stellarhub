@@ -92,8 +92,11 @@ public sealed class ShellViewModelTests : IDisposable
     public void Gallery_starts_empty_with_default_view_mode()
     {
         Assert.Empty(_viewModel.Gallery.Items);
+        // v0.12.3: 默认视图模式从 Grid 改为 Browse；三态必有其一为 true
         Assert.True(
-            _viewModel.Gallery.IsGridView || _viewModel.Gallery.IsListView);
+            _viewModel.Gallery.IsGridView
+            || _viewModel.Gallery.IsListView
+            || _viewModel.Gallery.IsBrowseView);
     }
 
     // ─── A1-10 (v0.8.0): 主动刷新 = 重扫监控目录（幂等）+ 重载画廊 ──────────

@@ -459,6 +459,13 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public string VersionText => $"v{AppInfo.Version} · {AppInfo.MilestoneLabel}";
     public string AiStatusText => "AI：关闭";
 
+    /// <summary>
+    /// W1/C1-NAME (v0.12.3): 底部状态栏在 AI 档位之后追加显示
+    /// 「{EnglishName} v{Version}」。顶栏 W1/C1-VER 保留品牌化
+    /// 「vX.Y.Z · 里程碑标签」展示，本属性仅用于底部简洁署名。
+    /// </summary>
+    public string AppVersionText => $"{AppInfo.EnglishName} v{AppInfo.Version}";
+
     // ─── U3-C (§4.E.3): B1-COL collapsible sidebar sections ────────────────
     // Expanded state persists; collapsed headers show the child count as (N).
 

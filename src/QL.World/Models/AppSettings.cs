@@ -23,8 +23,9 @@ public sealed class AppSettings
     /// <summary>WebP encoder quality (30–100).</summary>
     public int ThumbnailQuality { get; set; } = 82;
 
-    /// <summary>W1/B2 gallery presentation: "Grid" / "List" / "Browse".</summary>
-    public string GalleryViewMode { get; set; } = "Grid";
+    /// <summary>W1/B2 gallery presentation: "Grid" / "List" / "Browse".
+    /// v0.12.3: 默认从 "Grid" 改为 "Browse"（瀑布流），用户可经视图切换回退。</summary>
+    public string GalleryViewMode { get; set; } = "Browse";
 
     /// <summary>W1/B2-2 last chosen sort key.</summary>
     public string GallerySort { get; set; } = "ImportedDesc";
