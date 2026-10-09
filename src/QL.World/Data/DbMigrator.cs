@@ -11,7 +11,7 @@ namespace QL.World.Data;
 /// </summary>
 internal static class DbMigrator
 {
-    private const int CURRENT_VERSION = 8;
+    private const int CURRENT_VERSION = 9;
 
     public static void Migrate(SqliteConnection connection)
     {
@@ -35,6 +35,16 @@ internal static class DbMigrator
                 // dominant_colors JSON in the same transaction (pure HSV math).
                 if (target == 5)
                     BackfillColorFamilies(connection, transaction);
+
+                // M11-A: v9 adds the library-managed storage columns
+                // (library_hash / library_path / original_path /
+                // entry_code) and the CAS + entry-code-counter tables.
+                // Backfill library_hash ← file_hash and original_path ←
+                // file_path so every pre-M11 row points at the software
+                // library without a costly copy here; the M11-E wizard
+                // fills library_path / entry_code and moves bytes.
+                if (target == 9)
+                    BackfillLibraryHash(connection, transaction);
 
                 command.CommandText = $"PRAGMA user_version = {target};";
                 command.ExecuteNonQuery();
@@ -88,6 +98,28 @@ internal static class DbMigrator
             update.Parameters.AddWithValue("$id", id);
             update.ExecuteNonQuery();
         }
+    }
+
+    /// <summary>
+    /// Fills library_hash ← file_hash and original_path ← file_path for
+    /// pre-M11 rows. Physical files are not copied here — the M11-E
+    /// migration wizard handles that (source=local rows are copied +
+    /// hardlinked, source=remote rows are skipped + logged per the NAS
+    /// bypass constraint). library_path and entry_code stay NULL until
+    /// the wizard runs. A single UPDATE is atomic and safe; file_hash is
+    /// NOT NULL in the v1 schema so every row qualifies.
+    /// </summary>
+    private static void BackfillLibraryHash(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        using var update = connection.CreateCommand();
+        update.Transaction = transaction;
+        update.CommandText = """
+            UPDATE images
+            SET library_hash = file_hash,
+                original_path = file_path
+            WHERE library_hash IS NULL;
+            """;
+        update.ExecuteNonQuery();
     }
 
     private static int ReadUserVersion(SqliteConnection connection)

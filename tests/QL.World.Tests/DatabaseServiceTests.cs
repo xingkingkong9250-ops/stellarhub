@@ -32,6 +32,9 @@ public sealed class DatabaseServiceTests
             Assert.Contains("pbr_group_images", tables);
             // M5-G: persistent download queue table.
             Assert.Contains("download_queue", tables);
+            // M11-A: CAS physical layer + entry-code counter.
+            Assert.Contains("library_files", tables);
+            Assert.Contains("entry_code_counter", tables);
         });
     }
 
@@ -46,7 +49,7 @@ public sealed class DatabaseServiceTests
             command.CommandText = "PRAGMA user_version;";
             return Convert.ToInt32(command.ExecuteScalar());
         });
-        Assert.Equal(8, version);
+        Assert.Equal(9, version);
 
         // Second Initialize must not throw or duplicate anything.
         library.Db.Initialize();
@@ -100,7 +103,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(8, migrated);
+            Assert.Equal(9, migrated);
 
             var (tableCount, imageCount) = db.Run(conn =>
             {
@@ -196,7 +199,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(8, version);
+            Assert.Equal(9, version);
 
             var families = db.Run(conn =>
             {
@@ -310,7 +313,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(8, version);
+            Assert.Equal(9, version);
 
             // source column exists with DEFAULT 'local' and backfilled the v5 row.
             string sourceDefault = db.Run(conn =>
@@ -353,6 +356,89 @@ public sealed class DatabaseServiceTests
             Assert.Equal(2, indexCount);
 
             // Idempotent re-init stays at v7.
+            db.Initialize();
+            Assert.Equal("ok", db.QuickIntegrityCheck());
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            try { Directory.Delete(directory, recursive: true); }
+            catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void Migration_to_v9_backfills_library_hash_and_original_path()
+    {
+        string directory = Path.Combine(
+            Path.GetTempPath(), "ql-world-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            // Build a v8 database (run all schemas 1..8) with one local row
+            // whose file_hash / file_path should be mirrored into the new
+            // library-managed columns by the v9 backfill.
+            string databasePath = Path.Combine(directory, "qlworld.db");
+            using (var bootstrap = new SqliteConnection($"Data Source={databasePath}"))
+            {
+                bootstrap.Open();
+                foreach (int v in new[] { 1, 2, 3, 4, 5, 6, 7, 8 })
+                {
+                    using var schema = bootstrap.CreateCommand();
+                    schema.CommandText = DbMigrator.LoadSchemaSql(v);
+                    schema.ExecuteNonQuery();
+                }
+                using var versionCmd = bootstrap.CreateCommand();
+                versionCmd.CommandText = "PRAGMA user_version = 8;";
+                versionCmd.ExecuteNonQuery();
+
+                using var seed = bootstrap.CreateCommand();
+                seed.CommandText = """
+                    INSERT INTO images
+                        (file_path, file_name, sortable_name, file_hash, file_size,
+                         width, height, format, rating, notes, primary_category,
+                         dominant_colors, is_missing, created_at, updated_at)
+                    VALUES ('C:\old\img.png', 'img.png', 'img.png', 'a1b2c3', 1,
+                            4, 4, 'png', 0, '', NULL, NULL, 0,
+                            '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+                    """;
+                seed.ExecuteNonQuery();
+            }
+
+            using var db = new DatabaseService(directory);
+            db.Initialize();
+
+            int version = db.Run(conn =>
+            {
+                using var command = conn.CreateCommand();
+                command.CommandText = "PRAGMA user_version;";
+                return Convert.ToInt32(command.ExecuteScalar());
+            });
+            Assert.Equal(9, version);
+
+            var (libraryHash, originalPath, libraryPath, entryCode) = db.Run(conn =>
+            {
+                using var command = conn.CreateCommand();
+                command.CommandText = """
+                    SELECT library_hash, original_path, library_path, entry_code
+                    FROM images WHERE file_hash = 'a1b2c3';
+                    """;
+                using var reader = command.ExecuteReader();
+                reader.Read();
+                return (
+                    reader.IsDBNull(0) ? null : reader.GetString(0),
+                    reader.IsDBNull(1) ? null : reader.GetString(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2),
+                    reader.IsDBNull(3) ? null : reader.GetString(3));
+            });
+            // Backfill mirrored file_hash → library_hash and file_path → original_path.
+            Assert.Equal("a1b2c3", libraryHash);
+            Assert.Equal(@"C:\old\img.png", originalPath);
+            // library_path / entry_code stay NULL until the M11-E wizard runs.
+            Assert.Null(libraryPath);
+            Assert.Null(entryCode);
+
+            // Idempotent: re-init does not re-touch rows or throw.
             db.Initialize();
             Assert.Equal("ok", db.QuickIntegrityCheck());
         }

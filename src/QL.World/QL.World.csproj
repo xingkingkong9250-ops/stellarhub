@@ -41,6 +41,7 @@
     <EmbeddedResource Include="Data\Schema.v6.sql" />
     <EmbeddedResource Include="Data\Schema.v7.sql" />
     <EmbeddedResource Include="Data\Schema.v8.sql" />
+    <EmbeddedResource Include="Data\Schema.v9.sql" />
     <EmbeddedResource Include="Assets\Ml\text-embeddings-clip-vit-b32.json" />
     <EmbeddedResource Include="Assets\Ml\vocab.json" />
     <EmbeddedResource Include="Assets\Ml\merges.txt" />
