@@ -373,9 +373,12 @@ public sealed class AiLearningService
 
             if (refined.Count == 0)
                 return result;
+            // M12 (v0.13.0): 重排后标签变了，重新推导分类。
+            string? derivedCategory = TaxonomyService.DeriveCategory(refined)
+                ?? result.PrimaryCategory;
             return new AiAnalysisResult
             {
-                PrimaryCategory = result.PrimaryCategory,
+                PrimaryCategory = derivedCategory,
                 Tags = refined,
                 Embedding = result.Embedding,
                 ModelId = result.ModelId,

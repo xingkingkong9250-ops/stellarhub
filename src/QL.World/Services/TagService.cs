@@ -190,6 +190,31 @@ public sealed class TagService
             return result;
         });
 
+    /// <summary>
+    /// M12 (v0.13.0): 用户手动加/删标签后调用——读取该图全部标签，
+    /// 用 TaxonomyService 重新推导 primary_category 并无条件写入。
+    /// 不走 AddTags（避免触发 TagAdded 事件循环）。
+    /// </summary>
+    public void RecomputeCategoryForImage(long imageId)
+    {
+        IReadOnlyList<ImageTagRecord> tags = GetTagsForImage(imageId);
+        string? derived = TaxonomyService.DeriveCategory(
+            tags.Select(t => t.Tag).ToList());
+        _db.Run(conn =>
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                UPDATE images
+                SET primary_category = $cat, updated_at = $now
+                WHERE id = $id;
+                """;
+            cmd.Parameters.AddNullable("$cat", derived);
+            cmd.Parameters.AddWithValue("$now", DbTime.Now());
+            cmd.Parameters.AddWithValue("$id", imageId);
+            cmd.ExecuteNonQuery();
+        });
+    }
+
     /// <summary>B1-3: most used tags with counts.</summary>
     public IReadOnlyList<TagCount> GetTopTags(int limit = 50) =>
         _db.Run(conn =>

@@ -392,4 +392,178 @@ public sealed class AiAnalysisServiceTests : IDisposable
         Assert.Equal(ModelManifest.ModelId, row.ModelId);
         Assert.Equal(512, row.Dim);
     }
+
+    // ─── M12-B (v0.13.0): 标签驱动分类推导 ──────────────────────────
+
+    [Fact]
+    public async Task RunBatch_derives_category_from_taxonomy_tags()
+    {
+        long id = _lib.InsertImage();
+        var ai = new FakeAiService
+        {
+            AnalyzeFunc = _ => new AiAnalysisResult
+            {
+                // AI 返回"场景"，但标签里有"骑士"（角色组）——推导结果应覆盖
+                PrimaryCategory = "场景",
+                Tags = [new AiTag("骑士", 0.9), new AiTag("写实", 0.7)],
+            },
+        };
+        var notifications = new NotificationService();
+        var tags = new TagService(_lib.Db);
+        var analysis = new AiAnalysisService(ai, _lib.Db, tags, notifications);
+
+        await analysis.RunBatchAsync();
+
+        string? category = _lib.Db.Run(conn =>
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT primary_category FROM images WHERE id = $id;";
+            cmd.Parameters.AddWithValue("$id", id);
+            return cmd.ExecuteScalar()?.ToString();
+        });
+        // 骑士→角色（分类组），推导为角色，覆盖 AI 原始的"场景"
+        Assert.Equal("角色", category);
+    }
+
+    [Fact]
+    public async Task RunBatch_falls_back_to_ai_category_when_tags_not_in_taxonomy()
+    {
+        long id = _lib.InsertImage();
+        var ai = new FakeAiService
+        {
+            AnalyzeFunc = _ => new AiAnalysisResult
+            {
+                PrimaryCategory = "场景",
+                Tags = [new AiTag("硬表面", 0.9), new AiTag("机械", 0.8)],
+            },
+        };
+        var notifications = new NotificationService();
+        var tags = new TagService(_lib.Db);
+        var analysis = new AiAnalysisService(ai, _lib.Db, tags, notifications);
+
+        await analysis.RunBatchAsync();
+
+        string? category = _lib.Db.Run(conn =>
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT primary_category FROM images WHERE id = $id;";
+            cmd.Parameters.AddWithValue("$id", id);
+            return cmd.ExecuteScalar()?.ToString();
+        });
+        // 硬表面/机械不在词表 → 推导为 null → 回退 AI 原始"场景"
+        Assert.Equal("场景", category);
+    }
+
+    [Fact]
+    public async Task RunBatch_derives_null_when_only_filter_tags()
+    {
+        long id = _lib.InsertImage();
+        var ai = new FakeAiService
+        {
+            AnalyzeFunc = _ => new AiAnalysisResult
+            {
+                PrimaryCategory = null,
+                Tags = [new AiTag("写实", 0.9), new AiTag("自然光", 0.8)],
+            },
+        };
+        var notifications = new NotificationService();
+        var tags = new TagService(_lib.Db);
+        var analysis = new AiAnalysisService(ai, _lib.Db, tags, notifications);
+
+        await analysis.RunBatchAsync();
+
+        string? category = _lib.Db.Run(conn =>
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT primary_category FROM images WHERE id = $id;";
+            cmd.Parameters.AddWithValue("$id", id);
+            return cmd.ExecuteScalar()?.ToString();
+        });
+        // 写实/自然光都是筛选组标签 → 推导为 null → AI PrimaryCategory 也为 null → 不写入
+        Assert.True(string.IsNullOrEmpty(category));
+    }
+
+    [Fact]
+    public async Task RunBatch_multi_category_derives_by_tag_count()
+    {
+        long id = _lib.InsertImage();
+        var ai = new FakeAiService
+        {
+            AnalyzeFunc = _ => new AiAnalysisResult
+            {
+                Tags = [new AiTag("骑士", 0.9), new AiTag("士兵", 0.8),
+                        new AiTag("森林", 0.7)],
+            },
+        };
+        var notifications = new NotificationService();
+        var tags = new TagService(_lib.Db);
+        var analysis = new AiAnalysisService(ai, _lib.Db, tags, notifications);
+
+        await analysis.RunBatchAsync();
+
+        string? category = _lib.Db.Run(conn =>
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT primary_category FROM images WHERE id = $id;";
+            cmd.Parameters.AddWithValue("$id", id);
+            return cmd.ExecuteScalar()?.ToString();
+        });
+        // 角色×2（骑士+士兵）vs 场景×1（森林）→ 角色
+        Assert.Equal("角色", category);
+    }
+
+    [Fact]
+    public void RecomputeCategoryForImage_updates_category_from_tags()
+    {
+        long id = _lib.InsertImage();
+        var tags = new TagService(_lib.Db);
+
+        // 手动加标签：骑士（角色组）+ 金属（质感组）
+        tags.AddTags([id], ["骑士", "金属"], TagSource.Manual);
+
+        // 初次推导：角色×1 vs 质感×1 → 平局 → Categories 中角色在质感前面 → 角色
+        tags.RecomputeCategoryForImage(id);
+
+        string? category = _lib.Db.Run(conn =>
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT primary_category FROM images WHERE id = $id;";
+            cmd.Parameters.AddWithValue("$id", id);
+            return cmd.ExecuteScalar()?.ToString();
+        });
+        Assert.Equal("角色", category);
+
+        // 再加一个质感标签：石材 → 质感×2 vs 角色×1 → 质感
+        tags.AddTags([id], ["石材"], TagSource.Manual);
+        tags.RecomputeCategoryForImage(id);
+
+        category = _lib.Db.Run(conn =>
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT primary_category FROM images WHERE id = $id;";
+            cmd.Parameters.AddWithValue("$id", id);
+            return cmd.ExecuteScalar()?.ToString();
+        });
+        Assert.Equal("质感", category);
+    }
+
+    [Fact]
+    public void RecomputeCategoryForImage_sets_null_when_no_category_tags()
+    {
+        long id = _lib.InsertImage(category: "角色");
+        var tags = new TagService(_lib.Db);
+
+        // 只加筛选组标签
+        tags.AddTags([id], ["写实", "自然光"], TagSource.Manual);
+        tags.RecomputeCategoryForImage(id);
+
+        string? category = _lib.Db.Run(conn =>
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT primary_category FROM images WHERE id = $id;";
+            cmd.Parameters.AddWithValue("$id", id);
+            return cmd.ExecuteScalar()?.ToString();
+        });
+        Assert.True(string.IsNullOrEmpty(category));
+    }
 }

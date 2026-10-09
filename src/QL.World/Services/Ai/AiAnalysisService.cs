@@ -253,8 +253,11 @@ public sealed class AiAnalysisService
             _tags.AddTags([imageId], tagInputs, TagSource.Ai);
         }
 
-        // Primary category (only when NULL).
-        if (!string.IsNullOrWhiteSpace(result.PrimaryCategory))
+        // M12 (v0.13.0): 标签驱动分类——由 TaxonomyService 从标签推导
+        // primary_category，推导失败才回退 AI 原始 PrimaryCategory。
+        string? derivedCategory = TaxonomyService.DeriveCategory(result.Tags);
+        string? finalCategory = derivedCategory ?? result.PrimaryCategory;
+        if (!string.IsNullOrWhiteSpace(finalCategory))
         {
             _db.Run(conn =>
             {
@@ -264,7 +267,7 @@ public sealed class AiAnalysisService
                     SET primary_category = $cat, updated_at = $now
                     WHERE id = $id AND primary_category IS NULL;
                     """;
-                cmd.Parameters.AddWithValue("$cat", result.PrimaryCategory);
+                cmd.Parameters.AddWithValue("$cat", finalCategory);
                 cmd.Parameters.AddWithValue("$now", DbTime.Now());
                 cmd.Parameters.AddWithValue("$id", imageId);
                 cmd.ExecuteNonQuery();
