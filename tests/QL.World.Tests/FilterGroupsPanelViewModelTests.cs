@@ -1,3 +1,4 @@
+using QL.World.Models;
 using QL.World.Models.Taxonomy;
 using QL.World.Services;
 using QL.World.Tests.Support;
@@ -46,6 +47,41 @@ public sealed class FilterGroupsPanelViewModelTests : IDisposable
             _panel.GroupsBeforePalette[1].Chips.Count);
         Assert.Equal(FilterGroupsPanelViewModel.PaletteHexes.Count,
             _panel.Palette.Swatches.Count);
+    }
+
+    [Fact]
+    public void Panel_builds_three_single_select_attribute_groups()
+    {
+        // v0.13.5：原 B1-5 三维（分辨率/文件大小/评分）并入 B1-6-8/9/10。
+        Assert.Equal(
+            ["分辨率（长边）", "文件大小", "评分"],
+            _panel.AttributeGroups.Select(g => g.GroupName));
+        Assert.All(_panel.AttributeGroups, g => Assert.Equal(4, g.Chips.Count));
+        Assert.DoesNotContain(_panel.AttributeGroups.SelectMany(g => g.Chips),
+            c => c.Tag == "全部"); // 无「全部」chip，点已选项即清除
+    }
+
+    [Fact]
+    public void Single_select_attribute_group_is_mutually_exclusive_and_toggle_off()
+    {
+        SingleSelectFilterGroupViewModel resolution = _panel.AttributeGroups[0];
+        FilterTagChipViewModel small = resolution.Chips[0];   // <1024
+        FilterTagChipViewModel large = resolution.Chips[^1];  // ≥4096
+
+        small.SelectCommand.Execute(null);
+        Assert.True(small.IsActive);
+        Assert.Equal(ResolutionBuckets.Lt1024, _gallery.Filter.ResolutionBucket);
+
+        // 选另一桶 → 互斥切换，前一个自动取消。
+        large.SelectCommand.Execute(null);
+        Assert.False(small.IsActive);
+        Assert.True(large.IsActive);
+        Assert.Equal(ResolutionBuckets.Ge4096, _gallery.Filter.ResolutionBucket);
+
+        // 再点当前桶 → 取消，维度回到 null。
+        large.SelectCommand.Execute(null);
+        Assert.False(large.IsActive);
+        Assert.Null(_gallery.Filter.ResolutionBucket);
     }
 
     [Fact]
@@ -109,9 +145,13 @@ public sealed class FilterGroupsPanelViewModelTests : IDisposable
         _panel.GroupsBeforePalette[0].Chips[0].SelectCommand.Execute(null);
         _panel.GroupsAfterPalette[0].Chips[0].SelectCommand.Execute(null);
         _panel.Palette.Swatches[0].SelectCommand.Execute(null);
+        _panel.AttributeGroups[0].Chips[0].SelectCommand.Execute(null);
+        _panel.AttributeGroups[2].Chips[0].SelectCommand.Execute(null);
         Assert.NotNull(_gallery.Filter.ArtStyleTags);
         Assert.NotNull(_gallery.Filter.CompositionTags);
         Assert.NotNull(_gallery.Filter.ColorPaletteHexes);
+        Assert.NotNull(_gallery.Filter.ResolutionBucket);
+        Assert.NotNull(_gallery.Filter.RatingBucket);
 
         _panel.ResetSelection();
 
@@ -122,9 +162,13 @@ public sealed class FilterGroupsPanelViewModelTests : IDisposable
         Assert.Null(_gallery.Filter.ConditionTags);
         Assert.Null(_gallery.Filter.FileFormats);
         Assert.Null(_gallery.Filter.ColorPaletteHexes);
+        Assert.Null(_gallery.Filter.ResolutionBucket);
+        Assert.Null(_gallery.Filter.FileSizeBucket);
+        Assert.Null(_gallery.Filter.RatingBucket);
         Assert.All(_panel.GroupsBeforePalette.SelectMany(g => g.Chips), c => Assert.False(c.IsActive));
         Assert.All(_panel.GroupsAfterPalette.SelectMany(g => g.Chips), c => Assert.False(c.IsActive));
         Assert.All(_panel.Palette.Swatches, s => Assert.False(s.IsActive));
+        Assert.All(_panel.AttributeGroups.SelectMany(g => g.Chips), c => Assert.False(c.IsActive));
     }
 
     [Fact]

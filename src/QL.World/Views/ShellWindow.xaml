@@ -1090,72 +1090,14 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <!-- U3-A (§4.B.2): B1-5 属性筛选（默认收起，折叠态持久化） -->
-                        <ToggleButton Margin="2,16,0,0"
-                                      Style="{StaticResource SidebarSectionHeaderStyle}"
-                                      AutomationProperties.Name="属性筛选"
-                                      IsChecked="{Binding AttributeFilter.IsExpanded}"
-                                      Content="属性筛选" />
-                        <StackPanel Margin="2,0,0,0"
-                                    Visibility="{Binding AttributeFilter.IsExpanded, Converter={StaticResource BoolVis}}">
-                            <!-- v0.13.4: 原 B1-5-1「颜色」色族筛选与 B1-6-3 色彩倾向色板
-                                 功能重叠（均筛 color_family），已合并进 B1-6-3，编号作废不复用 -->
-                            <!-- B1-5-2 分辨率 -->
-                            <TextBlock Text="分辨率（长边）" Margin="2,2,0,0" FontSize="11"
-                                       Foreground="{DynamicResource TextMutedBrush}" />
-                            <ItemsControl ItemsSource="{Binding AttributeFilter.ResolutionOptions}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Button Style="{StaticResource FilterChipStyle}"
-                                                Content="{Binding Display}"
-                                                Command="{Binding SelectCommand}" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <!-- B1-5-3 文件大小 -->
-                            <TextBlock Text="文件大小" Margin="2,2,0,0" FontSize="11"
-                                       Foreground="{DynamicResource TextMutedBrush}" />
-                            <ItemsControl ItemsSource="{Binding AttributeFilter.FileSizeOptions}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Button Style="{StaticResource FilterChipStyle}"
-                                                Content="{Binding Display}"
-                                                Command="{Binding SelectCommand}" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <!-- B1-5-4 评分 -->
-                            <TextBlock Text="评分" Margin="2,2,0,0" FontSize="11"
-                                       Foreground="{DynamicResource TextMutedBrush}" />
-                            <ItemsControl ItemsSource="{Binding AttributeFilter.RatingOptions}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Button Style="{StaticResource FilterChipStyle}"
-                                                Content="{Binding Display}"
-                                                Command="{Binding SelectCommand}" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
+                        <!-- v0.13.5: 原 B1-5「属性筛选」分区整体作废——颜色（v0.13.4）、
+                             分辨率/文件大小/评分（v0.13.5）全部并入 B1-6 筛选标签组，
+                             B1-5 及 B1-5-1~4 编号作废永不复用。 -->
 
-                        <!-- M12-F (v0.13.0): B1-6 筛选标签组（默认收起，折叠态持久化）。
-                             7 个子组：美术风格/文件格式（chips）→ 色彩倾向（色板）→
-                             画面构图/灯光氛围/题材气质/状态形容（chips）；
+                        <!-- M12-F (v0.13.0) / v0.13.5: B1-6 筛选标签组（默认收起，折叠态持久化）。
+                             10 个子项：美术风格/文件格式（chips）→ 色彩倾向（色板）→
+                             画面构图/灯光氛围/题材气质/状态形容（chips）→
+                             分辨率/文件大小/评分（单选桶 chips，原 B1-5）；
                              组内 OR、组间 AND（LibraryFilter 各字段） -->
                         <ToggleButton Margin="2,16,0,0"
                                       Style="{StaticResource SidebarSectionHeaderStyle}"
@@ -1186,6 +1128,9 @@
                             </ItemsControl>
                             <!-- B1-6-4 画面构图 / B1-6-5 灯光氛围 / B1-6-6 题材气质 / B1-6-7 状态形容 -->
                             <ItemsControl ItemsSource="{Binding FilterGroups.GroupsAfterPalette}"
+                                          ItemTemplate="{StaticResource FilterGroupTemplate}" />
+                            <!-- B1-6-8 分辨率（长边）/ B1-6-9 文件大小 / B1-6-10 评分（单选桶，原 B1-5-2/3/4） -->
+                            <ItemsControl ItemsSource="{Binding FilterGroups.AttributeGroups}"
                                           ItemTemplate="{StaticResource FilterGroupTemplate}" />
                         </StackPanel>
                     </StackPanel>

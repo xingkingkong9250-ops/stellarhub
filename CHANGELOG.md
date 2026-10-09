@@ -9,6 +9,34 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.13.5] — 2026-10-09 UI 合并：属性筛选三维并入筛选标签组（B1-5 作废）
+
+### 变更
+
+- **B1-5 属性筛选分区整体取消（B1-5 及 B1-5-2/3/4 作废）**：分辨率（长边）/
+  文件大小/评分三维本质都是辅助筛选标签，与 B1-6 筛选标签组合并——
+  左栏筛选能力统一收口到 B1-6 一处。B1-5 区块从 ShellWindow.xaml 删除，
+  `SidebarSectionHeaderStyle` 折叠头与 `sidebar_attribute_filter_expanded`
+  持久化设置项同步移除（AppSettings/AppSettingsService）。
+- 新增 B1-6-8/9/10 三个**单选**桶组（`SingleSelectFilterGroupViewModel`，
+  复用 FilterGroupTemplate 与多选标签组外形一致）：组内互斥、再点取消、
+  无「全部」占位 chip；点击写 `Filter.ResolutionBucket/FileSizeBucket/
+  RatingBucket`，「清除全部筛选」一并重置。原 `AttributeFilterViewModel`
+  整文件删除，`AttributeFilterDisplay`（桶文案 switch）迁入
+  FilterGroupsPanelViewModel.cs（Support 命名空间）。
+- `docs/UI_NUMBERING.md`：B1-5、B1-5-1~4 全部标记**已作废永不复用**；
+  新增 B1-6-8/9/10 三行；B1-6 改 10 项。冒烟脚本 UiSmokeU3 同步：
+  四分区断言（属性筛选标题不存在）、「全部」chip 全局 =0、
+  B1-6-8/10 桶 chip（`<1024`/`未评分`）存在性。
+
+### 测试
+
+- 新增 2 项：`Panel_builds_three_single_select_attribute_groups`（组名序/
+  各 4 chips/无「全部」）、`Single_select_attribute_group_is_mutually_
+  exclusive_and_toggle_off`（互斥切换 + 再点取消回 null）；
+  `ResetSelection_clears_all_groups_and_palette` 扩展属性桶断言。
+  测试总数 781 → 783，全绿。
+
 ## [0.13.4] — 2026-10-09 UI 合并：颜色色族筛选并入色彩倾向色板
 
 ### 变更

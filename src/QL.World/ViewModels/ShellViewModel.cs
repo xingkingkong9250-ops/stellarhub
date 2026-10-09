@@ -37,7 +37,6 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         TagTree = new TagTreeViewModel(Gallery, services.ImageQuery, services.Tags);
         CollectionTree = new CollectionTreeViewModel(Gallery, services.Collections);
         PbrGroupTree = new PbrGroupTreeViewModel(Gallery, services.PbrGrouping);
-        AttributeFilter = new AttributeFilterViewModel(Gallery, services.Settings);
         FilterGroups = new FilterGroupsPanelViewModel(Gallery, services.Settings);
         Detail = new DetailViewModel(services.ImageQuery, services.Tags, Gallery, services.SemanticSearch);
         StatusBar = new StatusBarViewModel(services.Thumbnails, services.Settings);
@@ -169,7 +168,6 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public TagTreeViewModel TagTree { get; }
     public CollectionTreeViewModel CollectionTree { get; }
     public PbrGroupTreeViewModel PbrGroupTree { get; }
-    public AttributeFilterViewModel AttributeFilter { get; }
     public FilterGroupsPanelViewModel FilterGroups { get; }
     public DetailViewModel Detail { get; }
     public StatusBarViewModel StatusBar { get; }
@@ -1026,7 +1024,6 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         TagTree.ResetSelection();
         CollectionTree.ResetSelection();
         PbrGroupTree.ResetSelection();
-        AttributeFilter.ResetSelection();
         FilterGroups.ResetSelection();
         _ = Gallery.RefreshAsync();
     }

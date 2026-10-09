@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- 版本号唯一来源；脚本与界面均从此读取，禁止在别处硬编码 -->
-    <Version>0.13.4</Version>
+    <Version>0.13.5</Version>
     <!-- 品牌图标（猫与星光相框）；同时作为窗口/任务栏/EXE 图标 -->
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <AssemblyName>StellarHub</AssemblyName>

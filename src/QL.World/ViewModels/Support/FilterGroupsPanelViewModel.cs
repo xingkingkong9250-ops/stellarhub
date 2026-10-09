@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows.Media;
 using QL.World.Helpers;
+using QL.World.Models;
 using QL.World.Models.Taxonomy;
 using QL.World.Services;
 
@@ -12,6 +13,8 @@ namespace QL.World.ViewModels.Support;
 /// （语义由 LibraryFilter 各字段 + ImageQueryService 定义）。组内已选集合
 /// 非空时写入对应 LibraryFilter 字段，全不选时写 null（该维度不激活）。
 /// 色板 hex 经 ColorFamily.HexToFamily 映射为色族后匹配 i.color_family。
+/// v0.13.5：原 B1-5 属性筛选三维（分辨率/文件大小/评分）并入本面板尾部
+/// （B1-6-8/9/10，单选桶，点已选项取消），B1-5 整个分区作废。
 /// </summary>
 public sealed class FilterGroupsPanelViewModel : ObservableObject
 {
@@ -56,6 +59,37 @@ public sealed class FilterGroupsPanelViewModel : ObservableObject
         Palette = new ColorPaletteViewModel(
             PaletteHexes,
             list => ApplyAndRefresh(() => _gallery.Filter.ColorPaletteHexes = list));
+        // v0.13.5：原 B1-5 三维属性桶（单选；无「全部」chip，点已选项即清除）。
+        AttributeGroups =
+        [
+            new SingleSelectFilterGroupViewModel(
+                "分辨率（长边）",
+                [
+                    ("<1024", ResolutionBuckets.Lt1024),
+                    ("1024–2047", ResolutionBuckets.From1024To2047),
+                    ("2048–4095", ResolutionBuckets.From2048To4095),
+                    ("≥4096", ResolutionBuckets.Ge4096),
+                ],
+                v => ApplyAndRefresh(() => _gallery.Filter.ResolutionBucket = v)),
+            new SingleSelectFilterGroupViewModel(
+                "文件大小",
+                [
+                    ("<1 MB", FileSizeBuckets.Lt1Mb),
+                    ("1–5 MB", FileSizeBuckets.From1To5Mb),
+                    ("5–20 MB", FileSizeBuckets.From5To20Mb),
+                    ("≥20 MB", FileSizeBuckets.Ge20Mb),
+                ],
+                v => ApplyAndRefresh(() => _gallery.Filter.FileSizeBucket = v)),
+            new SingleSelectFilterGroupViewModel(
+                "评分",
+                [
+                    ("未评分", RatingBuckets.Unrated),
+                    ("≥3 ★", RatingBuckets.Ge3),
+                    ("≥4 ★", RatingBuckets.Ge4),
+                    ("5 ★", RatingBuckets.Eq5),
+                ],
+                v => ApplyAndRefresh(() => _gallery.Filter.RatingBucket = v)),
+        ];
     }
 
     /// <summary>B1-6 section expanded state; persisted, default collapsed.</summary>
@@ -81,7 +115,10 @@ public sealed class FilterGroupsPanelViewModel : ObservableObject
     /// <summary>色板之后的 chip 组（画面构图、灯光氛围、题材气质、状态形容）。</summary>
     public IReadOnlyList<FilterGroupViewModel> GroupsAfterPalette { get; }
 
-    /// <summary>清除全部筛选时重置所有 chips 与色板（不触发画廊刷新，由调用方统一刷新）。</summary>
+    /// <summary>B1-6-8/9/10 单选属性桶（分辨率/文件大小/评分），v0.13.5 自 B1-5 并入。</summary>
+    public IReadOnlyList<SingleSelectFilterGroupViewModel> AttributeGroups { get; }
+
+    /// <summary>清除全部筛选时重置所有 chips、色板与属性桶（不触发画廊刷新，由调用方统一刷新）。</summary>
     public void ResetSelection()
     {
         foreach (FilterGroupViewModel group in GroupsBeforePalette)
@@ -89,6 +126,8 @@ public sealed class FilterGroupsPanelViewModel : ObservableObject
         foreach (FilterGroupViewModel group in GroupsAfterPalette)
             group.ResetSelection();
         Palette.ResetSelection();
+        foreach (SingleSelectFilterGroupViewModel group in AttributeGroups)
+            group.ResetSelection();
     }
 
     private void ApplyAndRefresh(Action setField)
@@ -229,4 +268,82 @@ public sealed class ColorSwatchViewModel : ObservableObject
         get => _isActive;
         set => SetProperty(ref _isActive, value);
     }
+}
+
+/// <summary>
+/// v0.13.5: 单选属性桶组（分辨率/文件大小/评分）——组内 chips 互斥，
+/// 点击已选 chip 即取消（无「全部」chip）。外形与多选标签组一致，
+/// 直接复用 FilterGroupTemplate（GroupName + Chips/Tag/SelectCommand）。
+/// </summary>
+public sealed class SingleSelectFilterGroupViewModel
+{
+    private readonly Action<string?> _apply;
+
+    public SingleSelectFilterGroupViewModel(
+        string groupName,
+        IReadOnlyList<(string Display, string Value)> options,
+        Action<string?> apply)
+    {
+        GroupName = groupName;
+        _apply = apply;
+        foreach ((string display, string value) in options)
+        {
+            string captured = value;
+            FilterTagChipViewModel? chip = null;
+            chip = new FilterTagChipViewModel(display, _ => Toggle(chip!, captured));
+            Chips.Add(chip);
+        }
+    }
+
+    public string GroupName { get; }
+
+    public ObservableCollection<FilterTagChipViewModel> Chips { get; } = [];
+
+    /// <summary>清除全部筛选：取消选中并写 null（不刷新画廊）。</summary>
+    public void ResetSelection()
+    {
+        foreach (FilterTagChipViewModel chip in Chips)
+            chip.IsActive = false;
+        _apply(null);
+    }
+
+    private void Toggle(FilterTagChipViewModel clicked, string value)
+    {
+        bool wasActive = clicked.IsActive;
+        foreach (FilterTagChipViewModel chip in Chips)
+            chip.IsActive = false;
+        clicked.IsActive = !wasActive;
+        _apply(clicked.IsActive ? value : null);
+    }
+}
+
+/// <summary>桶键 → B2-1 筛选摘要显示文案（v0.13.5 随属性筛选并入 B1-6 迁移至此）。</summary>
+internal static class AttributeFilterDisplay
+{
+    public static string Resolution(string bucket) => bucket switch
+    {
+        ResolutionBuckets.Lt1024 => "<1024",
+        ResolutionBuckets.From1024To2047 => "1024–2047",
+        ResolutionBuckets.From2048To4095 => "2048–4095",
+        ResolutionBuckets.Ge4096 => "≥4096",
+        _ => bucket,
+    };
+
+    public static string FileSize(string bucket) => bucket switch
+    {
+        FileSizeBuckets.Lt1Mb => "<1 MB",
+        FileSizeBuckets.From1To5Mb => "1–5 MB",
+        FileSizeBuckets.From5To20Mb => "5–20 MB",
+        FileSizeBuckets.Ge20Mb => "≥20 MB",
+        _ => bucket,
+    };
+
+    public static string Rating(string bucket) => bucket switch
+    {
+        RatingBuckets.Unrated => "未评分",
+        RatingBuckets.Ge3 => "≥3 ★",
+        RatingBuckets.Ge4 => "≥4 ★",
+        RatingBuckets.Eq5 => "5 ★",
+        _ => bucket,
+    };
 }

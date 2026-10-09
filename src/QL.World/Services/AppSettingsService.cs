@@ -302,15 +302,6 @@ public sealed class AppSettingsService
             next => _settings.GalleryBrowseZoom = next);
     }
 
-    /// <summary>U3-A (§4.B.2): B1-5 attribute filter section expanded.</summary>
-    public bool SidebarAttributeFilterExpanded
-    {
-        get => _settings.SidebarAttributeFilterExpanded;
-        set => SetAndSave(value,
-            () => _settings.SidebarAttributeFilterExpanded,
-            next => _settings.SidebarAttributeFilterExpanded = next);
-    }
-
     /// <summary>M12-F: B1-6 筛选标签组 section expanded.</summary>
     public bool SidebarFilterGroupsExpanded
     {

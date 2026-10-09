@@ -1,11 +1,12 @@
-﻿# QL World U3 UIA 冒烟测试 — B1-COL 分区折叠+计数+重启持久化 / B1-5 属性筛选 chips /
+﻿# QL World U3 UIA 冒烟测试 — B1-COL 分区折叠+计数+重启持久化 / B1-6 筛选标签组（含属性桶）/
 # A1 完整性复选框 false 持久化（WhenWritingDefault 修复的 UI 级验证）
 # 用法: powershell -ExecutionPolicy Bypass -File tools\smoke\UiSmokeU3.ps1
 # 前置: .NET 10 SDK；脚本自建 Debug 构建并用隔离数据根，不影响真实数据。
 # 退出码: 0 = 全部通过；非 0 = 存在失败步骤。
-# 覆盖：W1/B1-COL 五分区 ToggleButton、折叠态计数文本、config.json false 显式写入、
-#       同数据根重启后折叠态保持；W1/B1-5 属性筛选展开后 chips 存在性；
+# 覆盖：W1/B1-COL 四分区 ToggleButton、折叠态计数文本、config.json false 显式写入、
+#       同数据根重启后折叠态保持；W1/B1-6 筛选标签组展开后标签/格式/属性桶 chips 存在性；
 #       W3/A1 完整性复选框取消勾选后的持久化。
+# 注：v0.13.5 起原 B1-5 属性筛选分区作废，分辨率/文件大小/评分并入 B1-6-8/9/10。
 # 未覆盖：W1/B2-3-ACT hover 操作组（空库无卡片，且 IsMouseOver 需真实光标，留待人工验收）。
 
 $ErrorActionPreference = 'Stop'
@@ -154,16 +155,17 @@ try {
     $mainWin = $app.Window
     Write-Host "  Main window: $($mainWin.Current.Name)"
 
-    # ── 1. 五分区 ToggleButton 存在（B1-COL + B1-5）──────────────
+    # ── 1. 四分区 ToggleButton 存在（B1-COL；v0.13.5 B1-5 属性筛选已作废） ──
     Write-Host '[Smoke] Step 1: section header toggle buttons exist'
     $tLibrary  = Find-FirstByName $mainWin '素材库'   ([System.Windows.Automation.ControlType]::Button)
     $tCollect  = Find-FirstByName $mainWin '收藏夹'   ([System.Windows.Automation.ControlType]::Button)
     $tTopTags  = Find-FirstByName $mainWin '热门标签' ([System.Windows.Automation.ControlType]::Button)
     $tPbr      = Find-FirstByName $mainWin '贴图组'   ([System.Windows.Automation.ControlType]::Button)
     $tAttr     = Find-FirstByName $mainWin '属性筛选' ([System.Windows.Automation.ControlType]::Button)
-    Assert-Step '五分区 ToggleButton 存在 (B1-COL + B1-5)' (
+    Assert-Step '四分区 ToggleButton 存在 (B1-COL)' (
         $null -ne $tLibrary -and $null -ne $tCollect -and $null -ne $tTopTags -and
-        $null -ne $tPbr -and $null -ne $tAttr) '缺少分区标题 ToggleButton'
+        $null -ne $tPbr) '缺少分区标题 ToggleButton'
+    Assert-Step '「属性筛选」分区头已移除 (B1-5 v0.13.5 作废)' ($null -eq $tAttr) '仍存在「属性筛选」标题'
     if ($null -ne $tLibrary) {
         Assert-Step '素材库标题支持 TogglePattern' (
             $tLibrary.GetSupportedPatterns() -contains [System.Windows.Automation.TogglePattern]::Pattern) '不支持 TogglePattern'
@@ -182,23 +184,16 @@ try {
         Assert-Step '折叠态标题显示「素材库 (8)」' ($header -eq '素材库 (8)') "实际「$header」（8 = 全部+6分类+未分类）"
     }
 
-    # ── 3. 展开属性筛选 → chips 出现（v0.13.4 起三维：颜色已并入 B1-6-3 色板） ──
-    Write-Host '[Smoke] Step 3: expand 属性筛选 shows chips'
-    if ($null -ne $tAttr) {
-        ($tAttr.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)).Toggle()
-        Start-Sleep -Milliseconds 800
-        # B1-5-1「颜色/品红」已删除：属性筛选内不应再出现色族 chip。
-        $chipMagenta = Find-FirstByName $mainWin '品红' ([System.Windows.Automation.ControlType]::Button)
-        Assert-Step '色族 chip「品红」已移除 (B1-5-1 作废)' ($null -eq $chipMagenta) '属性筛选中仍存在「品红」chip'
-        $allCond = New-Object System.Windows.Automation.AndCondition(
-            (New-Object System.Windows.Automation.PropertyCondition(
-                [System.Windows.Automation.AutomationElement]::NameProperty, '全部')),
-            (New-Object System.Windows.Automation.PropertyCondition(
-                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
-                [System.Windows.Automation.ControlType]::Button)))
-        $allChips = $mainWin.FindAll([System.Windows.Automation.TreeScope]::Descendants, $allCond)
-        Assert-Step '三维各含「全部」chip（=3）' ($allChips.Count -eq 3) "实际 $($allChips.Count) 个（分辨率/文件大小/评分）"
-    }
+    # ── 3. 旧属性 chips 存在性（v0.13.5：B1-5 整块删除，「全部」chip 不应再出现） ──
+    Write-Host '[Smoke] Step 3: legacy B1-5 chips removed'
+    $allCond = New-Object System.Windows.Automation.AndCondition(
+        (New-Object System.Windows.Automation.PropertyCondition(
+            [System.Windows.Automation.AutomationElement]::NameProperty, '全部')),
+        (New-Object System.Windows.Automation.PropertyCondition(
+            [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+            [System.Windows.Automation.ControlType]::Button)))
+    $allChips = $mainWin.FindAll([System.Windows.Automation.TreeScope]::Descendants, $allCond)
+    Assert-Step '旧属性筛选「全部」chip 已全部移除（=0）' ($allChips.Count -eq 0) "实际 $($allChips.Count) 个"
 
     # ── 3b. M12-F: 展开筛选标签组 → 美术风格 chips 出现 ────────
     Write-Host '[Smoke] Step 3b: expand 筛选标签组 shows art-style chips (B1-6)'
@@ -211,6 +206,11 @@ try {
         Assert-Step '美术风格 chip「写实」出现 (B1-6-1)' ($null -ne $chipRealistic) '未找到 Name="写实" 的 chip 按钮'
         $chipPng = Find-FirstByName $mainWin 'PNG' ([System.Windows.Automation.ControlType]::Button)
         Assert-Step '文件格式 chip「PNG」出现 (B1-6-2)' ($null -ne $chipPng) '未找到 Name="PNG" 的 chip 按钮'
+        # v0.13.5：原 B1-5 三维属性桶并入筛选标签组尾部（单选、无「全部」）。
+        $chipRes = Find-FirstByName $mainWin '<1024' ([System.Windows.Automation.ControlType]::Button)
+        Assert-Step '分辨率桶 chip「<1024」出现 (B1-6-8)' ($null -ne $chipRes) '未找到 Name="<1024" 的 chip 按钮'
+        $chipRating = Find-FirstByName $mainWin '未评分' ([System.Windows.Automation.ControlType]::Button)
+        Assert-Step '评分桶 chip「未评分」出现 (B1-6-10)' ($null -ne $chipRating) '未找到 Name="未评分" 的 chip 按钮'
     }
 
     # ── 4. 设置 A1 取消勾选完整性检查 ───────────────────────────

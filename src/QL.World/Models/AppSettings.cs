@@ -42,9 +42,6 @@ public sealed class AppSettings
     /// <summary>B2-4-BRW browse (masonry) card width (160–512).</summary>
     public int GalleryBrowseZoom { get; set; } = 240;
 
-    /// <summary>U3-A (§4.B.2): B1-5 attribute filter section expanded (default collapsed).</summary>
-    public bool SidebarAttributeFilterExpanded { get; set; }
-
     /// <summary>M12-F: B1-6 筛选标签组 section expanded (default collapsed).</summary>
     public bool SidebarFilterGroupsExpanded { get; set; }
 
