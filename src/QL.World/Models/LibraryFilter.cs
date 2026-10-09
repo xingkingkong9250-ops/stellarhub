@@ -58,6 +58,32 @@ public sealed class LibraryFilter
     /// </summary>
     public IReadOnlyList<long>? SemanticResultIds { get; set; }
 
+    // ─── M12-E: 标签组筛选（组内 OR，组间 AND）；null/空 = 不筛选 ──────
+
+    /// <summary>美术风格标签（多选）。</summary>
+    public IReadOnlyList<string>? ArtStyleTags { get; set; }
+
+    /// <summary>画面构图标签（多选）。</summary>
+    public IReadOnlyList<string>? CompositionTags { get; set; }
+
+    /// <summary>灯光氛围标签（多选）。</summary>
+    public IReadOnlyList<string>? LightingTags { get; set; }
+
+    /// <summary>题材气质标签（多选）。</summary>
+    public IReadOnlyList<string>? ThemeTags { get; set; }
+
+    /// <summary>状态形容标签（多选）。</summary>
+    public IReadOnlyList<string>? ConditionTags { get; set; }
+
+    /// <summary>文件格式（多选，如 "png"/"jpg"；与 i.format 不区分大小写比对）。</summary>
+    public IReadOnlyList<string>? FileFormats { get; set; }
+
+    /// <summary>
+    /// 色彩倾向色板选取的 "#RRGGBB" 列表。逐个经 ColorFamily.HexToFamily
+    /// 映射为色族后与 i.color_family 匹配（OR）；无法解析的 hex 被忽略。
+    /// </summary>
+    public IReadOnlyList<string>? ColorPaletteHexes { get; set; }
+
     /// <summary>Reference image id for image→image similar search (UI display only; filtering uses SemanticResultIds).</summary>
     public long? SimilarToImageId { get; set; }
 
@@ -87,6 +113,13 @@ public sealed class LibraryFilter
         FileSizeBucket = FileSizeBucket,
         RatingBucket = RatingBucket,
         SemanticResultIds = SemanticResultIds,
+        ArtStyleTags = ArtStyleTags,
+        CompositionTags = CompositionTags,
+        LightingTags = LightingTags,
+        ThemeTags = ThemeTags,
+        ConditionTags = ConditionTags,
+        FileFormats = FileFormats,
+        ColorPaletteHexes = ColorPaletteHexes,
         SimilarToImageId = SimilarToImageId,
         Limit = Limit,
         Offset = Offset,

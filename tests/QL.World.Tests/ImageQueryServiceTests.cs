@@ -495,6 +495,143 @@ public sealed class ImageQueryServiceTests
         Assert.Single(query.QueryGallery(new LibraryFilter { RatingBucket = "bogus" }));
     }
 
+    // ─── M12-E: 标签组 / 文件格式 / 色板筛选 ───────────────────────────────
+
+    [Fact]
+    public void Tag_group_filter_matches_any_tag_within_group()
+    {
+        using var library = new TestLibrary();
+        var query = new ImageQueryService(library.Db);
+        var tags = new TagService(library.Db);
+        long anime = library.InsertImage(filePath: @"X:\a.png");
+        long pixel = library.InsertImage(filePath: @"X:\p.png");
+        long ink = library.InsertImage(filePath: @"X:\i.png");
+        long none = library.InsertImage(filePath: @"X:\n.png");
+        tags.AddTags([anime], ["日系二次元"], TagSource.Manual);
+        tags.AddTags([pixel], ["像素风"], TagSource.Manual);
+        tags.AddTags([ink], ["水墨国风"], TagSource.Manual);
+
+        // 组内 OR：命中任一风格即通过。
+        var result = query.QueryGallery(new LibraryFilter
+        {
+            ArtStyleTags = ["日系二次元", "像素风"],
+        });
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, r => r.Id == anime);
+        Assert.Contains(result, r => r.Id == pixel);
+        Assert.DoesNotContain(result, r => r.Id == ink);
+        Assert.DoesNotContain(result, r => r.Id == none);
+
+        // null / 空列表 = 不筛选。
+        Assert.Equal(4, query.QueryGallery(new LibraryFilter { ArtStyleTags = null }).Count);
+        Assert.Equal(4, query.QueryGallery(new LibraryFilter { ArtStyleTags = [] }).Count);
+    }
+
+    [Fact]
+    public void Tag_groups_combine_with_and_across_groups()
+    {
+        using var library = new TestLibrary();
+        var query = new ImageQueryService(library.Db);
+        var tags = new TagService(library.Db);
+        long both = library.InsertImage(filePath: @"X:\both.png");
+        long styleOnly = library.InsertImage(filePath: @"X:\style.png");
+        long compOnly = library.InsertImage(filePath: @"X:\comp.png");
+        tags.AddTags([both], ["厚涂", "特写"], TagSource.Manual);
+        tags.AddTags([styleOnly], ["厚涂"], TagSource.Manual);
+        tags.AddTags([compOnly], ["特写"], TagSource.Manual);
+
+        // 组间 AND：美术风格与构图都命中才通过。
+        var result = query.QueryGallery(new LibraryFilter
+        {
+            ArtStyleTags = ["厚涂"],
+            CompositionTags = ["特写"],
+        });
+        Assert.Single(result);
+        Assert.Equal(both, result[0].Id);
+    }
+
+    [Fact]
+    public void File_format_filter_is_case_insensitive()
+    {
+        using var library = new TestLibrary();
+        var query = new ImageQueryService(library.Db);
+        long png = library.InsertImage(filePath: @"X:\a.png");   // InsertImage 默认 format='png'
+        long jpg = library.InsertImage(filePath: @"X:\b.png");
+        library.Db.Run(conn =>
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "UPDATE images SET format = 'JPG' WHERE id = $id;";
+            cmd.Parameters.AddWithValue("$id", jpg);
+            cmd.ExecuteNonQuery();
+        });
+
+        // 大小写不敏感：'PNG'/'jpg' 混排都能命中。
+        var result = query.QueryGallery(new LibraryFilter
+        {
+            FileFormats = ["PNG", "jpg"],
+        });
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, r => r.Id == png);
+        Assert.Contains(result, r => r.Id == jpg);
+
+        Assert.Empty(query.QueryGallery(new LibraryFilter { FileFormats = ["webp"] }));
+    }
+
+    [Fact]
+    public void Color_palette_hexes_filter_maps_to_families()
+    {
+        using var library = new TestLibrary();
+        var query = new ImageQueryService(library.Db);
+        long red = library.InsertImage(filePath: @"X:\red.png");
+        long blue = library.InsertImage(filePath: @"X:\blue.png");
+        long gray = library.InsertImage(filePath: @"X:\gray.png");
+        SetAttributes(library, red, colorFamily: "red");
+        SetAttributes(library, blue, colorFamily: "blue");
+        SetAttributes(library, gray, colorFamily: "gray");
+
+        // 两个 hex（红 + 蓝）→ OR 命中两张。
+        var result = query.QueryGallery(new LibraryFilter
+        {
+            ColorPaletteHexes = ["#FF0000", "#0000FF"],
+        });
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, r => r.Id == red);
+        Assert.Contains(result, r => r.Id == blue);
+
+        // 灰色 hex（低饱和）→ gray 色族。
+        Assert.Equal(gray, query.QueryGallery(
+            new LibraryFilter { ColorPaletteHexes = ["#808080"] }).Single().Id);
+
+        // 全部 hex 无法解析 → 忽略筛选（不报错、不缩小结果）。
+        Assert.Equal(3, query.QueryGallery(
+            new LibraryFilter { ColorPaletteHexes = ["bogus", "###"] }).Count);
+    }
+
+    [Fact]
+    public void Clone_copies_new_m12e_filter_fields()
+    {
+        var filter = new LibraryFilter
+        {
+            ArtStyleTags = ["写实"],
+            CompositionTags = ["特写", "全身"],
+            LightingTags = ["夜景"],
+            ThemeTags = ["科幻"],
+            ConditionTags = ["破损"],
+            FileFormats = ["png"],
+            ColorPaletteHexes = ["#FF0000"],
+        };
+
+        LibraryFilter clone = filter.Clone();
+
+        Assert.Same(filter.ArtStyleTags, clone.ArtStyleTags);
+        Assert.Same(filter.CompositionTags, clone.CompositionTags);
+        Assert.Same(filter.LightingTags, clone.LightingTags);
+        Assert.Same(filter.ThemeTags, clone.ThemeTags);
+        Assert.Same(filter.ConditionTags, clone.ConditionTags);
+        Assert.Same(filter.FileFormats, clone.FileFormats);
+        Assert.Same(filter.ColorPaletteHexes, clone.ColorPaletteHexes);
+    }
+
     private static void SetAttributes(
         TestLibrary library, long id,
         int? width = null, int? height = null,

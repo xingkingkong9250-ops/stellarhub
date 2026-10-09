@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 using QL.World.Data;
 using QL.World.Helpers;
 using QL.World.Models;
+using QL.World.Services.Colors;
 
 namespace QL.World.Services;
 
@@ -542,6 +543,47 @@ public sealed class ImageQueryService
             parameters.Add(("$tag", filter.Tag));
         }
 
+        // M12-E (§4.B.1): 标签组筛选。组内任一标签命中即通过（OR），
+        // 组与组之间 AND。美术风格/画面构图/灯光氛围/题材气质/状态形容。
+        AppendTagGroupClause(sql, parameters, "$artStyle", filter.ArtStyleTags);
+        AppendTagGroupClause(sql, parameters, "$composition", filter.CompositionTags);
+        AppendTagGroupClause(sql, parameters, "$lighting", filter.LightingTags);
+        AppendTagGroupClause(sql, parameters, "$theme", filter.ThemeTags);
+        AppendTagGroupClause(sql, parameters, "$condition", filter.ConditionTags);
+
+        // M12-E: 文件格式筛选（与 i.format 不区分大小写比对）。
+        if (filter.FileFormats is { Count: > 0 } formats)
+        {
+            var placeholders = new List<string>(formats.Count);
+            for (int i = 0; i < formats.Count; i++)
+                placeholders.Add($"$fmt{i}");
+            sql.Append(HasWhere(sql) ? "\n  AND " : "\nWHERE ");
+            sql.Append($"LOWER(i.format) IN ({string.Join(", ", placeholders)})");
+            for (int i = 0; i < formats.Count; i++)
+                parameters.Add((placeholders[i], formats[i].ToLowerInvariant()));
+        }
+
+        // M12-E: 色彩倾向——色板 hex 映射为色族后匹配 color_family。
+        // 全部 hex 无法解析时忽略该筛选（与 U3-A「未知桶键忽略」一致）。
+        if (filter.ColorPaletteHexes is { Count: > 0 } hexes)
+        {
+            List<string> families = hexes
+                .Select(ColorFamily.HexToFamily)
+                .OfType<string>()
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            if (families.Count > 0)
+            {
+                var placeholders = new List<string>(families.Count);
+                for (int i = 0; i < families.Count; i++)
+                    placeholders.Add($"$pf{i}");
+                sql.Append(HasWhere(sql) ? "\n  AND " : "\nWHERE ");
+                sql.Append($"i.color_family IN ({string.Join(", ", placeholders)})");
+                for (int i = 0; i < families.Count; i++)
+                    parameters.Add((placeholders[i], families[i]));
+            }
+        }
+
         if (filter.CollectionId is long collectionId)
         {
             sql.Append(HasWhere(sql) ? "\n  AND " : "\nWHERE ");
@@ -645,6 +687,29 @@ public sealed class ImageQueryService
             }
             parameters.Add(("$text", filter.Text.Trim()));
         }
+    }
+
+    /// <summary>M12-E: one tag-group clause — OR within the group (tag IN (...)).</summary>
+    private static void AppendTagGroupClause(
+        StringBuilder sql,
+        List<(string Name, object? Value)> parameters,
+        string prefix,
+        IReadOnlyList<string>? tags)
+    {
+        if (tags is not { Count: > 0 })
+            return;
+
+        var placeholders = new List<string>(tags.Count);
+        for (int i = 0; i < tags.Count; i++)
+            placeholders.Add($"{prefix}{i}");
+
+        sql.Append(HasWhere(sql) ? "\n  AND " : "\nWHERE ");
+        sql.Append($"""
+            EXISTS (SELECT 1 FROM image_tags it
+                    WHERE it.image_id = i.id AND it.tag IN ({string.Join(", ", placeholders)}))
+            """);
+        for (int i = 0; i < tags.Count; i++)
+            parameters.Add((placeholders[i], tags[i]));
     }
 
     private static bool HasWhere(StringBuilder sql) =>
