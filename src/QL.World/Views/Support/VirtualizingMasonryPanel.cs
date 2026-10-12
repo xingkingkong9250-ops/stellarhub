@@ -43,6 +43,10 @@ public sealed class VirtualizingMasonryPanel : VirtualizingPanel, IScrollInfo
     private int _layoutColumnCount;
     private bool _genHooked;
 
+    // v0.14.5: 自适应布局缓存（与 VirtualizingTilePanel 同源算法）
+    private int _columns;
+    private double _effectiveItemWidth;
+
     public double ItemWidth
     {
         get => (double)GetValue(ItemWidthProperty);
@@ -170,12 +174,18 @@ public sealed class VirtualizingMasonryPanel : VirtualizingPanel, IScrollInfo
         }
 
         double itemWidth = Math.Max(1, ItemWidth);
-        int columns = Math.Max(1, (int)((availableSize.Width + Gap) / (itemWidth + Gap)));
+
+        // v0.14.5: 自适应列数 —— 缩略图等比放大填满宽度，放大到 1.5 倍时插入新列缩回。
+        // 始终无右侧空白。瀑布流需要扣除列间间隙。
+        int columns = ComputeAdaptiveColumns(availableSize.Width, itemWidth, itemCount);
+        double effectiveWidth = (availableSize.Width - (columns - 1) * Gap) / columns;
+        _columns = columns;
+        _effectiveItemWidth = effectiveWidth;
 
         // Rebuild layout cache when column count changed or cache dropped.
         if (_layout is null || _layoutColumnCount != columns || _layout.Count != itemCount)
         {
-            _layout = BuildLayout(owner!, columns, itemWidth);
+            _layout = BuildLayout(owner!, columns, effectiveWidth);
             _layoutColumnCount = columns;
         }
 
@@ -223,7 +233,7 @@ public sealed class VirtualizingMasonryPanel : VirtualizingPanel, IScrollInfo
                 }
 
                 ItemLayout entry = _layout[index];
-                child.Measure(new Size(itemWidth, entry.Height));
+                child.Measure(new Size(effectiveWidth, entry.Height));
                 realizedThisPass++;
             }
         }
@@ -255,8 +265,14 @@ public sealed class VirtualizingMasonryPanel : VirtualizingPanel, IScrollInfo
         if (_layout is null || _layout.Count == 0)
             return finalSize;
 
-        double itemWidth = Math.Max(1, ItemWidth);
-        int columns = Math.Max(1, (int)((arrangeWidth + Gap) / (itemWidth + Gap)));
+        // v0.14.5: 使用 MeasureOverride 计算的自适应列数和尺寸，保证与测量阶段一致。
+        int columns = _columns;
+        double itemWidth = _effectiveItemWidth;
+        if (columns <= 0)
+        {
+            columns = Math.Max(1, (int)((arrangeWidth + Gap) / (Math.Max(1, ItemWidth) + Gap)));
+            itemWidth = (arrangeWidth - (columns - 1) * Gap) / columns;
+        }
 
         ItemsControl? owner = ItemsControl.GetItemsOwner(this);
         IItemContainerGenerator? generator = owner?.ItemContainerGenerator;
@@ -276,6 +292,37 @@ public sealed class VirtualizingMasonryPanel : VirtualizingPanel, IScrollInfo
         }
 
         return finalSize;
+    }
+
+    /// <summary>
+    /// v0.14.5: 计算自适应列数。缩略图等比放大填满宽度，放大到 1.5 倍原大小时
+    /// 插入新列缩回，始终无右侧空白。最小不低于原大小的 75%。
+    /// </summary>
+    private static int ComputeAdaptiveColumns(double viewportWidth, double itemWidth, int itemCount)
+    {
+        if (viewportWidth <= 0 || itemWidth <= 0)
+            return 1;
+
+        // 基础列数：用原大小能放几列（含间隙）
+        int baseColumns = Math.Max(1, (int)Math.Floor((viewportWidth + Gap) / (itemWidth + Gap)));
+        // 用基础列数放大填满
+        double expandedWidth = (viewportWidth - (baseColumns - 1) * Gap) / baseColumns;
+
+        // 如果放大超过 1.5 倍，尝试加一列
+        const double maxScale = 1.5;
+        int columns = baseColumns;
+        while (expandedWidth > itemWidth * maxScale && columns < itemCount)
+        {
+            columns++;
+            expandedWidth = (viewportWidth - (columns - 1) * Gap) / columns;
+        }
+
+        // 如果加列后缩太小（低于 75%），回退到前一列
+        const double minScale = 0.75;
+        if (columns > 1 && expandedWidth < itemWidth * minScale)
+            columns--;
+
+        return Math.Clamp(columns, 1, Math.Max(1, itemCount));
     }
 
     private static List<ItemLayout> BuildLayout(ItemsControl owner, int columns, double itemWidth)

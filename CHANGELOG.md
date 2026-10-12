@@ -9,6 +9,21 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.14.5] — 2026-10-12 画廊自适应布局：窗口缩放无空白
+
+### 变更
+
+- **网格视图（VirtualizingTilePanel）自适应**：窗口放大时缩略图等比放大填满宽度，
+  放大到 1.5 倍原大小时插入新列缩回；最小不低于原大小 75%。始终无右侧空白。
+- **瀑布流视图（VirtualizingMasonryPanel）自适应**：同源算法，扣除列间 Gap 后计算。
+- 新增 `ComputeAdaptiveColumns` 静态方法（网格/瀑布流各一份，因 Gap 计算不同）。
+- `MeasureOverride` 缓存 `_columns`/`_effectiveItemWidth`/`_effectiveItemHeight`，
+  `ArrangeOverride` 直接复用，保证测量与排列一致。
+
+### 验证
+
+- Release 编译 0 警告 0 错误。
+
 ## [0.14.4] — 2026-10-12 品牌区放大：Logo 填满顶栏 + 名称字号优化
 
 ### 变更

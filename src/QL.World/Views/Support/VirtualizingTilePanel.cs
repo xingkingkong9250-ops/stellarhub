@@ -38,6 +38,12 @@ public sealed class VirtualizingTilePanel : VirtualizingPanel, IScrollInfo
     private Size _extentSize;
     private Point _scrollOffset;
 
+    // v0.14.5: 自适应布局缓存。窗口放大时缩略图等比放大填满宽度，
+    // 放大到 1.5 倍时插入新列缩回，始终无右侧空白。
+    private int _columns;
+    private double _effectiveItemWidth;
+    private double _effectiveItemHeight;
+
     // F-14: the base VirtualizingPanel.OnItemsChanged path is unreliable
     // when the panel is created before items arrive (e.g. Grid mode at
     // startup with async data loading). The generator's ItemsChanged event
@@ -203,11 +209,20 @@ public sealed class VirtualizingTilePanel : VirtualizingPanel, IScrollInfo
 
         double itemWidth = Math.Max(1, ItemWidth);
         double itemHeight = Math.Max(1, ItemHeight);
-        int columns = Math.Max(1, (int)(availableSize.Width / itemWidth));
+
+        // v0.14.5: 自适应列数 —— 缩略图等比放大填满宽度，放大到 1.5 倍时插入新列缩回。
+        // 始终无右侧空白。
+        int columns = ComputeAdaptiveColumns(availableSize.Width, itemWidth, itemCount);
+        double effectiveWidth = availableSize.Width / columns;
+        double effectiveHeight = effectiveWidth / itemWidth * itemHeight;
+        _columns = columns;
+        _effectiveItemWidth = effectiveWidth;
+        _effectiveItemHeight = effectiveHeight;
+
         int rows = (int)Math.Ceiling((double)itemCount / columns);
 
         _viewportSize = availableSize;
-        _extentSize = new Size(availableSize.Width, Math.Max(0, rows * itemHeight));
+        _extentSize = new Size(availableSize.Width, Math.Max(0, rows * effectiveHeight));
         CoerceOffset();
         ScrollOwner?.InvalidateScrollInfo();
 
@@ -268,7 +283,7 @@ public sealed class VirtualizingTilePanel : VirtualizingPanel, IScrollInfo
                     continue;
                 }
 
-                child.Measure(new Size(itemWidth, itemHeight));
+                child.Measure(new Size(effectiveWidth, effectiveHeight));
                 realizedThisPass++;
             }
         }
@@ -308,9 +323,16 @@ public sealed class VirtualizingTilePanel : VirtualizingPanel, IScrollInfo
             ? _viewportSize.Width
             : finalSize.Width;
 
-        double itemWidth = Math.Max(1, ItemWidth);
-        double itemHeight = ItemHeight;
-        int columns = Math.Max(1, (int)(arrangeWidth / itemWidth));
+        // v0.14.5: 使用 MeasureOverride 计算的自适应列数和尺寸，保证与测量阶段一致。
+        int columns = _columns;
+        double itemWidth = _effectiveItemWidth;
+        double itemHeight = _effectiveItemHeight;
+        if (columns <= 0)
+        {
+            columns = Math.Max(1, (int)(arrangeWidth / Math.Max(1, ItemWidth)));
+            itemWidth = arrangeWidth / columns;
+            itemHeight = itemWidth / Math.Max(1, ItemWidth) * Math.Max(1, ItemHeight);
+        }
 
         // Same teardown guard as MeasureOverride: the generator is gone while
         // the outgoing panel drains its final layout pass. Resolve from owner
@@ -343,12 +365,44 @@ public sealed class VirtualizingTilePanel : VirtualizingPanel, IScrollInfo
         int columns, int totalRows, int itemCount,
         out int firstIndex, out int lastIndex)
     {
-        int firstRow = Math.Max(0, (int)Math.Floor(_scrollOffset.Y / ItemHeight) - 1);
-        int visibleRowCount = (int)Math.Ceiling(_viewportSize.Height / ItemHeight) + 2;
+        double effectiveHeight = _effectiveItemHeight > 0 ? _effectiveItemHeight : Math.Max(1, ItemHeight);
+        int firstRow = Math.Max(0, (int)Math.Floor(_scrollOffset.Y / effectiveHeight) - 1);
+        int visibleRowCount = (int)Math.Ceiling(_viewportSize.Height / effectiveHeight) + 2;
         int lastRow = Math.Min(totalRows - 1, firstRow + visibleRowCount);
 
         firstIndex = firstRow * columns;
         lastIndex = Math.Min(itemCount - 1, (lastRow + 1) * columns - 1);
+    }
+
+    /// <summary>
+    /// v0.14.5: 计算自适应列数。缩略图等比放大填满宽度，放大到 1.5 倍原大小时
+    /// 插入新列缩回，始终无右侧空白。最小不低于原大小的 75%。
+    /// </summary>
+    private static int ComputeAdaptiveColumns(double viewportWidth, double itemWidth, int itemCount)
+    {
+        if (viewportWidth <= 0 || itemWidth <= 0)
+            return 1;
+
+        // 基础列数：用原大小能放几列
+        int baseColumns = Math.Max(1, (int)Math.Floor(viewportWidth / itemWidth));
+        // 用基础列数放大填满
+        double expandedWidth = viewportWidth / baseColumns;
+
+        // 如果放大超过 1.5 倍，尝试加一列
+        const double maxScale = 1.5;
+        int columns = baseColumns;
+        while (expandedWidth > itemWidth * maxScale && columns < itemCount)
+        {
+            columns++;
+            expandedWidth = viewportWidth / columns;
+        }
+
+        // 如果加列后缩太小（低于 75%），回退到前一列
+        const double minScale = 0.75;
+        if (columns > 1 && expandedWidth < itemWidth * minScale)
+            columns--;
+
+        return Math.Clamp(columns, 1, Math.Max(1, itemCount));
     }
 
     private void CleanupContainers(
