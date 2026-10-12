@@ -17,9 +17,8 @@
         Title="{Binding Title}">
 
     <WindowChrome.WindowChrome>
-        <!-- v0.6.2: 合并系统标题栏与 Row 0 菜单行；Windows 自动在右侧绘制
-             最小化/最大化/关闭三按钮，无需自定义按钮逻辑。 -->
-        <WindowChrome CaptionHeight="40"
+        <!-- v0.14.3: 顶栏合并为单行 80px，CaptionHeight 同步为 80 使整行可拖动 -->
+        <WindowChrome CaptionHeight="80"
                       GlassFrameThickness="0"
                       ResizeBorderThickness="6"
                       CornerRadius="0"
@@ -641,39 +640,126 @@
 
     <Grid Background="{DynamicResource BackgroundBrush}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="40" />
-            <RowDefinition Height="44" />
+            <RowDefinition Height="80" />
             <RowDefinition Height="*" />
             <RowDefinition Height="28" />
         </Grid.RowDefinitions>
 
-        <!-- ═══════════ A1-M Row 1: 菜单行（VS Code 风格 — 品牌 + 文本菜单栏 + 右侧系统区） ═══════════ -->
+        <!-- ═══════════ A1 顶栏（v0.14.3：标题栏+工具条合并为单行 80px） ═══════════
+             排列顺序：A1-9 品牌 → A1-4 搜索框 → A1-5 搜索模式 → 剩余操作按钮依次 →
+                       本地/共享切换 → [弹性空白] → 通知/设置/版本号/系统三按钮 -->
         <Border Grid.Row="0" Background="{DynamicResource SurfaceVariantBrush}"
                 BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1">
-            <Grid Background="Transparent">
+            <Grid Background="Transparent" Margin="10,0">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <!-- 左侧：品牌 Logo + 名称（v0.7.0 品牌图：星光相框猫） -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0">
-                    <Border Width="22" Height="22" CornerRadius="6" Margin="0,0,8,0"
+                <!-- W1/A1-9: 品牌 Logo + 名称（Logo 填满顶栏高度） -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,12,0">
+                    <Border Width="56" Height="56" CornerRadius="12" Margin="0,0,10,0"
                             BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
                         <Border.Background>
                             <ImageBrush ImageSource="{StaticResource BrandLogoSource}" Stretch="UniformToFill" />
                         </Border.Background>
                     </Border>
-                    <TextBlock Text="千星汇图" FontSize="13" FontWeight="Bold"
+                    <TextBlock Text="千星汇图" FontSize="30" FontWeight="SemiBold"
+                               FontFamily="Microsoft YaHei UI"
                                Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                 </StackPanel>
 
-                <!-- v0.14.2: 菜单栏已移除（文件/视图/工具全部已有快捷按钮，帮助项无实际功能） -->
+                <!-- W1/A1-4: 搜索框 -->
+                <TextBox Grid.Column="1" x:Name="SearchTextBox" Style="{StaticResource CompactSearchBox}"
+                         Width="220" Height="32"
+                         AutomationProperties.Name="SearchBox"
+                         VerticalContentAlignment="Center"
+                         Text="{Binding TopBar.SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="搜索（300ms 防抖）" />
+
+                <!-- W1/A1-5: 搜索模式下拉 -->
+                <ComboBox Grid.Column="2" Width="118" Height="32" Margin="8,0,0,0"
+                          ItemsSource="{Binding TopBar.SearchModes}"
+                          DisplayMemberPath="Display"
+                          SelectedValuePath="Mode"
+                          SelectedValue="{Binding TopBar.SelectedSearchMode}" />
+
+                <!-- 剩余操作按钮依次排列：导入 / 扫描 / 刷新 / AI / 颜色 / 下载 / 审核 -->
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                    <!-- W1/A1-1 导入 -->
+                    <Button Style="{StaticResource CompactImportButton}"
+                            Command="{Binding TopBar.ImportCommand}" />
+                    <!-- 扫描 NAS -->
+                    <Button Margin="8,0,0,0" Style="{StaticResource CompactScanButton}"
+                            ToolTip="扫描已配置的 NAS 连接目录，索引为远程图片"
+                            AutomationProperties.Name="扫描NAS"
+                            Command="{Binding ScanNasLibraryCommand}" />
+                    <!-- W1/A1-10 刷新 -->
+                    <Button Margin="8,0,0,0" Style="{StaticResource CompactRefreshButton}"
+                            ToolTip="重新扫描监控目录并刷新画廊数据（F5）"
+                            AutomationProperties.Name="刷新数据"
+                            Command="{Binding RefreshCommand}" />
+                    <!-- W1/A1-2 AI 分析 -->
+                    <Button Margin="8,0,0,0" Style="{StaticResource CompactAiButton}"
+                            ToolTip="{Binding TopBar.AiDisabledReason}"
+                            Command="{Binding TopBar.AiCommand}" />
+                    <!-- W1/A1-8 分析颜色 -->
+                    <Button Margin="8,0,0,0" Style="{StaticResource CompactColorButton}"
+                            ToolTip="为缺失主色调的图片批量回填 dominant_colors"
+                            Command="{Binding TopBar.ColorCommand}" />
+                    <!-- 下载队列 -->
+                    <Button Margin="8,0,0,0" Style="{StaticResource CompactDownloadButton}"
+                            ToolTip="打开下载队列（NAS→本地，支持续传/重试）"
+                            AutomationProperties.Name="下载队列"
+                            Command="{Binding ShowDownloadQueueCommand}" />
+                    <!-- W1/A1-REV 审核队列（管理员可见，带 pending 角标） -->
+                    <Grid Margin="8,0,0,0"
+                          Visibility="{Binding IsReviewAvailable, Converter={StaticResource BoolVis}}">
+                        <Button x:Name="ReviewQueueButton" Style="{StaticResource CompactReviewButton}"
+                                ToolTip="审核用户提交到共享库的图片"
+                                AutomationProperties.Name="审核队列"
+                                Command="{Binding ShowReviewQueueCommand}" />
+                        <Border MinWidth="16" Height="16" Padding="4,0"
+                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Margin="0,-4,-6,0" CornerRadius="8"
+                                Background="{DynamicResource WarningBrush}"
+                                Visibility="{Binding PendingCount, Converter={StaticResource ZeroVis}, ConverterParameter=Invert}">
+                            <TextBlock FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextOnWarningBrush}"
+                                       Text="{Binding PendingCount}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </Grid>
+                </StackPanel>
+
+                <!-- 最近入库下拉 -->
+                <ComboBox Grid.Column="4" Width="110" Height="32" Margin="12,0,0,0"
+                          ItemsSource="{Binding TopBar.RecentImportOptions}"
+                          DisplayMemberPath="Display"
+                          SelectedValuePath="Days"
+                          SelectedValue="{Binding TopBar.SelectedRecentImport}"
+                          ToolTip="按入库时间筛选" />
+
+                <!-- W1/B1-SCOPE: 本地库/共享库切换（仅 NAS 登录可见） -->
+                <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                    <ToggleButton Style="{StaticResource CompactScopeToggle}"
+                                  IsChecked="{Binding IsLocalScope}"
+                                  Content="本地库" Tag="💻" ToolTip="本地图片库"
+                                  Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}" />
+                    <ToggleButton Style="{StaticResource CompactScopeToggle}" Margin="4,0,0,0"
+                                  IsChecked="{Binding IsSharedScope, Mode=OneWay}"
+                                  Command="{Binding SwitchToSharedCommand}"
+                                  Content="共享库" Tag="☁️" ToolTip="NAS 共享图库"
+                                  Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}" />
+                </StackPanel>
 
                 <!-- 右侧：通知 + 设置 + 版本号 + 自定义系统三按钮 -->
-                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center"
+                <StackPanel Grid.Column="7" Orientation="Horizontal" VerticalAlignment="Center"
                             WindowChrome.IsHitTestVisibleInChrome="True">
                     <Grid Margin="0,0,6,0">
                         <Button x:Name="NotificationsButton" Style="{StaticResource SubtleButtonStyle}" Content="🔔"
@@ -744,7 +830,6 @@
                             Command="{Binding TopBar.SettingsCommand}" />
                     <TextBlock Text="{Binding VersionText}" Margin="10,0,0,0" Style="{StaticResource CompactVersionText}"
                                Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
-                    <!-- v0.6.2: 自定义 caption 三按钮（替代系统 AeroCaptionButtons） -->
                     <Button Style="{StaticResource CaptionButton}" Content="—" Margin="8,0,0,0"
                             ToolTip="最小化" Click="OnMinimize" />
                     <Button Style="{StaticResource CaptionButton}" Content="▢"
@@ -755,102 +840,8 @@
             </Grid>
         </Border>
 
-        <!-- ═══════════ A1-T Row 2: 工具条行（操作按钮 + 搜索 + 视图切换） ═══════════ -->
-        <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}"
-                BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1">
-            <Grid Margin="14,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <!-- 左侧：操作工具条 -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Style="{StaticResource CompactImportButton}"
-                            Command="{Binding TopBar.ImportCommand}" />
-                    <!-- M5-D N7: scan a NAS library (remote import). -->
-                    <Button Margin="8,0,0,0" Style="{StaticResource CompactScanButton}"
-                            ToolTip="扫描已配置的 NAS 连接目录，索引为远程图片"
-                            AutomationProperties.Name="扫描NAS"
-                            Command="{Binding ScanNasLibraryCommand}" />
-                    <!-- A1-10 (v0.8.0): manual refresh — rescan watched dirs + reload gallery (F5). -->
-                    <Button Margin="8,0,0,0" Style="{StaticResource CompactRefreshButton}"
-                            ToolTip="重新扫描监控目录并刷新画廊数据（F5）"
-                            AutomationProperties.Name="刷新数据"
-                            Command="{Binding RefreshCommand}" />
-                    <Button Margin="8,0,0,0" Style="{StaticResource CompactAiButton}"
-                            ToolTip="{Binding TopBar.AiDisabledReason}"
-                            Command="{Binding TopBar.AiCommand}" />
-                    <Button Margin="8,0,0,0" Style="{StaticResource CompactColorButton}"
-                            ToolTip="为缺失主色调的图片批量回填 dominant_colors"
-                            Command="{Binding TopBar.ColorCommand}" />
-                    <!-- M5-G: open the persistent download queue window. -->
-                    <Button Margin="8,0,0,0" Style="{StaticResource CompactDownloadButton}"
-                            ToolTip="打开下载队列（NAS→本地，支持续传/重试）"
-                            AutomationProperties.Name="下载队列"
-                            Command="{Binding ShowDownloadQueueCommand}" />
-                    <!-- U6-C: 管理员审核队列入口（含 pending 角标） -->
-                    <Grid Margin="8,0,0,0"
-                          Visibility="{Binding IsReviewAvailable, Converter={StaticResource BoolVis}}">
-                        <Button x:Name="ReviewQueueButton" Style="{StaticResource CompactReviewButton}"
-                                ToolTip="审核用户提交到共享库的图片"
-                                AutomationProperties.Name="审核队列"
-                                Command="{Binding ShowReviewQueueCommand}" />
-                        <Border MinWidth="16" Height="16" Padding="4,0"
-                                HorizontalAlignment="Right" VerticalAlignment="Top"
-                                Margin="0,-4,-6,0" CornerRadius="8"
-                                Background="{DynamicResource WarningBrush}"
-                                Visibility="{Binding PendingCount, Converter={StaticResource ZeroVis}, ConverterParameter=Invert}">
-                            <TextBlock FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextOnWarningBrush}"
-                                       Text="{Binding PendingCount}"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                    </Grid>
-                </StackPanel>
-
-                <!-- 中部：搜索框 + 搜索模式 + 最近入库 -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
-                            VerticalAlignment="Center">
-                    <TextBox x:Name="SearchTextBox" Style="{StaticResource CompactSearchBox}" Height="30"
-                             AutomationProperties.Name="SearchBox"
-                             VerticalContentAlignment="Center"
-                             Text="{Binding TopBar.SearchText, UpdateSourceTrigger=PropertyChanged}"
-                             ToolTip="搜索（300ms 防抖）" />
-                    <ComboBox Width="118" Margin="8,0,0,0"
-                              ItemsSource="{Binding TopBar.SearchModes}"
-                              DisplayMemberPath="Display"
-                              SelectedValuePath="Mode"
-                              SelectedValue="{Binding TopBar.SelectedSearchMode}" />
-                    <!-- U2-B: 最近入库 dropdown (collapsed under 1500px) -->
-                    <StackPanel Style="{StaticResource CompactHidePanel}" Orientation="Horizontal">
-                        <ComboBox Width="110" Margin="8,0,0,0"
-                                  ItemsSource="{Binding TopBar.RecentImportOptions}"
-                                  DisplayMemberPath="Display"
-                                  SelectedValuePath="Days"
-                                  SelectedValue="{Binding TopBar.SelectedRecentImport}"
-                                  ToolTip="按入库时间筛选" />
-                    </StackPanel>
-                </StackPanel>
-
-                <!-- 右侧：本地/共享库切换（v0.12.3：视图切换三按钮迁移至 B2 工具条左侧） -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- U6-A B1-SCOPE: 本地库/共享库切换（仅 NAS 登录可见） -->
-                    <ToggleButton Style="{StaticResource CompactScopeToggle}"
-                                  IsChecked="{Binding IsLocalScope}"
-                                  Content="本地库" Tag="💻" ToolTip="本地图片库"
-                                  Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}" />
-                    <ToggleButton Style="{StaticResource CompactScopeToggle}" Margin="4,0,0,0"
-                                  IsChecked="{Binding IsSharedScope, Mode=OneWay}"
-                                  Command="{Binding SwitchToSharedCommand}"
-                                  Content="共享库" Tag="☁️" ToolTip="NAS 共享图库"
-                                  Visibility="{Binding IsSharedLibraryAvailable, Converter={StaticResource BoolVis}}" />
-                </StackPanel>
-            </Grid>
-        </Border>
-
         <!-- ═══════════ B 主分区 ═══════════ -->
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <!-- v0.13.0: B1 左栏宽度随 IsSidebarTextMode 切换：文字模式 240 / 图标模式 60 -->
                 <ColumnDefinition Width="{Binding IsSidebarTextMode, Converter={StaticResource BoolGridLen}, ConverterParameter='240,60'}" />
@@ -1842,7 +1833,7 @@
         </Grid>
 
         <!-- ═══════════ C1 状态栏（C1-L 状态 / C1-C 计数 / C1-R 快捷键提示+AI 档位） ═══════════ -->
-        <Border Grid.Row="3" Background="{DynamicResource SurfaceVariantBrush}"
+        <Border Grid.Row="2" Background="{DynamicResource SurfaceVariantBrush}"
                 BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,1,0,0">
             <Grid>
                 <Grid.RowDefinitions>
