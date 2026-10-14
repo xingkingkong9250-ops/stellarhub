@@ -1,6 +1,7 @@
-using System.IO;
+﻿using System.IO;
 using System.Reflection;
 using Microsoft.Data.Sqlite;
+using TinyPinyin;
 
 namespace QL.World.Data;
 
@@ -11,7 +12,7 @@ namespace QL.World.Data;
 /// </summary>
 internal static class DbMigrator
 {
-    private const int CURRENT_VERSION = 10;
+    private const int CURRENT_VERSION = 11;
 
     public static void Migrate(SqliteConnection connection)
     {
@@ -51,6 +52,12 @@ internal static class DbMigrator
                 // with tags get their category re-derived by TaxonomyService.
                 if (target == 10)
                     BackfillLegacyCategory(connection, transaction);
+
+                // v0.14.6: v11 adds pinyin column to image_tags and backfills
+                // all existing tags with NPinyin conversion so SQL LIKE can
+                // match pinyin-based queries.
+                if (target == 11)
+                    BackfillTagPinyin(connection, transaction);
 
                 command.CommandText = $"PRAGMA user_version = {target};";
                 command.ExecuteNonQuery();
@@ -240,6 +247,39 @@ internal static class DbMigrator
                 update.Parameters.AddWithValue("$id", id);
                 update.ExecuteNonQuery();
             }
+        }
+    }
+
+    /// <summary>
+    /// v0.14.6: 回填 image_tags.pinyin —— 遍历所有标签用 NPinyin 转换后 UPDATE。
+    /// 中文标签转拼音（例如「角色」→「juese」），纯英文/数字标签保持原样。
+    /// </summary>
+    private static void BackfillTagPinyin(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        var rows = new List<(long ImageId, string Tag)>();
+        using (var query = connection.CreateCommand())
+        {
+            query.Transaction = transaction;
+            query.CommandText = "SELECT image_id, tag FROM image_tags WHERE pinyin IS NULL;";
+            using var reader = query.ExecuteReader();
+            while (reader.Read())
+                rows.Add((reader.GetInt64(0), reader.GetString(1)));
+        }
+
+        using var update = connection.CreateCommand();
+        update.Transaction = transaction;
+        update.CommandText = "UPDATE image_tags SET pinyin = $pinyin WHERE image_id = $id AND tag = $tag;";
+        update.Parameters.AddWithValue("$pinyin", string.Empty);
+        update.Parameters.AddWithValue("$id", 0L);
+        update.Parameters.AddWithValue("$tag", string.Empty);
+
+        foreach ((long imageId, string tag) in rows)
+        {
+            string pinyin = PinyinHelper.GetPinyin(tag);
+            update.Parameters["$pinyin"].Value = pinyin;
+            update.Parameters["$id"].Value = imageId;
+            update.Parameters["$tag"].Value = tag;
+            update.ExecuteNonQuery();
         }
     }
 

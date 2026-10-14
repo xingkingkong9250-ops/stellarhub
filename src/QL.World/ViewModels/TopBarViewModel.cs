@@ -21,10 +21,8 @@ public sealed class TopBarViewModel : ObservableObject
     private readonly AppSettingsService _settings;
     private readonly DispatcherTimer _searchTimer;
     private string _searchText = string.Empty;
-    private SearchMode _searchMode = SearchMode.Tag;
     private bool _isImporting;
     private bool _isColorRunning;
-    private IReadOnlyList<SearchModeOption> _searchModes = DefaultSearchModes();
     private int? _selectedRecentImport;
 
     public TopBarViewModel(
@@ -74,9 +72,7 @@ public sealed class TopBarViewModel : ObservableObject
             }
         };
 
-        // 语义档仅在「AI 档支持文本 embedding」或「库中已有 image embedding」时才显示。
-        // 前者覆盖 Cloud 配置好的场景；后者覆盖 Disabled/Local 但库里有历史 embedding 的场景。
-        _searchModes = BuildSearchModes();
+        // v0.14.6: 不再手动选择搜索模式，由 SearchQueryParser 自动识别。
 
         _searchTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(SEARCH_DEBOUNCE_MS) };
         _searchTimer.Tick += async (_, _) =>
@@ -152,57 +148,11 @@ public sealed class TopBarViewModel : ObservableObject
         }
     }
 
-    public IReadOnlyList<SearchModeOption> SearchModes
+    /// <summary>v0.14.6: 立即提交搜索（Enter 键触发，跳过防抖定时器）。</summary>
+    public void CommitSearchNow()
     {
-        get => _searchModes;
-        private set
-        {
-            if (SetProperty(ref _searchModes, value))
-            {
-                // 当前选中的档被剔除时回退到 Tag，避免 ComboBox 找不到 SelectedItem。
-                if (!_searchModes.Any(o => o.Mode == _searchMode))
-                {
-                    _searchMode = SearchMode.Tag;
-                    OnPropertyChanged(nameof(SelectedSearchMode));
-                }
-            }
-        }
-    }
-
-    public SearchMode SelectedSearchMode
-    {
-        get => _searchMode;
-        set
-        {
-            if (SetProperty(ref _searchMode, value))
-                _ = CommitSearchAsync();
-        }
-    }
-
-    /// <summary>Refresh the SearchModes list (called after AI config changes or embeddings land).</summary>
-    public void RefreshSearchModes()
-    {
-        SearchModes = BuildSearchModes();
-    }
-
-    private static IReadOnlyList<SearchModeOption> DefaultSearchModes() =>
-    [
-        new(SearchMode.Tag, "标签"),
-        new(SearchMode.FileNameNotes, "文件名·备注"),
-    ];
-
-    private IReadOnlyList<SearchModeOption> BuildSearchModes()
-    {
-        var list = new List<SearchModeOption>
-        {
-            new(SearchMode.Tag, "标签"),
-            new(SearchMode.FileNameNotes, "文件名·备注"),
-        };
-        // 语义档：AI 档支持文本 embedding（Cloud 配置好），或库中已有 image embedding。
-        // 前者覆盖文→图搜索；后者覆盖图→图相似搜索（任意档可用，依赖已存向量）。
-        if (_ai.SupportsEmbeddings || _semanticSearch.HasAnyEmbeddings())
-            list.Add(new SearchModeOption(SearchMode.Semantic, "语义"));
-        return list;
+        _searchTimer.Stop();
+        _ = CommitSearchAsync();
     }
 
     public bool IsGridView
@@ -278,9 +228,7 @@ public sealed class TopBarViewModel : ObservableObject
     {
         _searchTimer.Stop();
         _searchText = string.Empty;
-        _searchMode = SearchMode.Semantic;
         OnPropertyChanged(nameof(SearchText));
-        OnPropertyChanged(nameof(SelectedSearchMode));
     }
 
     private async Task CommitSearchAsync()
@@ -293,49 +241,45 @@ public sealed class TopBarViewModel : ObservableObject
             return;
         }
 
-        // Semantic mode: clear text/tag filters; SemanticSearchService resolves the id list.
-        if (_searchMode == SearchMode.Semantic)
+        // v0.14.6: SearchQueryParser 自动识别意图，不再手动选择模式。
+        SearchQuery query = SearchQueryParser.Parse(_searchText);
+
+        // 空查询：清空所有搜索过滤
+        if (string.IsNullOrEmpty(query.Text))
         {
             _gallery.Filter.Text = null;
-            _gallery.Filter.Tag = null;
-            _gallery.Filter.SearchMode = SearchMode.Semantic;
+            _gallery.Filter.SearchMode = SearchMode.Tag;
+            _gallery.Filter.SearchPinyin = null;
+            _gallery.Filter.SemanticResultIds = null;
             _gallery.Filter.SimilarToImageId = null;
-
-            if (string.IsNullOrWhiteSpace(_searchText))
-            {
-                // 空查询：清空语义结果（让 ImageQueryService 走 1=0 分支显示空）。
-                _gallery.Filter.SemanticResultIds = null;
-            }
-            else
-            {
-                IReadOnlyList<long>? ids = await _semanticSearch.SearchByTextAsync(_searchText.Trim());
-                if (ids is null)
-                {
-                    _notifications.Publish(NotificationKind.SemanticSearchUnavailable,
-                        "语义搜索不可用",
-                        "当前 AI 档无法生成文本 embedding：关闭档请切换到本地/云端；"
-                        + "本地档请在设置中下载完整模型包（含文本模型）。");
-                    // 回退到 Tag 模式让用户至少能用搜索。
-                    _searchMode = SearchMode.Tag;
-                    _gallery.Filter.SearchMode = SearchMode.Tag;
-                    _gallery.Filter.Text = _searchText;
-                    OnPropertyChanged(nameof(SelectedSearchMode));
-                }
-                else
-                {
-                    _gallery.Filter.SemanticResultIds = ids;
-                }
-            }
-
             await _gallery.RefreshAsync();
             return;
         }
 
-        _gallery.Filter.Text = string.IsNullOrWhiteSpace(_searchText) ? null : _searchText;
-        _gallery.Filter.SearchMode = _searchMode;
+        // 默认走多字段 OR 搜索（标签+文件名+备注+分类+拼音）
+        _gallery.Filter.Text = query.Text;
+        _gallery.Filter.SearchMode = query.Mode;
+        _gallery.Filter.SearchPinyin = query.Pinyin;
         _gallery.Filter.SemanticResultIds = null;
         _gallery.Filter.SimilarToImageId = null;
+
         await _gallery.RefreshAsync();
+
+        // v0.14.6 Phase 5: 精确匹配无结果且 AI 可用时，自动降级语义搜索
+        // （仅当用户输入较长查询时才触发，避免短查询频繁降级）
+        if (query.Text.Length >= 4 && _gallery.TotalCount == 0
+            && (_ai.SupportsEmbeddings || _semanticSearch.HasAnyEmbeddings()))
+        {
+            IReadOnlyList<long>? ids = await _semanticSearch.SearchByTextAsync(query.Text);
+            if (ids is { Count: > 0 })
+            {
+                _gallery.Filter.Text = null;
+                _gallery.Filter.SearchMode = SearchMode.Semantic;
+                _gallery.Filter.SearchPinyin = null;
+                _gallery.Filter.SemanticResultIds = ids;
+                await _gallery.RefreshAsync();
+            }
+        }
     }
 }
 

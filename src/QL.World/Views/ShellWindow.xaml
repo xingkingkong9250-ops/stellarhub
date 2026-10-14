@@ -645,14 +645,13 @@
             <RowDefinition Height="28" />
         </Grid.RowDefinitions>
 
-        <!-- ═══════════ A1 顶栏（v0.14.3：标题栏+工具条合并为单行 80px） ═══════════
-             排列顺序：A1-9 品牌 → A1-4 搜索框 → A1-5 搜索模式 → 剩余操作按钮依次 →
-                       本地/共享切换 → [弹性空白] → 通知/设置/版本号/系统三按钮 -->
+        <!-- ═══════════ A1 顶栏（v0.14.6：搜索框合并模式选择，自动智能搜索） ═══════════
+             排列顺序：A1-9 品牌 → A1-4 智能搜索框（自动识别标签/文件名/分类/拼音/语义） →
+                       剩余操作按钮依次 → 本地/共享切换 → [弹性空白] → 通知/设置/版本号/系统三按钮 -->
         <Border Grid.Row="0" Background="{DynamicResource SurfaceVariantBrush}"
                 BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1">
             <Grid Background="Transparent" Margin="10,0">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
@@ -675,23 +674,17 @@
                                Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                 </StackPanel>
 
-                <!-- W1/A1-4: 搜索框 -->
+                <!-- W1/A1-4: 智能搜索框（自动识别标签/文件名/分类/拼音/语义） -->
                 <TextBox Grid.Column="1" x:Name="SearchTextBox" Style="{StaticResource CompactSearchBox}"
-                         Width="220" Height="32"
+                         Width="340" Height="32"
                          AutomationProperties.Name="SearchBox"
                          VerticalContentAlignment="Center"
                          Text="{Binding TopBar.SearchText, UpdateSourceTrigger=PropertyChanged}"
-                         ToolTip="搜索（300ms 防抖）" />
-
-                <!-- W1/A1-5: 搜索模式下拉 -->
-                <ComboBox Grid.Column="2" Width="118" Height="32" Margin="8,0,0,0"
-                          ItemsSource="{Binding TopBar.SearchModes}"
-                          DisplayMemberPath="Display"
-                          SelectedValuePath="Mode"
-                          SelectedValue="{Binding TopBar.SelectedSearchMode}" />
+                         ToolTip="智能搜索：标签/文件名/分类/拼音/语义（300ms 防抖）"
+                         KeyDown="SearchTextBox_KeyDown" />
 
                 <!-- 剩余操作按钮依次排列：导入 / 扫描 / 刷新 / AI / 颜色 / 下载 / 审核 -->
-                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
                     <!-- W1/A1-1 导入 -->
                     <Button Style="{StaticResource CompactImportButton}"
                             Command="{Binding TopBar.ImportCommand}" />
@@ -738,7 +731,7 @@
                 </StackPanel>
 
                 <!-- 最近入库下拉 -->
-                <ComboBox Grid.Column="4" Width="110" Height="32" Margin="12,0,0,0"
+                <ComboBox Grid.Column="3" Width="110" Height="32" Margin="12,0,0,0"
                           ItemsSource="{Binding TopBar.RecentImportOptions}"
                           DisplayMemberPath="Display"
                           SelectedValuePath="Days"
@@ -746,7 +739,7 @@
                           ToolTip="按入库时间筛选" />
 
                 <!-- W1/B1-SCOPE: 本地库/共享库切换（仅 NAS 登录可见） -->
-                <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
                     <ToggleButton Style="{StaticResource CompactScopeToggle}"
                                   IsChecked="{Binding IsLocalScope}"
                                   Content="本地库" Tag="💻" ToolTip="本地图片库"
@@ -759,7 +752,7 @@
                 </StackPanel>
 
                 <!-- 右侧：通知 + 设置 + 版本号 + 自定义系统三按钮 -->
-                <StackPanel Grid.Column="7" Orientation="Horizontal" VerticalAlignment="Center"
+                <StackPanel Grid.Column="6" Orientation="Horizontal" VerticalAlignment="Center"
                             WindowChrome.IsHitTestVisibleInChrome="True">
                     <Grid Margin="0,0,6,0">
                         <Button x:Name="NotificationsButton" Style="{StaticResource SubtleButtonStyle}" Content="🔔"

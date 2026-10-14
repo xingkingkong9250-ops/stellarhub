@@ -1,4 +1,5 @@
-using Microsoft.Data.Sqlite;
+﻿using Microsoft.Data.Sqlite;
+using TinyPinyin;
 using QL.World.Data;
 using QL.World.Helpers;
 using QL.World.Models;
@@ -94,16 +95,18 @@ public sealed class TagService
     {
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
+        string pinyin = PinyinHelper.GetPinyin(tag);
         command.CommandText = """
-            INSERT INTO image_tags (image_id, tag, source, confidence, created_at)
-            VALUES ($id, $tag, $source, $confidence, $now)
+            INSERT INTO image_tags (image_id, tag, source, confidence, created_at, pinyin)
+            VALUES ($id, $tag, $source, $confidence, $now, $pinyin)
             ON CONFLICT(image_id, tag) DO UPDATE SET
                 source = CASE
                     WHEN image_tags.source = 'manual' THEN 'manual'
                     ELSE excluded.source END,
                 confidence = CASE
                     WHEN image_tags.source = 'manual' THEN image_tags.confidence
-                    ELSE excluded.confidence END
+                    ELSE excluded.confidence END,
+                pinyin = excluded.pinyin
             WHERE image_tags.source <> 'manual' OR excluded.source = 'manual';
             """;
         command.Parameters.AddWithValue("$id", imageId);
@@ -111,6 +114,7 @@ public sealed class TagService
         command.Parameters.AddWithValue("$source", source);
         command.Parameters.AddNullable("$confidence", confidence);
         command.Parameters.AddWithValue("$now", now);
+        command.Parameters.AddWithValue("$pinyin", pinyin);
         return command.ExecuteNonQuery();
     }
 

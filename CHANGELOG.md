@@ -9,6 +9,33 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.14.6] — 2026-10-12 智能搜索：单搜索框自动识别意图 + 拼音 + 语义 fallback
+
+### 变更
+
+- **UI 合并**：删除 A1-5 搜索模式下拉 ComboBox，A1-4 搜索框加宽到 340px，
+  单搜索框自动识别意图（学习 ArtStation/FAB 素材网站搜索逻辑）。
+- **SearchQueryParser 智能解析**：自动判断搜索意图——含扩展名→文件名优先，
+  完全匹配分类名→分类搜索，含中文→生成拼音版本，其余→多字段 OR 搜索。
+- **ImageQueryService SQL 多字段 OR**：Tag 模式不再只查 image_tags，
+  联合查询 tag + file_name + notes + primary_category + pinyin。
+- **拼音支持**：新增 TinyPinyin 库；image_tags 表加 pinyin 列（schema v11）；
+  TagService/LegacyPythonImporter/ImageQueryService 入库时预计算拼音；
+  DbMigrator v11 迁移回填所有已有标签的拼音。
+- **语义 fallback**：精确匹配无结果（输入 ≥4 字符）且 AI 可用时，
+  自动降级到 SemanticSearchService 语义搜索并合并结果。
+- **Enter 键立即提交**：跳过 300ms 防抖定时器，SearchTextBox_KeyDown 处理器。
+
+### 新增文件
+
+- `Services/SearchQueryParser.cs` — 智能搜索查询解析器
+- `Data/Schema.v11.sql` — image_tags 加 pinyin 列
+
+### 验证
+
+- Release 编译 0 警告 0 错误
+- 测试 785/785 全绿
+
 ## [0.14.5] — 2026-10-12 画廊自适应布局：窗口缩放无空白
 
 ### 变更

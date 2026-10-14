@@ -21,10 +21,13 @@ public sealed class LibraryFilter
     /// <summary>PBR texture-group filter from B1-4; null = no group filter.</summary>
     public long? PbrGroupId { get; set; }
 
-    /// <summary>Free text interpreted per <see cref="SearchMode"/>.</summary>
+    /// <summary>v0.14.6: 搜索自由文本，由 SearchQueryParser 自动识别意图。</summary>
     public string? Text { get; set; }
 
     public SearchMode SearchMode { get; set; } = SearchMode.Tag;
+
+    /// <summary>v0.14.6: 搜索文本的拼音版本（含中文时由 SearchQueryParser 生成），SQL 同步匹配 pinyin 列。</summary>
+    public string? SearchPinyin { get; set; }
 
     public GallerySort Sort { get; set; } = GallerySort.ImportedDesc;
 
@@ -109,6 +112,7 @@ public sealed class LibraryFilter
         PbrGroupId = PbrGroupId,
         Text = Text,
         SearchMode = SearchMode,
+        SearchPinyin = SearchPinyin,
         Sort = Sort,
         ImportedWithinDays = ImportedWithinDays,
         OnlyMissing = OnlyMissing,

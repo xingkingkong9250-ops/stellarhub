@@ -1,6 +1,7 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.IO;
 using Microsoft.Data.Sqlite;
+using TinyPinyin;
 using QL.World.Data;
 using QL.World.Helpers;
 using QL.World.Models;
@@ -360,14 +361,15 @@ public sealed class LegacyPythonImporter
                 using var command = conn.CreateCommand();
                 command.Transaction = tx;
                 command.CommandText = """
-                    INSERT OR IGNORE INTO image_tags (image_id, tag, source, confidence, created_at)
-                    VALUES ($image, $tag, $source, $confidence, $now);
+                    INSERT OR IGNORE INTO image_tags (image_id, tag, source, confidence, created_at, pinyin)
+                    VALUES ($image, $tag, $source, $confidence, $now, $pinyin);
                     """;
                 command.Parameters.AddWithValue("$image", newImageId);
                 command.Parameters.AddWithValue("$tag", tag);
                 command.Parameters.AddWithValue("$source", source);
                 command.Parameters.AddNullable("$confidence", confidence);
                 command.Parameters.AddWithValue("$now", DbTime.Now());
+                command.Parameters.AddWithValue("$pinyin", PinyinHelper.GetPinyin(tag));
                 added += command.ExecuteNonQuery();
             }
         });

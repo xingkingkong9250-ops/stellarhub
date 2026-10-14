@@ -140,6 +140,16 @@ public partial class ShellWindow : Window
         SearchTextBox.SelectAll();
     }
 
+    // v0.14.6: Enter 键立即提交搜索，不等待防抖定时器
+    private void SearchTextBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            _viewModel.TopBar.CommitSearchNow();
+            e.Handled = true;
+        }
+    }
+
     private void GalleryList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_syncingSelection) return;

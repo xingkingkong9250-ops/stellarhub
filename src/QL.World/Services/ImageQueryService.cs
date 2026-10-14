@@ -1,6 +1,7 @@
-using System.IO;
+﻿using System.IO;
 using System.Text;
 using Microsoft.Data.Sqlite;
+using TinyPinyin;
 using QL.World.Data;
 using QL.World.Helpers;
 using QL.World.Models;
@@ -419,14 +420,15 @@ public sealed class ImageQueryService
                     using var tagInsert = conn.CreateCommand();
                     tagInsert.Transaction = tx;
                     tagInsert.CommandText = """
-                        INSERT OR IGNORE INTO image_tags (image_id, tag, source, confidence, created_at)
-                        VALUES ($id, $tag, $source, $confidence, $created);
+                        INSERT OR IGNORE INTO image_tags (image_id, tag, source, confidence, created_at, pinyin)
+                        VALUES ($id, $tag, $source, $confidence, $created, $pinyin);
                         """;
                     tagInsert.Parameters.AddWithValue("$id", newId);
                     tagInsert.Parameters.AddWithValue("$tag", tag.Tag);
                     tagInsert.Parameters.AddWithValue("$source", TagService.ToDb(tag.Source));
                     tagInsert.Parameters.AddNullable("$confidence", tag.Confidence);
                     tagInsert.Parameters.AddWithValue("$created", DbTime.Format(tag.CreatedAt));
+                    tagInsert.Parameters.AddWithValue("$pinyin", PinyinHelper.GetPinyin(tag.Tag));
                     tagInsert.ExecuteNonQuery();
                 }
             }
@@ -669,17 +671,39 @@ public sealed class ImageQueryService
         if (!string.IsNullOrWhiteSpace(filter.Text))
         {
             sql.Append(HasWhere(sql) ? "\n  AND " : "\nWHERE ");
+
+            // v0.14.6: 智能搜索 — 多字段 OR 联合查询
+            // Tag 模式（默认）：标签 + 文件名 + 备注 + 分类 + 拼音（如果有）
+            // FileNameNotes 模式：文件名 + 备注 + 拼音
             if (filter.SearchMode == SearchMode.Tag)
             {
                 sql.Append("""
-                    EXISTS (SELECT 1 FROM image_tags it
+                    (EXISTS (SELECT 1 FROM image_tags it
                             WHERE it.image_id = i.id
                               AND it.tag LIKE '%' || $text || '%')
+                     OR i.file_name LIKE '%' || $text || '%'
+                     OR i.notes LIKE '%' || $text || '%'
+                     OR i.primary_category LIKE '%' || $text || '%')
                     """);
+                if (!string.IsNullOrWhiteSpace(filter.SearchPinyin))
+                {
+                    sql.Append("""
+                     OR EXISTS (SELECT 1 FROM image_tags it2
+                               WHERE it2.image_id = i.id
+                                 AND it2.pinyin LIKE '%' || $pinyin || '%')
+                     OR i.file_name LIKE '%' || $pinyin || '%'
+                    """);
+                    parameters.Add(("$pinyin", filter.SearchPinyin));
+                }
             }
             else
             {
                 sql.Append("(i.file_name LIKE '%' || $text || '%' OR i.notes LIKE '%' || $text || '%')");
+                if (!string.IsNullOrWhiteSpace(filter.SearchPinyin))
+                {
+                    sql.Append(" OR i.file_name LIKE '%' || $pinyin || '%'");
+                    parameters.Add(("$pinyin", filter.SearchPinyin));
+                }
             }
             parameters.Add(("$text", filter.Text.Trim()));
         }
