@@ -457,7 +457,7 @@
                                    Visibility="{Binding TagsSummary, Converter={StaticResource NullVis}}" />
                     </StackPanel>
                     <Border Grid.RowSpan="2" Background="{DynamicResource OverlayBrush}"
-                            Visibility="{Binding IsMissing, Converter={StaticResource BoolVis}}">
+                            Visibility="{Binding IsMissing, Converter={StaticResource BoolVis}, FallbackValue=Collapsed, TargetNullValue=Collapsed}">
                         <TextBlock Text="文件缺失" Foreground="{DynamicResource WarningBrush}"
                                    FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
@@ -610,9 +610,10 @@
                         </Grid>
                     </Border>
 
-                    <!-- Missing file overlay (always visible when IsMissing) -->
+                    <!-- Missing file overlay：仅当行数据 IsMissing=true 时显示。
+                         FallbackValue/TargetNullValue=Collapsed：卡片无有效数据（虚拟化回收）时保持隐藏。 -->
                     <Border Background="{DynamicResource OverlayBrush}"
-                            Visibility="{Binding IsMissing, Converter={StaticResource BoolVis}}">
+                            Visibility="{Binding IsMissing, Converter={StaticResource BoolVis}, FallbackValue=Collapsed, TargetNullValue=Collapsed}">
                         <TextBlock Text="文件缺失" Foreground="{DynamicResource WarningBrush}"
                                    FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
