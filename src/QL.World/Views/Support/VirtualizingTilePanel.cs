@@ -219,6 +219,10 @@ public sealed class VirtualizingTilePanel : VirtualizingPanel, IScrollInfo
         _effectiveItemWidth = effectiveWidth;
         _effectiveItemHeight = effectiveHeight;
 
+        // v0.15.0: 上报卡片实际显示宽度（物理像素），供缩略图按显示尺寸选档。
+        QL.World.ViewModels.Support.GalleryDisplayMetrics.ReportItemWidth(
+            effectiveWidth, VisualTreeHelper.GetDpi(this).DpiScaleX);
+
         int rows = (int)Math.Ceiling((double)itemCount / columns);
 
         _viewportSize = availableSize;

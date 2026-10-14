@@ -182,6 +182,10 @@ public sealed class VirtualizingMasonryPanel : VirtualizingPanel, IScrollInfo
         _columns = columns;
         _effectiveItemWidth = effectiveWidth;
 
+        // v0.15.0: 上报卡片实际显示宽度（物理像素），供缩略图按显示尺寸选档。
+        QL.World.ViewModels.Support.GalleryDisplayMetrics.ReportItemWidth(
+            effectiveWidth, VisualTreeHelper.GetDpi(this).DpiScaleX);
+
         // Rebuild layout cache when column count changed or cache dropped.
         if (_layout is null || _layoutColumnCount != columns || _layout.Count != itemCount)
         {

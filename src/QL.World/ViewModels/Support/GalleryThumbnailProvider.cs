@@ -20,10 +20,16 @@ namespace QL.World.ViewModels.Support;
 /// the Preview tier is decoded on demand and pushed to
 /// <see cref="GalleryItemViewModel.PreviewImage"/> without caching (the
 /// detail pane shows one item at a time).
+/// v0.15.0: 画廊卡片按实际显示宽度（<see cref="GalleryDisplayMetrics"/>）选档——
+/// 卡片物理宽度超过 Thumb 档可承受的上采样范围时，自动升级用 Preview 档
+/// WebP 作为卡片图（单独的小容量 LRU），先显示 Thumb 再渐进替换。
+/// 本地行始终允许升级；远端行在弱网（<see cref="NetworkConditionMonitor"/>）
+/// 下不触发 Preview 生成（避免整图下载消耗带宽），已缓存的 Preview 仍可使用。
 /// </summary>
 public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDisposable
 {
     private const int CACHE_LIMIT = 500;
+    private const int HI_CACHE_LIMIT = 64;
     private const int PREFETCH_RANGE = 15;
     private const int LOAD_RETRY_DELAY_MS = 350;
 
@@ -56,6 +62,15 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
     private readonly Dictionary<string, long> _previewHashToId = new();
     private readonly HashSet<string> _previewInFlight = new();
 
+    // v0.15.0: 画廊高分辨率档（复用 Preview 档 WebP）。与 Thumb LRU 分开：
+    // 1024px 位图单张可达 ~4MB，容量必须远小于 Thumb 的 500。
+    private readonly Dictionary<string, BitmapSource> _hiCache = new();
+    private readonly LinkedList<string> _hiLru = new();
+    private readonly Dictionary<string, LinkedListNode<string>> _hiLruNodes = new();
+    private readonly HashSet<string> _hiInFlight = new();
+    // 已请求生成但尚未就绪的 Preview 档 hash（画廊升级用），就绪后扇出到可见行。
+    private readonly HashSet<string> _hiPending = new();
+
     private readonly Dictionary<int, INasConnector> _connectors = new();
     private readonly object _connectorGate = new();
     private bool _disposed;
@@ -80,6 +95,7 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
         _settings = settings;
         _networkMonitor = networkMonitor;
         _thumbnails.ThumbnailReady += OnThumbnailReady;
+        GalleryDisplayMetrics.Changed += OnDisplayMetricsChanged;
         // F-08: when a weak network recovers, re-request thumbnails for the
         // remote rows that Attach had to skip — otherwise those cards stay
         // blank until the user scrolls them out and back again.
@@ -91,6 +107,7 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
     public void Attach(GalleryItemViewModel item)
     {
         ArgumentNullException.ThrowIfNull(item);
+        bool needThumb = false;
         lock (_gate)
         {
             // Id-keyed: duplicate images (same FileHash) no longer evict each
@@ -103,30 +120,47 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
             }
             ids.Add(item.Id);
 
+            // v0.15.0: 高分辨率档命中则直接使用，不再下发 256px Thumb。
+            if (_hiCache.TryGetValue(item.FileHash, out BitmapSource? hi))
+            {
+                TouchHiLru(item.FileHash);
+                item.ThumbnailImage = hi;
+                return;
+            }
+
             if (_cache.TryGetValue(item.FileHash, out BitmapSource? cached))
             {
                 TouchLru(item.FileHash);
                 item.ThumbnailImage = cached;
-                return;
+            }
+            else
+            {
+                needThumb = true;
             }
         }
 
-        if (_thumbnails.ThumbnailExists(item.FileHash, ThumbnailLevel.Thumb))
+        if (needThumb)
         {
-            StartLoad(item);
+            if (_thumbnails.ThumbnailExists(item.FileHash, ThumbnailLevel.Thumb))
+            {
+                StartLoad(item);
+            }
+            else
+            {
+                // M5-H: on weak networks, skip remote thumbnail requests — only
+                // show cached thumbs so the gallery stays responsive over a slow
+                // link. Local items are unaffected. The Changed handler re-runs
+                // Attach once the network recovers (F-08).
+                if (!IsRemoteOnWeakNetwork(item))
+                {
+                    _thumbnails.Request(item.FileHash, CreateSource(item),
+                        ThumbnailLevel.Thumb, highPriority: true);
+                }
+            }
         }
-        else
-        {
-            // M5-H: on weak networks, skip remote thumbnail requests — only
-            // show cached thumbs so the gallery stays responsive over a slow
-            // link. Local items are unaffected. The Changed handler re-runs
-            // Attach once the network recovers (F-08).
-            if (IsRemoteOnWeakNetwork(item))
-                return;
 
-            _thumbnails.Request(item.FileHash, CreateSource(item),
-                ThumbnailLevel.Thumb, highPriority: true);
-        }
+        // v0.15.0: Thumb 就位后继续按显示宽度升级高分辨率档（渐进替换）。
+        EnsureHighRes(item);
     }
 
     /// <summary>Called when the container is recycled/unloaded.</summary>
@@ -158,7 +192,62 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
         {
             _realized.Clear();
             _realizedHashes.Clear();
+            _hiPending.Clear();
         }
+    }
+
+    /// <summary>
+    /// v0.15.0: 显示宽度变化（窗口缩放/布局切换）。只升级不降级——
+    /// 已显示高清图的卡片保持高清（更锐利），新 Attach 按新宽度选档。
+    /// </summary>
+    private void OnDisplayMetricsChanged()
+    {
+        if (_disposed || !GalleryDisplayMetrics.NeedsHighRes)
+            return;
+
+        List<GalleryItemViewModel> snapshot;
+        lock (_gate)
+        {
+            snapshot = _realized.Values.ToList();
+        }
+        foreach (GalleryItemViewModel item in snapshot)
+            EnsureHighRes(item);
+    }
+
+    /// <summary>
+    /// v0.15.0: 确保卡片在显示宽度超过 Thumb 档上采样范围时升级到 Preview
+    /// 档 WebP。命中高清 LRU 直接换图；磁盘已有 Preview WebP 则后台解码；
+    /// 否则请求生成（本地始终允许；远端弱网不生成，避免整图下载占带宽，
+    /// 网络恢复后 OnNetworkConditionChanged → Attach 会重新走到这里）。
+    /// </summary>
+    private void EnsureHighRes(GalleryItemViewModel item)
+    {
+        if (!GalleryDisplayMetrics.NeedsHighRes)
+            return;
+
+        lock (_gate)
+        {
+            if (_hiCache.TryGetValue(item.FileHash, out BitmapSource? hi))
+            {
+                TouchHiLru(item.FileHash);
+                item.ThumbnailImage = hi;
+                return;
+            }
+        }
+
+        if (_thumbnails.ThumbnailExists(item.FileHash, ThumbnailLevel.Preview))
+        {
+            StartHiLoad(item);
+            return;
+        }
+
+        if (IsRemoteOnWeakNetwork(item))
+            return;
+
+        lock (_gate)
+            _hiPending.Add(item.FileHash);
+        _thumbnails.Request(item.FileHash, CreateSource(item),
+            ThumbnailLevel.Preview, highPriority: true);
     }
 
     /// <summary>
@@ -244,6 +333,7 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
         if (_disposed) return;
         _disposed = true;
         _thumbnails.ThumbnailReady -= OnThumbnailReady;
+        GalleryDisplayMetrics.Changed -= OnDisplayMetricsChanged;
         if (_networkMonitor is not null)
             _networkMonitor.Changed -= OnNetworkConditionChanged;
         // M5-E: release cached NAS connectors (HttpClient pools) on shutdown.
@@ -287,12 +377,14 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
     /// M5-F: routes the ThumbnailReady callback by level. Thumb → load into
     /// the gallery grid/list (all visible rows sharing the hash); Preview →
     /// load into the detail pane.
+    /// v0.15.0: Preview 就绪同时扇出给等待高分辨率升级的画廊可见行。
     /// </summary>
     private void OnThumbnailReady(string hash, ThumbnailLevel level)
     {
         if (_disposed) return;
 
         List<GalleryItemViewModel> targets = [];
+        List<GalleryItemViewModel> hiTargets = [];
         lock (_gate)
         {
             if (level == ThumbnailLevel.Thumb)
@@ -306,21 +398,39 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
                     }
                 }
             }
-            else if (_previewHashToId.TryGetValue(hash, out long previewId) &&
-                     _previewRequested.TryGetValue(previewId, out GalleryItemViewModel? previewItem))
+            else
             {
-                targets.Add(previewItem);
+                if (_previewHashToId.TryGetValue(hash, out long previewId) &&
+                    _previewRequested.TryGetValue(previewId, out GalleryItemViewModel? previewItem))
+                {
+                    targets.Add(previewItem);
+                }
+
+                // v0.15.0: 画廊高分辨率升级等待者。
+                if (_hiPending.Remove(hash) &&
+                    _realizedHashes.TryGetValue(hash, out HashSet<long>? hiIds))
+                {
+                    foreach (long id in hiIds)
+                    {
+                        if (_realized.TryGetValue(id, out GalleryItemViewModel? row))
+                            hiTargets.Add(row);
+                    }
+                }
             }
         }
 
-        if (targets.Count == 0)
-            return;
-
         if (level == ThumbnailLevel.Preview)
-            StartPreviewLoad(targets[0]);
+        {
+            if (targets.Count > 0)
+                StartPreviewLoad(targets[0]);
+            foreach (GalleryItemViewModel item in hiTargets)
+                StartHiLoad(item);
+        }
         else
+        {
             foreach (GalleryItemViewModel item in targets)
                 StartLoad(item);
+        }
     }
 
     /// <summary>
@@ -607,6 +717,90 @@ public sealed class GalleryThumbnailProvider : IGalleryThumbnailProvider, IDispo
         {
             _lru.Remove(node);
             _lru.AddFirst(node);
+        }
+    }
+
+    /// <summary>
+    /// v0.15.0: 后台解码 Preview 档 WebP 并发布为画廊卡片的高分辨率图。
+    /// 解码失败时保留已显示的 Thumb（渐进升级不破坏现有画面）。
+    /// </summary>
+    private void StartHiLoad(GalleryItemViewModel item)
+    {
+        string hash = item.FileHash;
+        string path = _thumbnails.GetThumbnailPath(hash, ThumbnailLevel.Preview);
+
+        lock (_gate)
+        {
+            if (_hiInFlight.Contains(hash)) return;
+            _hiInFlight.Add(hash);
+        }
+
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                if (!File.Exists(path))
+                {
+                    // 与 StartLoad 相同的兜底：文件在竞态中消失 → 重新请求，
+                    // ThumbnailReady(Preview) 会重新进入本路径。
+                    lock (_gate)
+                        _hiPending.Add(hash);
+                    _thumbnails.Request(hash, CreateSource(item),
+                        ThumbnailLevel.Preview, highPriority: true);
+                    return;
+                }
+
+                BitmapSource? bitmap = Helpers.WebpImageDecoder.DecodeFile(path);
+                if (bitmap is null)
+                    return;
+
+                lock (_gate)
+                {
+                    PutHiCache(hash, bitmap);
+                    PublishToRealized(hash, bitmap);
+                }
+            }
+            catch (Exception ex)
+            {
+                QL.World.App.WriteLog($"[THUMB] StartHiLoad exception hash={hash}: {ex.GetType().Name} {ex.Message}");
+            }
+            finally
+            {
+                lock (_gate)
+                {
+                    _hiInFlight.Remove(hash);
+                }
+            }
+        });
+    }
+
+    private void TouchHiLru(string key)
+    {
+        if (_hiLruNodes.TryGetValue(key, out LinkedListNode<string>? node))
+        {
+            _hiLru.Remove(node);
+            _hiLru.AddFirst(node);
+        }
+    }
+
+    private void PutHiCache(string key, BitmapSource bitmap)
+    {
+        if (_hiLruNodes.TryGetValue(key, out LinkedListNode<string>? existing))
+        {
+            _hiLru.Remove(existing);
+            _hiLruNodes.Remove(key);
+        }
+
+        _hiCache[key] = bitmap;
+        LinkedListNode<string> added = _hiLru.AddFirst(key);
+        _hiLruNodes[key] = added;
+
+        while (_hiCache.Count > HI_CACHE_LIMIT && _hiLru.Last is not null)
+        {
+            string oldest = _hiLru.Last.Value;
+            _hiLru.RemoveLast();
+            _hiLruNodes.Remove(oldest);
+            _hiCache.Remove(oldest);
         }
     }
 
