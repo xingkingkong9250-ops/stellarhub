@@ -7,16 +7,16 @@
 | 编号 | 名称 | 状态 | 说明 |
 |---|---|---|---|
 | W1 | 主窗口 | 已实现（M1） | 1400×850，最小 1100×700，PerMonitorV2 |
-| W1/A1 | 顶栏（单行 80px，兼任标题栏） | 已实现（M1，v0.14.3 合并） | v0.14.3 起原标题栏（40）+ 工具条行（44）合并为单行 80px；WindowChrome.CaptionHeight=80 整行可拖动；排列顺序：A1-9 品牌 → A1-4 搜索框 → A1-5 搜索模式 → 操作按钮（导入/扫描/刷新/AI/颜色/下载/审核）→ 最近入库 → 本地/共享切换 → [弹性空白] → 通知/设置/版本号/系统三按钮 |
+| W1/A1 | 顶栏（单行 80px，兼任标题栏） | 已实现（M1，v0.14.3 合并，v0.14.8 可点击修复） | v0.14.3 起原标题栏（40）+ 工具条行（44）合并为单行 80px；WindowChrome.CaptionHeight=80 整行可拖动（v0.14.8 起各交互控件补 IsHitTestVisibleInChrome 恢复点击）；排列顺序：A1-9 品牌 → A1-4 智能搜索框 → 操作按钮（导入/扫描/刷新/AI/颜色/下载/审核）→ 最近入库 → 本地/共享切换 → [弹性空白] → 通知/设置/版本号/系统三按钮 |
 | W1/A1-1 | 「导入」按钮 | 已实现（M1） | 「＋ 导入图片」，打开 W2 |
 | W1/A1-2 | 「AI 分析」按钮 | 已实现（M3，v0.9.0 语义调整） | 仅分析**无任何标签且无分类**的图（人工/AI 标签均算有标签，跳过不刷新）；AI 不可用时置灰 + ToolTip 说明原因；启动软件不自动分析 |
 | W1/A1-3 | 视图切换（网格/列表/浏览） | 已实现（M1+B2-3-BRW，v0.12.3 迁移位置） | 三态 ToggleButton 互斥切换；v0.12.3 起从顶部 Row 1 工具条右侧整组迁移至 B2 画廊工具条左侧（W1/B2-1 区），更贴近画廊与缩放/排序同栏；网格/列表各一支缩放滑杆，浏览态独立 160–512 卡片宽度滑杆；v0.12.3 起默认视图为 Browse（瀑布流） |
-| W1/A1-4 | 搜索框 | 已实现（M1） | AutomationId 语义名 SearchBox，300ms 防抖 |
-| W1/A1-5 | 搜索模式下拉 | 已实现（M1） | 标签 / 文件名·备注 / 语义（M3-E1） |
+| W1/A1-4 | 智能搜索框 | 已实现（M1，v0.14.6 智能化） | AutomationId 语义名 SearchBox；宽 340px；300ms 防抖 + Enter 立即提交；v0.14.6 起自动识别意图（SearchQueryParser）：含扩展名→文件名优先、完全匹配分类名→分类搜索、含中文→生成拼音联合匹配、其余→标签/文件名/备注/分类多字段 OR；精确无结果且 ≥4 字符自动降级语义搜索（A1-5 搜索模式下拉并入本编号） |
+| W1/A1-5 | 搜索模式下拉 | **已合并（v0.14.6）** | v0.14.6 起搜索模式下拉 ComboBox 删除，标签/文件名·备注/语义三模式能力并入 A1-4 智能搜索框（意图自动识别 + 拼音 + 语义 fallback），编号作废不复用 |
 | W1/A1-6 | 通知铃铛 | 已实现（M2） | 未读红点徽标 + 弹层列表（未读标记/全部已读/清空）；v0.7.3 修复弹层绑定路径（VM 转发 Items，此前列表恒空仅徽标正常） |
 | W1/A1-7 | 设置齿轮 | 已实现（M2） | 打开 W3 |
 | W1/A1-8 | 「分析颜色」按钮 | 已实现（M3-D） | 手动批量回填 dominant_colors；与 AI 档位无关；占用主线程串行执行 |
-| W1/A1-9 | 品牌 Logo 图块 + 名称 + AI 按钮品牌渐变 | 已实现（U2-A，v0.7.0 焕新） | v0.7.0 起 Logo 为 22×22 圆角品牌图「星光相框猫」（Assets/brand-logo.jpg，ImageBrush UniformToFill + BorderSubtle 描边），替换原 20×20 渐变占位色块；名称「千星汇图」；AI 按钮 hover 切 AccentGradientBrush（青蓝 #0E9FC0→#3B82F6）+ TextOnAccentBrush 文字。全部窗口图标统一 Assets/app.ico（Generic.xaml 隐式 Window 样式 + csproj ApplicationIcon） |
+| W1/A1-9 | 品牌 Logo 图块 + 名称 + AI 按钮品牌渐变 | 已实现（U2-A，v0.7.0 焕新，v0.14.4 放大） | v0.7.0 起 Logo 为圆角品牌图「星光相框猫」（Assets/brand-logo.jpg，ImageBrush UniformToFill + BorderSubtle 描边），替换原渐变占位色块；v0.14.4 起品牌块放大填满顶栏行高（Logo 跟随 80px 行高、名称「千星汇图」30px SemiBold Microsoft YaHei UI）；AI 按钮 hover 切 AccentGradientBrush（青蓝 #0E9FC0→#3B82F6）+ TextOnAccentBrush 文字。全部窗口图标统一 Assets/app.ico（Generic.xaml 隐式 Window 样式 + csproj ApplicationIcon） |
 | W1/A1-10 | 「🔄 刷新」按钮 | 已实现（v0.8.0） | 顶栏工具条（扫描 NAS 之后）；主动刷新：逐个重扫全部监控目录（ImportService 按 hash 幂等去重）→ 重载画廊 → 状态栏汇报，有新增联动主色调回填；无监控目录退化为纯画廊重载；F5 快捷键同命令；<1500px 收窄为 🔄 图标 |
 | W1/A1-M | 文本菜单栏（VS Code 风格 Row 0，兼任标题栏） | 已移除（v0.14.2） | v0.14.2 移除：文件/视图/工具功能全部已有快捷按钮（重复入口），帮助三项无实际功能。Ctrl+I 等快捷键仍由 InputBindings 生效。编号 A1-M-FILE/VIEW/TOOLS/HELP 同步作废，不复用。 |
 | W1/A1-M-FILE | 「文件(_F)」菜单 | 已移除（v0.14.2） | 同 A1-M |
@@ -52,7 +52,7 @@
 | W1/B2 | 画廊区 | 已实现（M1） | |
 | W1/B2-1 | 视图切换+筛选摘要 | 已实现（M1，v0.12.3 重定位） | v0.12.3 起：W1/A1-3 视图切换三按钮（网格/列表/浏览）+ 分隔 + 筛选摘要（FilterSummary，无筛选时隐藏）。原「显示 N 张 / 共 M」计数移除，计数职责完全交给 W1/C1-C 状态栏居中区（早已存在） |
 | W1/B2-2 | 排序下拉 | 已实现（M1） | 必须真实生效并持久化 |
-| W1/B2-3 | 图卡（网格/列表） | 已实现（M1） | VirtualizingTilePanel UI 虚拟化 |
+| W1/B2-3 | 图卡（网格/列表） | 已实现（M1，v0.14.5 自适应，v0.15.0 分档加载） | VirtualizingTilePanel UI 虚拟化；v0.14.5 起窗口缩放自适应列数（缩略图等比放大填满、1.5 倍插列缩回，无右侧空白）；v0.15.0 起按卡片物理显示宽度自动选档（≤320px 用 256px Thumb，超过渐进升级 1024px Preview；远端弱网不触发生成） |
 | W1/B2-3-SEL | 选中态视觉锚点 | 已实现（U1-A） | 网格 2px Accent 外描边；列表 3px 左竖条+底线（Padding 同步减 3px 抵消 layout shift）；底色由 ListBoxItem AccentBg 提供 |
 | W1/B2-3-OL1 | 「最近入库」下拉 | 已实现（U2-B） | 今天/近 7 天/近 30 天/全部；持久化到 settings.gallery_recent_import_days |
 | W1/B2-3-BDG | 缩略图来源徽标 | 已实现（U2-D） | 网格右下角/列表右上角；三态「本地/云端/AI」，无 AI 数据时隐藏 |
