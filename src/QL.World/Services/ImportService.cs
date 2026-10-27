@@ -37,6 +37,7 @@ public sealed class ImportService
 
     private readonly DatabaseService _db;
     private readonly ImageInspector _inspector;
+    private readonly PerceptualHashService _hasher;
     private readonly PbrGroupingService? _pbrGrouping;
     private readonly string? _libraryRoot;
     private readonly LibraryStorageService _storage;
@@ -46,10 +47,12 @@ public sealed class ImportService
         ImageInspector inspector,
         PbrGroupingService? pbrGrouping = null,
         string? libraryRootPath = null,
-        LibraryStorageService? storage = null)
+        LibraryStorageService? storage = null,
+        PerceptualHashService? hasher = null)
     {
         _db = db;
         _inspector = inspector;
+        _hasher = hasher ?? new PerceptualHashService();
         _pbrGrouping = pbrGrouping;
         _libraryRoot = string.IsNullOrWhiteSpace(libraryRootPath) ? null : libraryRootPath;
         _storage = storage ?? new LibraryStorageService();
@@ -117,6 +120,13 @@ public sealed class ImportService
 
             List<ImportedItem> inserted = InsertBatch(batch, options);
             report.Added.AddRange(inserted);
+
+            // DUP-B: 批事务返回后按 batch[i] ↔ inserted[i] 对齐，用库内 +
+            // 本次已入库的 phash 索引查 L1 同图。只记录不拦截，也不写
+            // duplicate_candidates（那由全库扫描生成）。
+            for (int i = 0; i < inserted.Count; i++)
+                RecordDuplicate(batch[i], inserted[i], snapshot, report);
+
             foreach (ImportedItem item in inserted)
             {
                 // Local rows track the parent dir for PBR rescanning; remote
@@ -220,6 +230,21 @@ public sealed class ImportService
                     continue;
                 }
 
+                // 0.16.0 DUP-A: 感知哈希（L1 同图判定基础）。纯增强字段，
+                // 读取/解码失败只留 NULL，不影响导入本身。
+                string? phash = null;
+                try
+                {
+                    using Stream phashStream = accessor.OpenRead(file);
+                    if (_hasher.TryCompute(phashStream) is ulong hashValue)
+                        phash = PerceptualHashService.ToHex(hashValue);
+                }
+                catch (Exception ex) when (ex is IOException
+                    or UnauthorizedAccessException or NasConnectionException)
+                {
+                    // 远端弱网/临时读失败：本张图后续由查重扫描补算。
+                }
+
                 string originalName = GetFileName(file, options.Source);
                 string rowPath = file;
                 string? entryCode = null;
@@ -264,7 +289,8 @@ public sealed class ImportService
                     options.NasConnectionId,
                     category,
                     physicalPath,
-                    entryCode));
+                    entryCode,
+                    phash));
                 snapshot.HashCategories.Add((hash, category));
                 snapshot.OriginalPaths.Add(file);
 
@@ -296,6 +322,43 @@ public sealed class ImportService
         Skipped = state.Skipped,
         CurrentFile = state.CurrentFile,
     };
+
+    /// <summary>
+    /// DUP-B: 对一张刚入库的新图查 L1 最优命中（汉明距离 ≤ 阈值），
+    /// 记录报告/日志，再把新图增量加入索引，保证同批与后续批次可互查。
+    /// 索引先查后加，新图不会匹配到自己。
+    /// </summary>
+    private static void RecordDuplicate(
+        PendingImage item,
+        ImportedItem inserted,
+        ExistingSnapshot snapshot,
+        ImportReport report)
+    {
+        if (PerceptualHashService.TryParseHex(item.Phash) is not ulong hash)
+            return;
+
+        ExistingSnapshot.PhashEntry? match = null;
+        int bestDistance = int.MaxValue;
+        foreach (ExistingSnapshot.PhashEntry candidate in snapshot.PhashEntries)
+        {
+            int distance = PerceptualHashService.HammingDistance(hash, candidate.Hash);
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                match = candidate;
+            }
+        }
+
+        if (match is not null && bestDistance <= PerceptualHashService.SameImageMaxDistance)
+        {
+            report.Duplicates.Add(new DuplicateHit(
+                inserted.Id, match.ImageId, item.OriginalPath, match.Path, bestDistance));
+            report.LogLines.Add(
+                $"疑似重复（距离 {bestDistance}）：{item.OriginalPath} ↔ {match.Path}");
+        }
+
+        snapshot.AddPhash(inserted.Id, item.OriginalPath, hash);
+    }
 
     private List<ImportedItem> InsertBatch(List<PendingImage> batch, ImportOptions options)
     {
@@ -354,13 +417,13 @@ public sealed class ImportService
                          width, height, format, rating, notes, primary_category,
                          dominant_colors, is_missing, created_at, updated_at,
                          source, nas_connection_id,
-                         library_hash, library_path, original_path, entry_code)
+                         library_hash, library_path, original_path, entry_code, phash)
                     VALUES
                         ($path, $name, $sortable, $hash, $size,
                          $width, $height, $format, 0, '', $category,
                          NULL, 0, $now, $now,
                          $source, $nasConn,
-                         $hash, $libPath, $original, $entryCode);
+                         $hash, $libPath, $original, $entryCode, $phash);
                     SELECT last_insert_rowid();
                     """;
                 insert.Parameters.AddWithValue("$path", item.FilePath);
@@ -382,6 +445,7 @@ public sealed class ImportService
                 insert.Parameters.AddWithValue("$original", item.OriginalPath);
                 insert.Parameters.AddWithValue("$entryCode",
                     (object?)item.EntryCode ?? DBNull.Value);
+                insert.Parameters.AddNullable("$phash", item.Phash);
 
                 long id = Convert.ToInt64(insert.ExecuteScalar());
                 inserted.Add(new ImportedItem(id, item.FilePath, item.Hash, item.OriginalPath));
@@ -500,6 +564,22 @@ public sealed class ImportService
                 while (reader.Read())
                     snapshot.RecordPhysicalPath(reader.GetString(0), reader.GetString(1));
             }
+            using (var command = conn.CreateCommand())
+            {
+                // DUP-B: L1 索引只依赖已算出的 phash；无效值静默跳过，
+                // 存量 NULL 行由 DUP-C 全库扫描补算。
+                command.CommandText =
+                    "SELECT id, COALESCE(original_path, file_path), phash "
+                    + "FROM images WHERE phash IS NOT NULL;";
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    if (PerceptualHashService.TryParseHex(reader.GetString(2))
+                        is not ulong hash)
+                        continue;
+                    snapshot.AddPhash(reader.GetInt64(0), reader.GetString(1), hash);
+                }
+            }
             return snapshot;
         });
     }
@@ -517,7 +597,8 @@ public sealed class ImportService
         int? NasConnectionId,
         string Category,
         string? PhysicalPath,
-        string? EntryCode);
+        string? EntryCode,
+        string? Phash);
 
     private sealed class ExistingSnapshot
     {
@@ -531,6 +612,16 @@ public sealed class ImportService
 
         private readonly Dictionary<string, string> _physicalByHash =
             new(StringComparer.Ordinal);
+
+        private readonly List<PhashEntry> _phashEntries = [];
+
+        /// <summary>DUP-B: 库内已算出的 phash 索引（含本次导入增量）。</summary>
+        public IReadOnlyList<PhashEntry> PhashEntries => _phashEntries;
+
+        public void AddPhash(long imageId, string path, ulong hash)
+            => _phashEntries.Add(new PhashEntry(imageId, path, hash));
+
+        public sealed record PhashEntry(long ImageId, string Path, ulong Hash);
 
         public bool TryGetPhysicalPath(string hash, out string? physicalPath)
             => _physicalByHash.TryGetValue(hash, out physicalPath);

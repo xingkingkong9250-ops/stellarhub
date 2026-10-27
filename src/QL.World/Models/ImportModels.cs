@@ -62,6 +62,18 @@ public sealed class ImportProgress
 /// </summary>
 public sealed record ImportedItem(long Id, string FilePath, string FileHash, string OriginalPath = "");
 
+/// <summary>
+/// 0.16.0 DUP-B: 导入时 L1 感知哈希命中的疑似重复（只记录，不拦截入库）。
+/// <paramref name="FilePath"/> 是本次导入的源路径，
+/// <paramref name="ExistingFilePath"/> 是库内已有图片的原始路径。
+/// </summary>
+public sealed record DuplicateHit(
+    long ImageId,
+    long ExistingImageId,
+    string FilePath,
+    string ExistingFilePath,
+    int HammingDistance);
+
 /// <summary>Outcome of an import run.</summary>
 public sealed class ImportReport
 {
@@ -71,4 +83,7 @@ public sealed class ImportReport
     public bool Cancelled { get; set; }
     public List<ImportedItem> Added { get; } = [];
     public List<string> LogLines { get; } = [];
+
+    /// <summary>DUP-B: 每张新图最多一条最优 L1 命中（无 phash 的新图不参与）。</summary>
+    public List<DuplicateHit> Duplicates { get; } = [];
 }

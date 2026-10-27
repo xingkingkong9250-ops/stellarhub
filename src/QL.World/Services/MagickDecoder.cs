@@ -28,6 +28,12 @@ public interface IMagickDecoder
     /// caller. Returns false when the file cannot be decoded.
     /// </summary>
     bool TryLoadFrame(string path, out Image? image);
+
+    /// <summary>
+    /// 0.16.0 DUP-A: decodes a frame from an already-open stream (NAS originals
+    /// and other non-seekable sources). The caller owns the stream.
+    /// </summary>
+    bool TryLoadFrame(Stream stream, out Image? image);
 }
 
 /// <summary>
@@ -99,6 +105,30 @@ internal sealed class MagickDecoder : IMagickDecoder
             return true;
         }
         catch (Exception ex) when (ex is IOException
+            or UnauthorizedAccessException or MagickException)
+        {
+            image?.Dispose();
+            image = null;
+            return false;
+        }
+    }
+
+    public bool TryLoadFrame(Stream stream, out Image? image)
+    {
+        image = null;
+
+        try
+        {
+            using var frames = new MagickImageCollection(stream);
+            frames.Flatten();
+            if (frames.Count == 0)
+                return false;
+
+            byte[] png = frames.ToByteArray(MagickFormat.Png);
+            image = Image.Load<Rgba32>(png);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or NotSupportedException
             or UnauthorizedAccessException or MagickException)
         {
             image?.Dispose();
