@@ -142,6 +142,10 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
             () => IsReviewAvailable);
         if (IsReviewAvailable)
             _ = RefreshPendingCountAsync();
+
+        // 0.16.0 DUP-D: W8 重复审核入口。L1 感知哈希恒可用，AI 不可用也不置灰。
+        ShowDuplicateReviewCommand = new RelayCommand(
+            () => ShowDuplicateReviewDialog?.Invoke());
     }
 
     public AppSettingsService Settings => _services.Settings;
@@ -209,6 +213,12 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>U6-C: bound by App to instantiate <see cref="Views.ReviewQueueWindow"/>.</summary>
     public event Action? ShowReviewQueueDialog;
+
+    /// <summary>0.16.0 DUP-D: opens the W8 duplicate review window.</summary>
+    public RelayCommand ShowDuplicateReviewCommand { get; }
+
+    /// <summary>0.16.0 DUP-D: bound by App to instantiate <see cref="Views.DuplicateReviewWindow"/>.</summary>
+    public event Action? ShowDuplicateReviewDialog;
 
     private int _pendingCount;
     /// <summary>U6-C: number of submissions awaiting review (toolbar badge).</summary>

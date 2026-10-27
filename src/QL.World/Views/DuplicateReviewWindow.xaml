@@ -1,0 +1,306 @@
+<Window x:Class="QL.World.Views.DuplicateReviewWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Width="980" Height="640"
+        MinWidth="820" MinHeight="520"
+        ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource SurfaceBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
+        Title="重复审核 — 千星汇图">
+
+    <Grid Background="{DynamicResource BackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- W8/TB 工具栏 -->
+        <Grid Grid.Row="0" Margin="14,12,14,8">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="🔍 重复审核" FontSize="14" FontWeight="Bold"
+                           Foreground="{DynamicResource TextPrimaryBrush}" />
+                <Button Content="开始全库扫描" Margin="14,0,0,0" Padding="12,4"
+                        Style="{StaticResource AccentButtonStyle}"
+                        AutomationProperties.Name="开始全库扫描"
+                        Command="{Binding ScanCommand}" />
+                <Button Content="取消扫描" Margin="8,0,0,0" Padding="12,4"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        AutomationProperties.Name="取消扫描"
+                        Command="{Binding CancelScanCommand}" />
+                <ComboBox Width="110" Height="28" Margin="16,0,0,0"
+                          AutomationProperties.Name="类型筛选"
+                          ToolTip="按重复类型筛选"
+                          ItemsSource="{Binding KindOptions}"
+                          DisplayMemberPath="Display"
+                          SelectedValuePath="Value"
+                          SelectedValue="{Binding SelectedKindFilter}" />
+                <ComboBox Width="96" Height="28" Margin="8,0,0,0"
+                          AutomationProperties.Name="状态筛选"
+                          ToolTip="按处理状态筛选"
+                          ItemsSource="{Binding StatusOptions}"
+                          DisplayMemberPath="Display"
+                          SelectedValuePath="Value"
+                          SelectedValue="{Binding SelectedStatusFilter}" />
+                <Button Content="刷新" Width="64" Margin="8,0,0,0" Padding="0,4"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        AutomationProperties.Name="刷新重复组"
+                        Command="{Binding RefreshCommand}" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <TextBlock Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"
+                           Text="{Binding GroupsSummaryText}" />
+                <TextBlock Margin="12,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}"
+                           VerticalAlignment="Center" Text="{Binding StatusText}" />
+            </StackPanel>
+        </Grid>
+
+        <!-- 扫描进度 -->
+        <Grid Grid.Row="1" Margin="14,0,14,8">
+            <ProgressBar Height="4" Minimum="0" Maximum="100"
+                         Value="{Binding ScanPercent, Mode=OneWay}"
+                         Foreground="{DynamicResource AccentBrush}"
+                         Background="{DynamicResource SurfaceVariantBrush}"
+                         Visibility="{Binding IsScanning, Converter={StaticResource BoolVis}}" />
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,0"
+                        Visibility="{Binding IsScanning, Converter={StaticResource BoolVis}}">
+                <TextBlock Foreground="{DynamicResource TextMutedBrush}"
+                           Text="{Binding ScanPhaseText}" />
+                <TextBlock Margin="10,0,0,0" Foreground="{DynamicResource TextMutedBrush}"
+                           Text="{Binding ScanDetailText}" />
+            </StackPanel>
+        </Grid>
+
+        <!-- 主体：左组列表 / 右组详情 -->
+        <Grid Grid.Row="2" Margin="12,0,12,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- W8/L 组列表 -->
+            <Border Grid.Column="0" Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1"
+                    CornerRadius="6" Margin="0,0,10,0">
+                <Grid>
+                    <ListBox Margin="6"
+                             AutomationProperties.Name="重复组列表"
+                             ItemsSource="{Binding Groups}"
+                             SelectedItem="{Binding SelectedGroup, Mode=TwoWay}"
+                             Background="Transparent" BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="4,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- 缩略图堆叠 -->
+                                    <ItemsControl Grid.Column="0" ItemsSource="{Binding StackMembers}"
+                                                  VerticalAlignment="Center">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Width="34" Height="34" Margin="0,0,-14,0"
+                                                        Background="{DynamicResource SurfaceVariantBrush}"
+                                                        BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                                        BorderThickness="1" CornerRadius="3">
+                                                    <Image Source="{Binding ThumbnailImage}" Stretch="UniformToFill" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <StackPanel Grid.Column="1" Margin="26,0,0,0" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Border Padding="5,0" CornerRadius="3"
+                                                    Background="{DynamicResource SurfaceVariantBrush}">
+                                                <TextBlock Text="{Binding LevelText}" FontSize="10"
+                                                           Foreground="{DynamicResource AccentBrush}" />
+                                            </Border>
+                                            <TextBlock Margin="6,0,0,0" FontSize="11"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       Text="{Binding KindText}" />
+                                            <TextBlock Margin="6,0,0,0" FontSize="11"
+                                                       Foreground="{DynamicResource TextMutedBrush}"
+                                                       Text="{Binding MemberCountText}" />
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                            <TextBlock FontSize="11"
+                                                       Foreground="{DynamicResource TextMutedBrush}"
+                                                       Text="{Binding ScoreText, StringFormat='得分 {0}'}" />
+                                            <TextBlock Margin="8,0,0,0" FontSize="11"
+                                                       Foreground="{DynamicResource TextMutedBrush}"
+                                                       Text="{Binding StatusText}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="2" />
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                    </ListBox>
+
+                    <TextBlock Text="没有重复组&#x0a;点击「开始全库扫描」检测库内重复图片"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               TextAlignment="Center" FontSize="13"
+                               Foreground="{DynamicResource TextMutedBrush}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Groups.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+            </Border>
+
+            <!-- W8/R 组详情 -->
+            <Border Grid.Column="1" Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1"
+                    CornerRadius="6" Padding="12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="2,0,0,8">
+                        <TextBlock Text="组内图片" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBlock Margin="10,0,0,0" Foreground="{DynamicResource TextMutedBrush}"
+                                   Text="{Binding SelectedGroup.MemberCountText}" />
+                        <TextBlock Margin="10,0,0,0" Foreground="{DynamicResource TextMutedBrush}"
+                                   Text="{Binding SelectedGroup.KindText}" />
+                    </StackPanel>
+
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding SelectedGroup.Members}"
+                                      AutomationProperties.Name="组内图片列表">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Width="196" Margin="4" Padding="6"
+                                            Background="{DynamicResource SurfaceVariantBrush}"
+                                            BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                            BorderThickness="1" CornerRadius="6">
+                                        <StackPanel>
+                                            <Grid Height="128">
+                                                <Border Background="{DynamicResource BackgroundBrush}"
+                                                        BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                                        BorderThickness="1" CornerRadius="4">
+                                                    <Image Source="{Binding ThumbnailImage}" Stretch="Uniform" />
+                                                </Border>
+                                                <CheckBox HorizontalAlignment="Left" VerticalAlignment="Top"
+                                                          Margin="6" Background="{DynamicResource SurfaceBrush}"
+                                                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                          AutomationProperties.Name="选择图片" />
+                                                <Border HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                        Margin="6" Padding="5,1" CornerRadius="3"
+                                                        Background="{DynamicResource WarningBrush}"
+                                                        Visibility="{Binding IsRecommended, Converter={StaticResource BoolVis}}">
+                                                    <TextBlock Text="推荐保留" FontSize="10" FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource TextOnWarningBrush}" />
+                                                </Border>
+                                            </Grid>
+
+                                            <TextBlock Margin="0,6,0,0" FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Text="{Binding FileName}"
+                                                       ToolTip="{Binding FilePath}"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}" />
+                                            <WrapPanel Margin="0,3,0,0">
+                                                <TextBlock FontSize="11"
+                                                           Foreground="{DynamicResource TextMutedBrush}"
+                                                           Text="{Binding DimensionsText}" />
+                                                <TextBlock Margin="8,0,0,0" FontSize="11"
+                                                           Foreground="{DynamicResource TextMutedBrush}"
+                                                           Text="{Binding FileSizeText}" />
+                                                <TextBlock Margin="8,0,0,0" FontSize="11"
+                                                           Foreground="{DynamicResource TextMutedBrush}"
+                                                           Text="{Binding CreatedAtText}" />
+                                            </WrapPanel>
+                                            <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                                <TextBlock FontSize="11"
+                                                           Foreground="{DynamicResource AccentBrush}"
+                                                           Text="{Binding LevelText}" />
+                                                <TextBlock Margin="6,0,0,0" FontSize="11"
+                                                           Foreground="{DynamicResource TextMutedBrush}"
+                                                           Text="{Binding KindText}" />
+                                                <TextBlock Margin="6,0,0,0" FontSize="11"
+                                                           Foreground="{DynamicResource TextMutedBrush}"
+                                                           Text="{Binding ScoreText, StringFormat='得分 {0}'}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <!-- W8/ACT 组动作 -->
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right"
+                                Margin="0,10,0,0">
+                        <Button Content="保留全部" Width="96" Padding="2,4"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                AutomationProperties.Name="保留全部"
+                                ToolTip="整组标记为已忽略，不再出现在待处理列表"
+                                Command="{Binding KeepAllCommand}"
+                                CommandParameter="{Binding SelectedGroup}" />
+                        <Button Content="删除选中" Width="96" Margin="8,0,0,0" Padding="2,4"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                AutomationProperties.Name="删除选中"
+                                ToolTip="从库中移除勾选的图片（不删磁盘文件，8 秒内可撤销）"
+                                Command="{Binding DeleteSelectedCommand}"
+                                CommandParameter="{Binding SelectedGroup}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- 底部：撤销条 + 关闭 -->
+        <Border Grid.Row="3" Padding="12,8"
+                Background="{DynamicResource SurfaceVariantBrush}"
+                BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,1,0,0">
+            <Grid>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                            Visibility="{Binding UndoVisible, Converter={StaticResource BoolVis}}">
+                    <TextBlock Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Center" Text="{Binding UndoText}" />
+                    <Button Content="撤销" Width="64" Margin="10,0,0,0" Padding="0,2"
+                            Style="{StaticResource SubtleButtonStyle}"
+                            AutomationProperties.Name="撤销删除"
+                            Command="{Binding UndoCommand}" />
+                </StackPanel>
+                <Button Content="关闭" Width="96" HorizontalAlignment="Right"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        IsCancel="True" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

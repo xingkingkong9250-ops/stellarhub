@@ -241,6 +241,7 @@ public partial class App : Application
             _shellViewModel.ShowSettingsDialog += ShowSettingsDialog;
             _shellViewModel.ShowDownloadQueueDialog += ShowDownloadQueueDialog;
             _shellViewModel.ShowReviewQueueDialog += ShowReviewQueueDialog;
+            _shellViewModel.ShowDuplicateReviewDialog += ShowDuplicateReviewDialog;
             _shellViewModel.RequestSaveCopyDialog += ShowSaveCopyDialog;
             WriteLog("[STARTUP] Creating ShellWindow...");
             _shellWindow = new ShellWindow(_shellViewModel);
@@ -463,6 +464,23 @@ public partial class App : Application
         catch (Exception ex)
         {
             WriteLog($"[REVIEW] Dialog failed: {ex}");
+        }
+    }
+
+    private void ShowDuplicateReviewDialog()
+    {
+        if (_shellWindow is null || _services is null) return;
+        try
+        {
+            var dialog = new DuplicateReviewWindow(_services)
+            {
+                Owner = _shellWindow,
+            };
+            dialog.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"[DUP] Dialog failed: {ex}");
         }
     }
 

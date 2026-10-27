@@ -115,6 +115,16 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+        <!-- 0.16.0 DUP-D (A1-11): 重复审核入口。L1 恒可用，AI 不可用也不置灰。 -->
+        <Style x:Key="CompactDuplicateButton" TargetType="Button" BasedOn="{StaticResource SubtleButtonStyle}">
+            <Setter Property="Content" Value="🔍 查重" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Window},
+                                               Converter={StaticResource Threshold}, ConverterParameter=1500}" Value="True">
+                    <Setter Property="Content" Value="🔍" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
         <!-- F-04 (extended): the remaining text buttons on the left also
              collapse to icons so the two sides never overlap. -->
         <Style x:Key="CompactImportButton" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
@@ -731,6 +741,12 @@
                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                     </Grid>
+                    <!-- W1/A1-11 查重（重复审核窗口，L1 恒可用） -->
+                    <Button x:Name="DuplicateReviewButton" Margin="8,0,0,0"
+                            Style="{StaticResource CompactDuplicateButton}"
+                            ToolTip="扫描全库重复图片并人工审核（严格同图 + 近似变体）"
+                            AutomationProperties.Name="查重"
+                            Command="{Binding ShowDuplicateReviewCommand}" />
                 </StackPanel>
 
                 <!-- 最近入库下拉 -->

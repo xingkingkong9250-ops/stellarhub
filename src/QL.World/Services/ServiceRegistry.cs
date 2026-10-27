@@ -1,3 +1,4 @@
+using System.IO;
 using QL.World.Data;
 using QL.World.Helpers;
 using QL.World.Models;
@@ -32,6 +33,13 @@ public sealed class ServiceRegistry
     public ColorAnalysisService Colors { get; }
     public SemanticSearchService SemanticSearch { get; }
     public PbrGroupingService PbrGrouping { get; }
+    /// <summary>
+    /// 0.16.0 DUP-C/D: 全库查重扫描（L1 BK-tree + L2 分块余弦）。
+    /// 缩略图根目录与 <see cref="ThumbnailService"/> 保持一致，供存量 phash 补算。
+    /// </summary>
+    public DuplicateScanService Duplicates { get; }
+    /// <summary>0.16.0 DUP-D: W8 重复审核窗口的分组读取与状态变更。</summary>
+    public DuplicateReviewService DuplicateReview { get; }
     /// <summary>
     /// M5-D: builds <see cref="INasConnector"/> instances from persisted
     /// <see cref="NasConnectionSpec"/>s. Shared by <see cref="SettingsViewModel"/>
@@ -153,6 +161,11 @@ public sealed class ServiceRegistry
         Colors = colors ?? throw new ArgumentNullException(nameof(colors));
         SemanticSearch = semanticSearch ?? throw new ArgumentNullException(nameof(semanticSearch));
         PbrGrouping = pbrGrouping ?? throw new ArgumentNullException(nameof(pbrGrouping));
+        Duplicates = new DuplicateScanService(
+            database,
+            thumbnailRoot: Path.Combine(
+                settings.DataRoot, AppDataRootResolver.ThumbnailsFolderName));
+        DuplicateReview = new DuplicateReviewService(database);
         NasFactory = nasFactory ?? throw new ArgumentNullException(nameof(nasFactory));
         ThumbnailCache = thumbnailCache ?? throw new ArgumentNullException(nameof(thumbnailCache));
         DownloadQueue = downloadQueue ?? throw new ArgumentNullException(nameof(downloadQueue));

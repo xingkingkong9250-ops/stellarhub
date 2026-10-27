@@ -345,6 +345,17 @@ public sealed class ImageQueryService
 
             foreach (long id in ids)
             {
+                // 0.16.0 DUP-D: duplicate_candidates 对 images(id) 有外键且无
+                // ON DELETE CASCADE（schema 只增不删），必须先清候选行。
+                using (var candidates = conn.CreateCommand())
+                {
+                    candidates.Transaction = tx;
+                    candidates.CommandText =
+                        "DELETE FROM duplicate_candidates WHERE image_id = $id;";
+                    candidates.Parameters.AddWithValue("$id", id);
+                    candidates.ExecuteNonQuery();
+                }
+
                 using var delete = conn.CreateCommand();
                 delete.Transaction = tx;
                 delete.CommandText = "DELETE FROM images WHERE id = $id;";
