@@ -85,11 +85,11 @@ DUP-E 涉及文件：
 
 | 编号 | 内容 | 涉及编号 | 状态 |
 |---|---|---|---|
-| PEND-001 | ImageSharp 3.x → 4.x 升级与 Six Labors Split License 合规评估 | B2-3、W3/A7-PRE | 未排期 |
+| PEND-001 | ImageSharp 3.x → 4.x 升级与 Six Labors Split License 合规评估 | B2-3、W3/A7-PRE | **评估完成，暂缓升级**（见 `docs/superpowers/plans/2026-10-27-pend-001-imagesharp-assessment.md`；4.x 构建需 Community 许可 key） |
 | PEND-002 | B1 三分区入口重挂（收藏夹 / 高频标签 / 贴图组） | B1-2、B1-3、B1-4 | **已完成（0.17.0 移入 W9）** |
 | PEND-003 | 托管库目录在线迁移（当前「修改…」恒置灰） | W3/A1-LIB-CHG、W3/A1-LIB-PROG | **已完成（0.19.0）** |
 | PEND-004 | 共享收藏夹（collections.json） | W1/B2-SHARED、W1/B2-SHARED-COL | **已完成（0.18.0）** |
-| PEND-005 | 跨平台（macOS / Linux / 移动端，抽象口子已留） | 全局 | 未排期 |
+| PEND-005 | 跨平台（macOS / Linux / 移动端，抽象口子已留） | 全局 | **评估完成**（见 `docs/superpowers/plans/2026-10-27-pend-005-cross-platform-assessment.md`；1.0 前不启动 UI 重写） |
 
 ### 5.2 本次核对新发现的待办
 
@@ -109,8 +109,8 @@ DUP-E 涉及文件：
 1. ~~收尾 0.16.0~~（已完成）。
 2. ~~PEND-002 入口重挂~~（已完成，0.17.0 W9 素材组织窗口）。
 3. ~~共享与迁移能力补齐~~：PEND-004 共享收藏夹（0.18.0）、PEND-003 托管库在线迁移（0.19.0）均已完成。
-4. **依赖与许可**：PEND-001 ImageSharp 4.x 评估，先做许可合规结论再决定是否升级。
-5. **跨平台**：PEND-005 在 Windows 稳定后评估，优先抽离 WPF 依赖与文件系统适配层。
+4. **依赖与许可**：~~PEND-001 评估~~（已完成，结论：暂缓升级）。取得 Community 许可 key（或确认商业订阅）后，再按评估文档步骤升至 4.1.2 并删除审计抑制。
+5. **跨平台**：~~PEND-005 评估~~（已完成，结论：1.0 前保持 Windows 优先）。1.0 后可先做核心层抽取，再以 Avalonia 独立里程碑推进。
 6. **1.0.0 正式版**：上述收尾与用户确认后再升主版本（升 1.0.0 必须用户确认）。
 
 ## 7. 验证方式
