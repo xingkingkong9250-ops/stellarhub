@@ -230,4 +230,116 @@ public sealed class CloudAiServiceTests
         float[]? emb = await ai.EmbedTextAsync("test", CancellationToken.None);
         Assert.Null(emb);
     }
+
+    // ── 0.16.0 DUP-E: 双图 VLM 对比 ───────────────────────────────────
+
+    [Fact]
+    public async Task CompareImages_parses_same_and_confidence()
+    {
+        string json = "{\"same\":true,\"confidence\":0.87}";
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                "{\"choices\":[{\"message\":{\"content\":\"" + json.Replace("\"", "\\\"") + "\"}}]}"),
+        };
+        var ai = new CloudAiService(MakeConfig(), new StubHttpHandler(_ => response));
+
+        (string a, string b) = await CreatePairFilesAsync();
+        try
+        {
+            (bool same, double confidence) = await ai.CompareImagesAsync(
+                a, b, CancellationToken.None);
+
+            Assert.True(same);
+            Assert.Equal(0.87, confidence, 3);
+        }
+        finally
+        {
+            File.Delete(a);
+            File.Delete(b);
+        }
+    }
+
+    [Fact]
+    public async Task CompareImages_sends_both_images_in_request()
+    {
+        string? capturedBody = null;
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                "{\"choices\":[{\"message\":{\"content\":\"{\\\"same\\\":false,\\\"confidence\\\":0.9}\"}}]}"),
+        };
+        var handler = new StubHttpHandler(request =>
+        {
+            capturedBody ??= request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return response;
+        });
+        var ai = new CloudAiService(MakeConfig(), handler);
+
+        (string a, string b) = await CreatePairFilesAsync();
+        try
+        {
+            await ai.CompareImagesAsync(a, b, CancellationToken.None);
+
+            Assert.NotNull(capturedBody);
+            using JsonDocument doc = JsonDocument.Parse(capturedBody);
+            JsonElement content = doc.RootElement
+                .GetProperty("messages")[1]
+                .GetProperty("content");
+            int imageCount = content.EnumerateArray()
+                .Count(item => item.GetProperty("type").GetString() == "image_url");
+            Assert.Equal(2, imageCount);
+        }
+        finally
+        {
+            File.Delete(a);
+            File.Delete(b);
+        }
+    }
+
+    [Fact]
+    public async Task CompareImages_returns_no_verdict_when_not_configured()
+    {
+        var config = MakeConfig();
+        config.EncryptedApiKey = string.Empty;
+        var ai = new CloudAiService(config);
+
+        (bool same, double confidence) = await ai.CompareImagesAsync(
+            "a.png", "b.png", CancellationToken.None);
+
+        Assert.False(same);
+        Assert.Equal(0, confidence);
+    }
+
+    [Fact]
+    public async Task CompareImages_returns_no_verdict_on_http_error()
+    {
+        var handler = new StubHttpHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        var ai = new CloudAiService(MakeConfig(), handler);
+
+        (string a, string b) = await CreatePairFilesAsync();
+        try
+        {
+            (bool same, double confidence) = await ai.CompareImagesAsync(
+                a, b, CancellationToken.None);
+
+            Assert.False(same);
+            Assert.Equal(0, confidence);
+        }
+        finally
+        {
+            File.Delete(a);
+            File.Delete(b);
+        }
+    }
+
+    private static async Task<(string A, string B)> CreatePairFilesAsync()
+    {
+        string a = Path.Combine(Path.GetTempPath(), $"ql-vlm-a-{Guid.NewGuid():N}.png");
+        string b = Path.Combine(Path.GetTempPath(), $"ql-vlm-b-{Guid.NewGuid():N}.png");
+        await File.WriteAllBytesAsync(a, [137, 80, 78, 71, 13, 10, 26, 10]);
+        await File.WriteAllBytesAsync(b, [137, 80, 78, 71, 13, 10, 26, 10]);
+        return (a, b);
+    }
 }

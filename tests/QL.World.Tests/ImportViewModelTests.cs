@@ -82,7 +82,9 @@ public sealed class ImportViewModelTests : IDisposable
 
         await vm.StartCommand.ExecuteAsync();
 
-        Assert.Equal(1, vm.Added);
+        // Added 由 Progress<T> 回调异步回填，全量跑时可能晚于指令完成；
+        // AddedOnClose 来自 ImportReport，断言更稳定。
+        Assert.Equal(1, vm.AddedOnClose);
         Assert.Contains(notifications.Items,
             entry => entry.Kind == NotificationKind.DuplicateDetected);
         Assert.Contains(vm.LogLines, line => line.Contains("疑似重复"));

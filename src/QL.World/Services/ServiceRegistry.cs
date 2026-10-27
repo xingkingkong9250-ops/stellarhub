@@ -164,7 +164,9 @@ public sealed class ServiceRegistry
         Duplicates = new DuplicateScanService(
             database,
             thumbnailRoot: Path.Combine(
-                settings.DataRoot, AppDataRootResolver.ThumbnailsFolderName));
+                settings.DataRoot, AppDataRootResolver.ThumbnailsFolderName),
+            // 0.16.0 DUP-E: 仅云端后端具备双图 VLM 对比能力；其它后端探测为 null，L3 静默跳过。
+            vlm: ai as IVlmImageCompare);
         DuplicateReview = new DuplicateReviewService(database);
         NasFactory = nasFactory ?? throw new ArgumentNullException(nameof(nasFactory));
         ThumbnailCache = thumbnailCache ?? throw new ArgumentNullException(nameof(thumbnailCache));

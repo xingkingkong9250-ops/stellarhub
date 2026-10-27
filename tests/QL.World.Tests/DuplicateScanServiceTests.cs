@@ -1,5 +1,6 @@
 using System.IO;
 using QL.World.Services;
+using QL.World.Services.Ai;
 using QL.World.Tests.Support;
 
 namespace QL.World.Tests;
@@ -191,6 +192,152 @@ public sealed class DuplicateScanServiceTests
         Assert.Empty(ReadCandidates(library));
     }
 
+    // ── 0.16.0 DUP-E: L3 VLM 终审 ─────────────────────────────────────
+
+    [Fact]
+    public async Task L3_phash_boundary_pair_confirmed_by_vlm_persists_as_exact()
+    {
+        using var library = new TestLibrary();
+        long first = library.InsertImage("a.png");
+        long second = library.InsertImage("b.png");
+        SetPhash(library, first, 0UL);
+        SetPhash(library, second, 0xFFFUL);   // 距离 12，落在 11~18 边界带
+
+        var vlm = new StubVlm((_, _) => (true, 0.9));
+        var service = new DuplicateScanService(library.Db, vlm: vlm);
+        DuplicateScanResult result = await service.ScanAsync();
+
+        Assert.True(result.L3Available);
+        Assert.Equal(1, result.L3PairsReviewed);
+        Assert.Equal(1, result.L3ConfirmedPairs);
+        Assert.Equal(0, result.L3RejectedPairs);
+        Assert.Equal(1, result.GroupCount);
+        Assert.Equal(1, result.ExactGroupCount);
+        Assert.Equal(1, result.L3GroupCount);
+        Assert.Single(vlm.Calls);
+
+        List<CandidateRow> rows = ReadCandidates(library);
+        Assert.Equal(2, rows.Count);
+        Assert.All(rows, row =>
+        {
+            Assert.Equal("exact", row.Kind);
+            Assert.Equal("L3", row.Level);
+        });
+    }
+
+    [Fact]
+    public async Task L3_boundary_pair_rejected_by_vlm_is_discarded()
+    {
+        using var library = new TestLibrary();
+        long first = library.InsertImage("a.png");
+        long second = library.InsertImage("b.png");
+        SetPhash(library, first, 0UL);
+        SetPhash(library, second, 0xFFFUL);
+
+        var vlm = new StubVlm((_, _) => (false, 0.95));
+        var service = new DuplicateScanService(library.Db, vlm: vlm);
+        DuplicateScanResult result = await service.ScanAsync();
+
+        Assert.Equal(1, result.L3PairsReviewed);
+        Assert.Equal(0, result.L3ConfirmedPairs);
+        Assert.Equal(1, result.L3RejectedPairs);
+        Assert.Equal(0, result.GroupCount);
+        Assert.Empty(ReadCandidates(library));
+    }
+
+    [Fact]
+    public async Task L3_cosine_boundary_pair_confirmed_becomes_variant()
+    {
+        using var library = new TestLibrary();
+        long first = library.InsertImage("a.png");
+        long second = library.InsertImage("b.png");
+        // phash 差异最大 → 不进 pHash 边界带；仅余弦 0.9 落在 0.88~0.92。
+        SetPhash(library, first, 0UL);
+        SetPhash(library, second, ulong.MaxValue);
+        InsertEmbedding(library, first, "m", [1f, 0f, 0f]);
+        InsertEmbedding(library, second, "m", [0.9f, 0.4358899f, 0f]);
+
+        var vlm = new StubVlm((_, _) => (true, 0.85));
+        var service = new DuplicateScanService(library.Db, vlm: vlm);
+        DuplicateScanResult result = await service.ScanAsync();
+
+        Assert.Equal(1, result.L3ConfirmedPairs);
+        Assert.Equal(1, result.GroupCount);
+        Assert.Equal(1, result.VariantGroupCount);
+        Assert.Equal(1, result.L3GroupCount);
+
+        List<CandidateRow> rows = ReadCandidates(library);
+        Assert.Equal(2, rows.Count);
+        Assert.All(rows, row =>
+        {
+            Assert.Equal("variant", row.Kind);
+            Assert.Equal("L3", row.Level);
+        });
+    }
+
+    [Fact]
+    public async Task L3_is_skipped_silently_when_vlm_unavailable()
+    {
+        using var library = new TestLibrary();
+        long first = library.InsertImage("a.png");
+        long second = library.InsertImage("b.png");
+        long third = library.InsertImage("c.png");
+        SetPhash(library, first, 0UL);
+        SetPhash(library, second, 0xFFFUL);   // 边界带，无 VLM 应忽略
+        SetPhash(library, third, 1UL);        // 与 first 距离 1，L1 照常入组
+
+        var service = new DuplicateScanService(library.Db);
+        DuplicateScanResult result = await service.ScanAsync();
+
+        Assert.False(result.L3Available);
+        Assert.Equal(0, result.L3PairsReviewed);
+        Assert.Equal(1, result.GroupCount);
+        Assert.Equal(1, result.ExactGroupCount);
+
+        List<CandidateRow> rows = ReadCandidates(library);
+        Assert.DoesNotContain(rows, row => row.ImageId == second);
+        Assert.All(rows, row => Assert.Equal("L1", row.Level));
+    }
+
+    [Fact]
+    public async Task L3_no_verdict_drops_pair_without_counting_rejection()
+    {
+        using var library = new TestLibrary();
+        long first = library.InsertImage("a.png");
+        long second = library.InsertImage("b.png");
+        SetPhash(library, first, 0UL);
+        SetPhash(library, second, 0xFFFUL);
+
+        // Confidence=0 表示「无判定」（未配置/网络/解析失败），不是否决。
+        var vlm = new StubVlm((_, _) => (false, 0));
+        var service = new DuplicateScanService(library.Db, vlm: vlm);
+        DuplicateScanResult result = await service.ScanAsync();
+
+        Assert.Equal(1, result.L3PairsReviewed);
+        Assert.Equal(0, result.L3ConfirmedPairs);
+        Assert.Equal(0, result.L3RejectedPairs);
+        Assert.Equal(0, result.GroupCount);
+        Assert.Empty(ReadCandidates(library));
+    }
+
+    [Fact]
+    public async Task L3_does_not_send_confident_l1_pairs_to_vlm()
+    {
+        using var library = new TestLibrary();
+        long first = library.InsertImage("a.png");
+        long second = library.InsertImage("b.png");
+        SetPhash(library, first, 0UL);
+        SetPhash(library, second, 3UL);       // 距离 2 ≤10，已确定同图
+
+        var vlm = new StubVlm((_, _) => (false, 0.99));
+        var service = new DuplicateScanService(library.Db, vlm: vlm);
+        DuplicateScanResult result = await service.ScanAsync();
+
+        Assert.Empty(vlm.Calls);
+        Assert.Equal(1, result.GroupCount);
+        Assert.All(ReadCandidates(library), row => Assert.Equal("L1", row.Level));
+    }
+
     // ── helpers ───────────────────────────────────────────────────────
 
     private static void SetPhash(TestLibrary library, long imageId, ulong hash) =>
@@ -274,6 +421,23 @@ public sealed class DuplicateScanServiceTests
 
     private sealed record CandidateRow(
         long ImageId, string GroupId, string Kind, string Level, double Score, string Status);
+
+    private sealed class StubVlm : IVlmImageCompare
+    {
+        private readonly Func<string, string, (bool Same, double Confidence)> _verdict;
+
+        public StubVlm(Func<string, string, (bool Same, double Confidence)> verdict) =>
+            _verdict = verdict;
+
+        public List<(string A, string B)> Calls { get; } = [];
+
+        public Task<(bool SameImage, double Confidence)> CompareImagesAsync(
+            string pathA, string pathB, CancellationToken cancellationToken)
+        {
+            Calls.Add((pathA, pathB));
+            return Task.FromResult(_verdict(pathA, pathB));
+        }
+    }
 
     private sealed class CollectingProgress : IProgress<DuplicateScanProgress>
     {

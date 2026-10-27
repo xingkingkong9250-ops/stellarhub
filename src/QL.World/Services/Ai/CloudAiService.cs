@@ -15,7 +15,7 @@ namespace QL.World.Services.Ai;
 /// categorization + tagging, and (optionally) embeddings for vectors.
 /// Only HTTPS base URLs are accepted; failures return error results, not exceptions.
 /// </summary>
-public sealed class CloudAiService : IAiService
+public sealed class CloudAiService : IAiService, IVlmImageCompare
 {
     private const int TIMEOUT_SECONDS = 30;
 
@@ -47,6 +47,15 @@ public sealed class CloudAiService : IAiService
     /// category output — derived from tags via TaxonomyService downstream.
     /// </summary>
     private static readonly string SystemPrompt = BuildSystemPrompt();
+
+    /// <summary>
+    /// 0.16.0 DUP-E: 双图查重终审提示词。判断「同一画面的重复副本」，
+    /// 允许转码/缩放/调色/轻微裁剪，输出 same + confidence。
+    /// </summary>
+    private const string VlmComparePrompt =
+        "你是图片查重助手。判断用户给出的两张图片是否为同一张画面的重复副本" +
+        "（允许转码、缩放、调色、轻微裁剪）。" +
+        "输出 JSON：{\"same\":true|false,\"confidence\":0.0-1.0}。只输出 JSON，无多余文字。";
 
     private static string BuildSystemPrompt()
     {
@@ -220,6 +229,82 @@ public sealed class CloudAiService : IAiService
         foreach (var v in vec.EnumerateArray())
             result.Add(v.GetSingle());
         return [.. result];
+    }
+
+    /// <summary>
+    /// 0.16.0 DUP-E: 双图 VLM 终审。失败（未配置/网络/解析）返回 (false, 0)，
+    /// 调用方把 Confidence&lt;=0 视为「无判定」，不会误丢弃候选对。
+    /// </summary>
+    public async Task<(bool SameImage, double Confidence)> CompareImagesAsync(
+        string pathA, string pathB, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(pathA);
+        ArgumentNullException.ThrowIfNull(pathB);
+        if (!IsAvailable)
+            return (false, 0);
+
+        try
+        {
+            string dataUrlA = await ToDataUrlAsync(pathA, cancellationToken);
+            string dataUrlB = await ToDataUrlAsync(pathB, cancellationToken);
+
+            var messages = new object[]
+            {
+                new { role = "system", content = VlmComparePrompt },
+                new
+                {
+                    role = "user",
+                    content = new object[]
+                    {
+                        new { type = "text", text = "判断这两张图片是否同一画面。" },
+                        new { type = "image_url", image_url = new { url = dataUrlA } },
+                        new { type = "image_url", image_url = new { url = dataUrlB } },
+                    },
+                },
+            };
+
+            var payload = new
+            {
+                model = _config.ModelName,
+                messages,
+                response_format = new { type = "json_object" },
+                max_tokens = 100,
+            };
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, NormalizeUrl("chat/completions"))
+            {
+                Content = JsonContent.Create(payload),
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", DecryptKey());
+
+            using HttpResponseMessage response = await _http.SendAsync(request, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+            string content = json.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString()!;
+            var parsed = JsonSerializer.Deserialize<JsonElement>(content);
+
+            if (!parsed.TryGetProperty("same", out JsonElement sameElement) ||
+                sameElement.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                return (false, 0);
+
+            double confidence =
+                parsed.TryGetProperty("confidence", out JsonElement confidenceElement) &&
+                confidenceElement.TryGetDouble(out double value)
+                    ? Math.Clamp(value, 0, 1)
+                    : 0;
+            return (sameElement.GetBoolean(), confidence);
+        }
+        catch
+        {
+            return (false, 0);
+        }
+    }
+
+    private static async Task<string> ToDataUrlAsync(string path, CancellationToken cancellationToken)
+    {
+        byte[] bytes = await File.ReadAllBytesAsync(path, cancellationToken);
+        return $"data:{GuessMime(path)};base64,{Convert.ToBase64String(bytes)}";
     }
 
     private string NormalizeUrl(string endpoint)

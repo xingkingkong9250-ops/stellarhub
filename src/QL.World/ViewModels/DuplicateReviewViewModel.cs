@@ -243,7 +243,10 @@ public sealed class DuplicateReviewViewModel : ObservableObject, IDisposable
             StatusText = result.Cancelled
                 ? "扫描已取消（未写入候选）"
                 : $"扫描完成：{result.GroupCount} 组"
-                  + $"（同图 {result.ExactGroupCount} / 变体 {result.VariantGroupCount}）";
+                  + $"（同图 {result.ExactGroupCount} / 变体 {result.VariantGroupCount}）"
+                  + (result.L3PairsReviewed > 0
+                      ? $"，L3 终审确认 {result.L3ConfirmedPairs}/{result.L3PairsReviewed} 对"
+                      : string.Empty);
             ScanPhaseText = result.Cancelled ? "已取消" : "完成";
             ScanPercent = result.Cancelled ? ScanPercent : 100;
         }
@@ -402,6 +405,7 @@ public sealed class DuplicateReviewViewModel : ObservableObject, IDisposable
             DuplicateScanPhase.Backfill => "补算感知哈希",
             DuplicateScanPhase.PhashPairing => "严格同图配对（L1）",
             DuplicateScanPhase.VectorScan => "近似变体扫描（L2）",
+            DuplicateScanPhase.TerminalReview => "VLM 终审（L3）",
             DuplicateScanPhase.Persist => "写入候选组",
             _ => "扫描中",
         };
