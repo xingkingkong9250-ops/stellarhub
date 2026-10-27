@@ -81,6 +81,18 @@ public sealed class ShellViewModelTests : IDisposable
     }
 
     [Fact]
+    public void ShowMaterialOrganizer_raises_dialog_event()
+    {
+        // 0.17.0 PEND-002: A1-12 入口命令必须通知 App 打开 W9。
+        bool raised = false;
+        _viewModel.ShowMaterialOrganizerDialog += () => raised = true;
+
+        _viewModel.ShowMaterialOrganizerCommand.Execute(null);
+
+        Assert.True(raised);
+    }
+
+    [Fact]
     public void M1_status_strings_are_non_empty()
     {
         Assert.False(string.IsNullOrWhiteSpace(_viewModel.StatusBar.StatusText));

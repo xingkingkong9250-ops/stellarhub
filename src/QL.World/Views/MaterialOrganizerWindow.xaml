@@ -1,0 +1,160 @@
+<Window x:Class="QL.World.Views.MaterialOrganizerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Width="760" Height="620"
+        MinWidth="640" MinHeight="480"
+        ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource SurfaceBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
+        Title="素材组织 — 千星汇图">
+
+    <Grid Background="{DynamicResource BackgroundBrush}" Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- W9/HD 标题区 -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="🗂 素材组织" FontSize="14" FontWeight="Bold"
+                       Foreground="{DynamicResource TextPrimaryBrush}" />
+            <TextBlock Margin="12,0,0,0" VerticalAlignment="Center"
+                       Foreground="{DynamicResource TextMutedBrush}"
+                       Text="选中条目即在主窗口画廊应用筛选，再次点击同一条目取消" />
+        </StackPanel>
+
+        <TabControl Grid.Row="1" Margin="0,10,0,0">
+            <!-- W9-T1 收藏夹 -->
+            <TabItem Header="收藏夹" AutomationProperties.Name="收藏夹页">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal">
+                        <Button Content="＋ 新建收藏夹"
+                                Style="{StaticResource ChipActiveButtonStyle}"
+                                AutomationProperties.Name="新建收藏夹"
+                                Command="{Binding CreateCollectionCommand}" />
+                        <TextBlock Margin="12,0,0,0" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   Text="右键收藏夹可重命名/删除/设封面/加入当前所选图片" />
+                    </StackPanel>
+
+                    <ScrollViewer Grid.Row="1" Margin="0,8,0,0" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding CollectionTree.CollectionNodes}"
+                                      AutomationProperties.Name="收藏夹列表">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <ToggleButton Style="{StaticResource TreeToggleStyle}"
+                                                  AutomationProperties.Name="{Binding DisplayName}"
+                                                  IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                                  Command="{Binding SelectCommand}"
+                                                  Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}">
+                                        <ToggleButton.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                                                <MenuItem Header="加入当前所选图片"
+                                                          Command="{Binding DataContext.AddSelectedToCollectionCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                <MenuItem Header="重命名…"
+                                                          Command="{Binding DataContext.RenameCollectionCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                <MenuItem Header="删除…"
+                                                          Command="{Binding DataContext.DeleteCollectionCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                <MenuItem Header="设为封面（当前所选）"
+                                                          Command="{Binding DataContext.SetCollectionCoverCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                            </ContextMenu>
+                                        </ToggleButton.ContextMenu>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{Binding DisplayName}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Margin="6,0,0,0" FontSize="11"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource TextMutedBrush}"
+                                                       Text="{Binding Count}" />
+                                        </Grid>
+                                    </ToggleButton>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
+
+            <!-- W9-T2 高频标签 -->
+            <TabItem Header="高频标签" AutomationProperties.Name="高频标签页">
+                <ScrollViewer Margin="10" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding TagTree.TopTagNodes}"
+                                  AutomationProperties.Name="高频标签列表">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Style="{StaticResource ChipButtonStyle}"
+                                        Command="{Binding SelectCommand}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="#" Foreground="{DynamicResource TextMutedBrush}" />
+                                        <TextBlock Text="{Binding Tag}" Margin="2,0,0,0" />
+                                        <TextBlock Text="{Binding Count, StringFormat=' {0}'}"
+                                                   Foreground="{DynamicResource TextMutedBrush}"
+                                                   Margin="4,0,0,0" />
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- W9-T3 贴图组 -->
+            <TabItem Header="贴图组" AutomationProperties.Name="贴图组页">
+                <ScrollViewer Margin="10" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding PbrGroupTree.GroupNodes}"
+                                  AutomationProperties.Name="贴图组列表">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <ToggleButton Style="{StaticResource TreeToggleStyle}"
+                                              AutomationProperties.Name="{Binding DisplayName}"
+                                              IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                              Command="{Binding SelectCommand}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding DisplayName}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Margin="6,0,0,0" FontSize="11"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextMutedBrush}"
+                                                   Text="{Binding MemberCount}" />
+                                    </Grid>
+                                </ToggleButton>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="关闭" Width="80" Padding="0,4"
+                    Style="{StaticResource SubtleButtonStyle}"
+                    AutomationProperties.Name="关闭"
+                    Click="OnCloseClick" />
+        </StackPanel>
+    </Grid>
+</Window>

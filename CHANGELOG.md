@@ -9,6 +9,24 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.17.0] — 2026-10-27 PEND-002：素材组织窗口（收藏夹 / 高频标签 / 贴图组）
+
+### 新增
+
+- **W9 素材组织窗口**：把 v0.13.6 起在左栏暂隐藏的三块入口集中到独立窗口，
+  三个页签分别为收藏夹、高频标签（Top50）与贴图组；复用
+  `CollectionTreeViewModel` / `TagTreeViewModel.TopTagNodes` /
+  `PbrGroupTreeViewModel`，选中条目即在主窗口画廊应用对应筛选，再次点击取消。
+- **收藏夹操作**：页签内可新建收藏夹；节点右键支持加入当前所选图片、重命名、
+  删除、设为封面（复用 ShellViewModel 既有命令与收藏夹服务）。
+- **顶栏入口 A1-12**：「🗂 素材组织」按钮（窄窗收窄为 🗂）以非模态方式打开 W9，
+  重复点击时激活已有窗口，关闭后再次打开重新创建。
+
+### 测试
+
+- 新增 1 项 ShellViewModel 测试：`ShowMaterialOrganizerCommand` 触发
+  `ShowMaterialOrganizerDialog` 事件。
+
 ## [0.16.0] — 2026-10-27 图片查重 DUP-A~E：感知哈希、全库扫描、审核窗口与 VLM 终审
 
 ### 新增

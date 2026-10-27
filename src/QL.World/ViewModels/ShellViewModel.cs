@@ -146,6 +146,10 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         // 0.16.0 DUP-D: W8 重复审核入口。L1 感知哈希恒可用，AI 不可用也不置灰。
         ShowDuplicateReviewCommand = new RelayCommand(
             () => ShowDuplicateReviewDialog?.Invoke());
+
+        // 0.17.0 PEND-002: W9 素材组织窗口（收藏夹/高频标签/贴图组）。
+        ShowMaterialOrganizerCommand = new RelayCommand(
+            () => ShowMaterialOrganizerDialog?.Invoke());
     }
 
     public AppSettingsService Settings => _services.Settings;
@@ -219,6 +223,12 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>0.16.0 DUP-D: bound by App to instantiate <see cref="Views.DuplicateReviewWindow"/>.</summary>
     public event Action? ShowDuplicateReviewDialog;
+
+    /// <summary>0.17.0 PEND-002: opens the W9 material organizer window.</summary>
+    public RelayCommand ShowMaterialOrganizerCommand { get; }
+
+    /// <summary>0.17.0 PEND-002: bound by App to instantiate <see cref="Views.MaterialOrganizerWindow"/>.</summary>
+    public event Action? ShowMaterialOrganizerDialog;
 
     private int _pendingCount;
     /// <summary>U6-C: number of submissions awaiting review (toolbar badge).</summary>

@@ -125,6 +125,16 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+        <!-- 0.17.0 PEND-002 (A1-12): 素材组织入口（收藏夹/高频标签/贴图组）。 -->
+        <Style x:Key="CompactOrganizerButton" TargetType="Button" BasedOn="{StaticResource SubtleButtonStyle}">
+            <Setter Property="Content" Value="🗂 素材组织" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Window},
+                                               Converter={StaticResource Threshold}, ConverterParameter=1500}" Value="True">
+                    <Setter Property="Content" Value="🗂" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
         <!-- F-04 (extended): the remaining text buttons on the left also
              collapse to icons so the two sides never overlap. -->
         <Style x:Key="CompactImportButton" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
@@ -747,6 +757,12 @@
                             ToolTip="扫描全库重复图片并人工审核（严格同图 + 近似变体）"
                             AutomationProperties.Name="查重"
                             Command="{Binding ShowDuplicateReviewCommand}" />
+                    <!-- W1/A1-12 素材组织（收藏夹 / 高频标签 / 贴图组） -->
+                    <Button x:Name="MaterialOrganizerButton" Margin="8,0,0,0"
+                            Style="{StaticResource CompactOrganizerButton}"
+                            ToolTip="管理收藏夹、高频标签与贴图组，选中即在画廊应用筛选"
+                            AutomationProperties.Name="素材组织"
+                            Command="{Binding ShowMaterialOrganizerCommand}" />
                 </StackPanel>
 
                 <!-- 最近入库下拉 -->

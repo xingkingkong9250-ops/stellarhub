@@ -26,6 +26,7 @@ public partial class App : Application
 
     private ShellWindow? _shellWindow;
     private ShellViewModel? _shellViewModel;
+    private MaterialOrganizerWindow? _organizerWindow;
     private ServiceRegistry? _services;
     private DatabaseService? _database;
     private ThumbnailService? _thumbnails;
@@ -242,6 +243,7 @@ public partial class App : Application
             _shellViewModel.ShowDownloadQueueDialog += ShowDownloadQueueDialog;
             _shellViewModel.ShowReviewQueueDialog += ShowReviewQueueDialog;
             _shellViewModel.ShowDuplicateReviewDialog += ShowDuplicateReviewDialog;
+            _shellViewModel.ShowMaterialOrganizerDialog += ShowMaterialOrganizerDialog;
             _shellViewModel.RequestSaveCopyDialog += ShowSaveCopyDialog;
             WriteLog("[STARTUP] Creating ShellWindow...");
             _shellWindow = new ShellWindow(_shellViewModel);
@@ -481,6 +483,35 @@ public partial class App : Application
         catch (Exception ex)
         {
             WriteLog($"[DUP] Dialog failed: {ex}");
+        }
+    }
+
+    /// <summary>
+    /// 0.17.0 PEND-002: W9 素材组织窗口。非模态显示，便于选中条目时主窗口
+    /// 画廊同步刷新；重复打开时激活已有窗口。
+    /// </summary>
+    private void ShowMaterialOrganizerDialog()
+    {
+        if (_shellWindow is null || _shellViewModel is null) return;
+        try
+        {
+            if (_organizerWindow is { IsLoaded: true })
+            {
+                _organizerWindow.Activate();
+                return;
+            }
+
+            var window = new MaterialOrganizerWindow(_shellViewModel)
+            {
+                Owner = _shellWindow,
+            };
+            window.Closed += (_, _) => _organizerWindow = null;
+            _organizerWindow = window;
+            window.Show();
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"[ORG] Dialog failed: {ex}");
         }
     }
 

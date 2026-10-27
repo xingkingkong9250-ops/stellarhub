@@ -206,6 +206,35 @@ try {
         $stillOpen = Find-TopWindowByTitle $app.Process.Id '*重复审核*' 2
         Assert-Step 'W8 关闭后窗口消失' ($null -eq $stillOpen) '窗口仍然存在'
     }
+
+    # ── 6. A1-12 素材组织入口 + W9 三页签 ─────────────────────
+    Write-Host '[Smoke] Step 6: A1-12 material organizer window'
+    $organizerButton = Find-FirstByName $mainWin '素材组织' ([System.Windows.Automation.ControlType]::Button)
+    Assert-Step '顶栏「素材组织」按钮存在 (A1-12)' ($null -ne $organizerButton) '未找到 AutomationProperties.Name=素材组织 的按钮'
+
+    $organizerWindow = $null
+    if ($null -ne $organizerButton) {
+        ($organizerButton.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)).Invoke()
+        $organizerWindow = Find-TopWindowByTitle $app.Process.Id '*素材组织*' 10
+    }
+    Assert-Step 'W9 素材组织窗口已打开' ($null -ne $organizerWindow) '等待 10 秒未找到标题含「素材组织」的窗口'
+
+    if ($null -ne $organizerWindow) {
+        $tabCollections = Find-FirstByName $organizerWindow '收藏夹页' ([System.Windows.Automation.ControlType]::TabItem)
+        $tabTopTags = Find-FirstByName $organizerWindow '高频标签页' ([System.Windows.Automation.ControlType]::TabItem)
+        $tabPbrGroups = Find-FirstByName $organizerWindow '贴图组页' ([System.Windows.Automation.ControlType]::TabItem)
+        Assert-Step 'W9「收藏夹」页签存在 (W9-T1)' ($null -ne $tabCollections) '缺少收藏夹页签'
+        Assert-Step 'W9「高频标签」页签存在 (W9-T2)' ($null -ne $tabTopTags) '缺少高频标签页签'
+        Assert-Step 'W9「贴图组」页签存在 (W9-T3)' ($null -ne $tabPbrGroups) '缺少贴图组页签'
+
+        $organizerClose = Find-FirstByName $organizerWindow '关闭' ([System.Windows.Automation.ControlType]::Button)
+        if ($null -ne $organizerClose) {
+            ($organizerClose.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)).Invoke()
+            Start-Sleep -Milliseconds 800
+        }
+        $stillOpen = Find-TopWindowByTitle $app.Process.Id '*素材组织*' 2
+        Assert-Step 'W9 关闭后窗口消失' ($null -eq $stillOpen) '窗口仍然存在'
+    }
 }
 finally {
     Stop-App $app
