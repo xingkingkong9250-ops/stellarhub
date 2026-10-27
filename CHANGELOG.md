@@ -9,6 +9,30 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.19.0] — 2026-10-27 PEND-003：托管库目录在线迁移
+
+### 新增
+
+- **库目录在线迁移（W3/A1-LIB-CHG）**：设置窗口「素材库托管目录」卡片
+  的「修改…」按钮启用。选择空目录后，软件把整个数据根（`qlworld.db`、
+  `thumbnails\`、`models\`、`files\` CAS 与分类硬链接）复制到新目录，
+  复制过程显示进度条与当前文件；完成后自动退出，重新打开即使用新目录。
+  旧目录保留作为备份，确认无误后可手动删除。
+- **迁移一致性**：复制在 `DatabaseService` 维护锁内进行，并先执行
+  `PRAGMA wal_checkpoint(TRUNCATE)`，保证被复制的 `qlworld.db` 是完整快照；
+  `-wal`/`-shm` 与 `.tmp-*` 临时文件不参与复制。
+- **路径重写**：对新库执行 `images.file_path / library_path / original_path`、
+  `library_files.physical_path`、`download_queue.local_target` 的根前缀替换
+  （仅替换以旧根开头的值，外部原始路径保持不变）。
+- **复制校验与失败回滚**：复制完成后核对文件数/字节数，并对新库执行
+  `PRAGMA quick_check`；任一环节失败都会删除本次创建的目标条目、保持原
+  库目录设置不变，并提示「迁移失败，已回滚」。
+
+### 测试
+
+- 新增 3 项测试：目标校验（同目录/嵌套/非空/未配置）、完整迁移与路径重写
+  （含旧目录保留、配置切换、新库 quick_check）、复制失败回滚。
+
 ## [0.18.0] — 2026-10-27 PEND-004：共享收藏夹（collections.json）
 
 ### 新增

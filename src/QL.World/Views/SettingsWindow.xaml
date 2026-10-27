@@ -52,7 +52,7 @@
                               Margin="0,4,0,0"
                               IsChecked="{Binding CheckIntegrityOnStartup}" />
 
-                    <!-- M11 W3/A1：素材库托管（库目录首启向导后不可改） -->
+                    <!-- M11 W3/A1：素材库托管（PEND-003 起支持在线迁移到空目录） -->
                     <Border Margin="0,22,0,0" Padding="12,10"
                             Background="{DynamicResource SurfaceBrush}"
                             BorderBrush="{DynamicResource BorderSubtleBrush}"
@@ -64,12 +64,21 @@
                                 <Button Content="修改…" Width="72" Margin="8,0,0,0"
                                         DockPanel.Dock="Right"
                                         Style="{StaticResource SubtleButtonStyle}"
-                                        IsEnabled="False"
-                                        ToolTip="当前版本暂不支持迁移库目录；如需更换请先退出并手动迁移数据" />
+                                        Command="{Binding ChangeLibraryRootCommand}"
+                                        IsEnabled="{Binding CanChangeLibraryRoot}"
+                                        ToolTip="把整库复制到一个空目录；完成后软件退出，重开即使用新目录（旧目录保留作备份）" />
                                 <TextBox IsReadOnly="True"
                                          Text="{Binding LibraryRootDisplayText, Mode=OneWay}"
                                          VerticalContentAlignment="Center" />
                             </DockPanel>
+                            <StackPanel Margin="0,8,0,0"
+                                        Visibility="{Binding IsRelocatingLibrary, Converter={StaticResource BoolVis}}">
+                                <ProgressBar Height="6" Minimum="0" Maximum="100"
+                                             Value="{Binding RelocationPercent}" />
+                                <TextBlock Text="{Binding RelocationStatusText}" Margin="0,4,0,0"
+                                           FontSize="11" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                            </StackPanel>
                             <CheckBox Margin="0,8,0,0"
                                       Content="显示未托管的旧版图片"
                                       IsEnabled="{Binding CanToggleLegacyVisibility}"

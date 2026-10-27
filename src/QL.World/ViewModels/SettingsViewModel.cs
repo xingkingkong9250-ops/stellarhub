@@ -38,8 +38,15 @@ public sealed class SettingsViewModel : ObservableObject
     /// 此时「设为主 NAS 并迁移」按钮不可用（仅保留旧「仅切标记」入口）。
     /// </summary>
     private readonly NasConnectionRegistry? _nasRegistry;
+    /// <summary>
+    /// PEND-003: null 时（登录前设置窗）不支持在线迁移库目录，A1「修改…」置灰。
+    /// </summary>
+    private readonly LibraryRelocationService? _libraryRelocation;
     private bool _isMigrating;
     private string _migrationStatusText = string.Empty;
+    private bool _isRelocatingLibrary;
+    private double _relocationPercent;
+    private string _relocationStatusText = string.Empty;
 
     private string _selectedTheme;
     private string? _selectedWatcherDirectory;
@@ -68,7 +75,8 @@ public sealed class SettingsViewModel : ObservableObject
         INasConnectorFactory nasConnectorFactory,
         AccountService? accounts,
         CurrentUser? currentUser,
-        NasConnectionRegistry? nasRegistry = null)
+        NasConnectionRegistry? nasRegistry = null,
+        LibraryRelocationService? libraryRelocation = null)
     {
         _settings = settings;
         _thumbnails = thumbnails;
@@ -82,6 +90,7 @@ public sealed class SettingsViewModel : ObservableObject
         _accounts = accounts;
         _currentUser = currentUser;
         _nasRegistry = nasRegistry;
+        _libraryRelocation = libraryRelocation;
         PbrRules = new PbrRulesViewModel(settings, pbrGrouping);
 
         _selectedTheme = settings.Theme;
@@ -108,6 +117,9 @@ public sealed class SettingsViewModel : ObservableObject
             () => !_isLegacyImporting);
         OpenLogsFolderCommand = new RelayCommand(OpenLogsFolder);
         CloseCommand = new RelayCommand(() => RequestClose?.Invoke());
+        ChangeLibraryRootCommand = new AsyncRelayCommand(
+            ChangeLibraryRootAsync,
+            () => CanChangeLibraryRoot);
         TestCloudConnectionCommand = new AsyncRelayCommand(
             TestCloudConnectionAsync,
             () => SelectedAiBackend is not null && !_isTestingConnection);
@@ -629,6 +641,45 @@ public sealed class SettingsViewModel : ObservableObject
         set => _settings.ShowLegacyImages = value;
     }
 
+    /// <summary>
+    /// PEND-003: 是否允许在线迁移库目录。登录后的设置窗注入了迁移服务且
+    /// 当前已配置库目录时才可用；迁移进行中禁用。
+    /// </summary>
+    public bool CanChangeLibraryRoot =>
+        _libraryRelocation is not null &&
+        _settings.IsLibraryRootConfigured &&
+        !_isRelocatingLibrary;
+
+    /// <summary>PEND-003: 库目录迁移进行中（禁用按钮 + 显示进度）。</summary>
+    public bool IsRelocatingLibrary
+    {
+        get => _isRelocatingLibrary;
+        private set
+        {
+            if (SetProperty(ref _isRelocatingLibrary, value))
+            {
+                OnPropertyChanged(nameof(CanChangeLibraryRoot));
+                ChangeLibraryRootCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    /// <summary>PEND-003: 0–100 迁移进度。</summary>
+    public double RelocationPercent
+    {
+        get => _relocationPercent;
+        private set => SetProperty(ref _relocationPercent, value);
+    }
+
+    /// <summary>PEND-003: 迁移过程文案（"12/100 个文件 — files\ab\…"）。</summary>
+    public string RelocationStatusText
+    {
+        get => _relocationStatusText;
+        private set => SetProperty(ref _relocationStatusText, value);
+    }
+
+    public AsyncRelayCommand ChangeLibraryRootCommand { get; }
+
     // ─── A5 关于 / 旧版导入 / 诊断 ─────────────────────────────────────────
 
     public string VersionText => $"v{AppInfo.Version}";
@@ -1131,6 +1182,12 @@ public sealed class SettingsViewModel : ObservableObject
     /// <summary>Window closes on invoke.</summary>
     public event Action? RequestClose;
 
+    /// <summary>
+    /// PEND-003: 库目录迁移成功后触发。App 据此在设置窗关闭后退出软件，
+    /// 让新目录在下次启动时生效（ThumbnailService 等按 dataRoot 构造）。
+    /// </summary>
+    public event Action? RequestShutdownForRelocation;
+
     // ─── Actions ────────────────────────────────────────────────────────────
 
     private void RegenerateAllThumbnails()
@@ -1154,6 +1211,87 @@ public sealed class SettingsViewModel : ObservableObject
         StatusBarText = skipped > 0
             ? $"已重新排队 {items.Count - skipped} 张缩略图（跳过 {skipped} 张远程）"
             : $"已重新排队 {items.Count} 张缩略图";
+    }
+
+    /// <summary>
+    /// PEND-003: 选择空目录并把整库复制过去。成功后提示并退出软件；
+    /// 失败时服务已回滚目标目录，原库保持不变。
+    /// </summary>
+    private async Task ChangeLibraryRootAsync()
+    {
+        if (_libraryRelocation is null) return;
+
+        var dialog = new OpenFolderDialog
+        {
+            Title = "选择新的素材库目录（须为空目录）",
+        };
+        if (dialog.ShowDialog() != true) return;
+
+        string target = dialog.FolderName;
+        try
+        {
+            _libraryRelocation.ValidateTarget(target);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "无法迁移素材库",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        MessageBoxResult confirm = MessageBox.Show(
+            $"将把当前素材库完整复制到：\n{target}\n\n" +
+            "复制期间请保持设置窗口打开。完成后软件会自动退出，重新打开即使用新目录。\n" +
+            "旧目录会保留作为备份，确认无误后可手动删除。\n\n是否继续？",
+            "迁移素材库目录", MessageBoxButton.YesNo,
+            MessageBoxImage.Question, MessageBoxResult.No);
+        if (confirm != MessageBoxResult.Yes) return;
+
+        IsRelocatingLibrary = true;
+        RelocationPercent = 0;
+        RelocationStatusText = "准备迁移…";
+
+        try
+        {
+            var progress = new Progress<LibraryRelocationProgress>(p =>
+            {
+                RelocationPercent = p.Percent;
+                RelocationStatusText = p.CurrentItem.Length == 0
+                    ? $"{p.FilesCopied}/{p.FilesTotal} 个文件"
+                    : $"{p.FilesCopied}/{p.FilesTotal} 个文件 — {p.CurrentItem}";
+            });
+
+            LibraryRelocationResult result =
+                await _libraryRelocation.RelocateAsync(target, progress);
+
+            RelocationPercent = 100;
+            RelocationStatusText =
+                $"迁移完成：{result.FilesCopied} 个文件，用时 {result.Duration.TotalSeconds:F0} 秒";
+
+            MessageBox.Show(
+                $"素材库已迁移到：\n{result.NewRoot}\n\n" +
+                "软件将退出，请重新打开以使用新目录。",
+                "迁移完成", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            RequestShutdownForRelocation?.Invoke();
+            RequestClose?.Invoke();
+        }
+        catch (LibraryRelocationException ex)
+        {
+            RelocationStatusText = "迁移失败，已回滚";
+            MessageBox.Show(ex.Message, "迁移失败",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        catch (Exception ex)
+        {
+            RelocationStatusText = $"迁移失败：{ex.Message}";
+            MessageBox.Show($"迁移失败：{ex.Message}", "迁移失败",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            IsRelocatingLibrary = false;
+        }
     }
 
     private void AddWatcherDirectory()

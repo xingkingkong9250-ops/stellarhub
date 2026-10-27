@@ -406,7 +406,7 @@ public partial class App : Application
 
     private void ShowSettingsDialog()
     {
-        if (_shellWindow is null || _services is null) return;
+        if (_shellWindow is null || _services is null || _database is null) return;
         try
         {
             var settingsViewModel = new SettingsViewModel(
@@ -422,11 +422,19 @@ public partial class App : Application
                 _services.NasFactory,
                 _services.Accounts,
                 _services.CurrentUser,
-                _services.NasRegistry);
+                _services.NasRegistry,
+                // PEND-003: 库目录在线迁移（复制 + 路径重写 + 校验 + 退出重启）。
+                new LibraryRelocationService(_services.Settings, _database, WriteLog));
             settingsViewModel.ThemeChanged += theme =>
             {
                 SetTheme(theme);
                 WriteLog($"[SETTINGS] Theme switched to {theme}.");
+            };
+
+            bool shutdownAfterRelocation = false;
+            settingsViewModel.RequestShutdownForRelocation += () =>
+            {
+                shutdownAfterRelocation = true;
             };
 
             var dialog = new SettingsWindow(settingsViewModel)
@@ -434,6 +442,12 @@ public partial class App : Application
                 Owner = _shellWindow,
             };
             dialog.ShowDialog();
+
+            if (shutdownAfterRelocation)
+            {
+                WriteLog("[SETTINGS] Library relocated; shutting down for restart.");
+                Shutdown();
+            }
         }
         catch (Exception ex)
         {

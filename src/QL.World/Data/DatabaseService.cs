@@ -108,6 +108,29 @@ public sealed class DatabaseService : IDisposable
             return true;
         });
 
+    /// <summary>
+    /// PEND-003: flushes the WAL into the main database file so a plain file
+    /// copy of <c>qlworld.db</c> is a consistent snapshot.
+    /// </summary>
+    public void CheckpointWal() =>
+        Run(conn =>
+        {
+            using var command = conn.CreateCommand();
+            command.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
+            command.ExecuteNonQuery();
+        });
+
+    /// <summary>
+    /// PEND-003: holds the connection gate for a long external operation
+    /// (library relocation copy) so no writes can reach the WAL while the
+    /// directory is copied. Dispose to release. Reentrant on the same thread.
+    /// </summary>
+    public IDisposable AcquireMaintenanceLock()
+    {
+        Monitor.Enter(_gate);
+        return new MaintenanceLock(_gate);
+    }
+
     /// <summary>Quick integrity gate for W3/A1 startup check.</summary>
     public string QuickIntegrityCheck() =>
         Run(conn =>
@@ -139,5 +162,20 @@ public sealed class DatabaseService : IDisposable
         using var command = _connection!.CreateCommand();
         command.CommandText = sql;
         command.ExecuteNonQuery();
+    }
+
+    private sealed class MaintenanceLock : IDisposable
+    {
+        private readonly object _gate;
+        private bool _released;
+
+        public MaintenanceLock(object gate) => _gate = gate;
+
+        public void Dispose()
+        {
+            if (_released) return;
+            _released = true;
+            Monitor.Exit(_gate);
+        }
     }
 }

@@ -83,10 +83,11 @@
 | W2 | 导入对话框（520×480，可调，最小 460×420） | 已实现（M1） | 来源/选项/进度/日志/取消/完成 |
 | W2/AI | 「AI 分析（导入完成后自动执行）」三选一 | 已实现（v0.9.0） | 位于文件格式之后：关闭 AI（默认，每次打开重置）/ 云端 AI / 本地 AI；选云端或本地时导入运行结束即对本次新增图按所选后端作用域分析，进度写底部信息提示栏（BatchProgress 事件）；后端按次解析（AiServiceFactory.Create(settings, mode)），不改写 W3/A3 全局设置 |
 | W3 | 设置窗口 | 已实现（M3） | 480×640 TabControl：A1 常规 / A2 缩略图 / A3 AI / A4 监控 / A5 关于 / A6 贴图组；v0.7.2 起全部页签内容包 ScrollViewer（TabScrollStyle，矮窗口自适应滚动条）+ 隧道阶段滚轮统一接管（TabScroll_PreviewMouseWheel，防 ListBox/Slider 吞滚轮），A1–A8 编号不变 |
-| W3/A1 | 常规页签 | 已实现（M2，M11 加托管卡片） | 主题（Dark/Light 即时切换）/完整性检查开关；库位置随数据根（M3 可视化）；M11 起底部增「素材库托管目录（M11）」卡片（子编号 W3/A1-LIB*） |
-| W3/A1-LIB | 素材库托管卡片 | 已实现（M11） | 常规页签底部独立 Border 卡片：只读库目录 + 置灰修改按钮 + 未托管图开关 |
-| W3/A1-LIB-PATH | 库目录只读文本框 | 已实现（M11） | 绑 LibraryRootDisplayText；未配置时显「未配置（旧版直存模式）」；库目录仅 W7 首启向导可设 |
-| W3/A1-LIB-CHG | 「修改…」按钮 | 已实现（M11） | 恒置灰（IsEnabled=False），M11 不支持迁移库目录，Tooltip 引导退出后手动迁移 |
+| W3/A1 | 常规页签 | 已实现（M2，M11 加托管卡片，0.19.0 支持迁移） | 主题（Dark/Light 即时切换）/完整性检查开关；库位置随数据根（M3 可视化）；M11 起底部增「素材库托管目录（M11）」卡片（子编号 W3/A1-LIB*），0.19.0 起可在线迁移 |
+| W3/A1-LIB | 素材库托管卡片 | 已实现（M11，0.19.0 起支持迁移） | 常规页签底部独立 Border 卡片：只读库目录 + 「修改…」迁移按钮 + 未托管图开关 + 迁移进度区 |
+| W3/A1-LIB-PATH | 库目录只读文本框 | 已实现（M11） | 绑 LibraryRootDisplayText；未配置时显「未配置（旧版直存模式）」；库目录由 W7 首启向导或 0.19.0 在线迁移设置 |
+| W3/A1-LIB-CHG | 「修改…」按钮 | 已实现（0.19.0） | 绑 ChangeLibraryRootCommand/CanChangeLibraryRoot；选择空目录→确认→整库复制→成功后退出重启；失败自动回滚；登录前设置窗禁用 |
+| W3/A1-LIB-PROG | 迁移进度区 | 已实现（0.19.0） | 仅在 IsRelocatingLibrary=true 时显示：ProgressBar（RelocationPercent）+ 当前文件文案（RelocationStatusText） |
 | W3/A1-LIB-SHOW | 「显示未托管的旧版图片」开关 | 已实现（M11） | 绑 ShowLegacyImages；仅 W7 选过「跳过」（LegacyDataSkipped=true）时可用；翻转经 LegacyVisibilityChanged 事件即时重查画廊；软跳过可逆，不删数据 |
 | W3/A2 | 缩略图页签 | 已实现（M2） | 边长/质量滑杆 + 全部重新生成 |
 | W3/A3 | AI 页签 | 已实现（M3 第二阶段） | 三档单选 + 云端配置（base_url/模型/API Key/测试连接）+ 本地 ONNX 区块（状态文本/进度条/下载·取消·手动导入·删除模型四按钮/体积·许可·来源小字行；M3-E2 起下载为 vision+text 模型捆绑包） |
