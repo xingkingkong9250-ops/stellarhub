@@ -140,14 +140,85 @@ public partial class ShellWindow : Window
         SearchTextBox.SelectAll();
     }
 
-    // v0.14.6: Enter 键立即提交搜索，不等待防抖定时器
+    // 0.20.0: Enter 先把末尾词转 chip，再立即提交搜索（跳过防抖定时器）
     private void SearchTextBox_KeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter)
         {
+            _viewModel.TopBar.TryCommitTerm();
             _viewModel.TopBar.CommitSearchNow();
             e.Handled = true;
         }
+    }
+
+    // 0.20.0: PreviewKeyDown 处理 Tab → 转 chip 不提交；空文本 Backspace → 删最后一个 chip
+    private void SearchTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Tab)
+        {
+            if (_viewModel.TopBar.TryCommitTerm())
+            {
+                e.Handled = true;
+                // 保持焦点在 TextBox（下一个词条继续输入）
+                SearchTextBox.Focus();
+            }
+            return;
+        }
+
+        if (e.Key == Key.Back && string.IsNullOrEmpty(SearchTextBox.Text))
+        {
+            int last = _viewModel.TopBar.SearchTerms.Count - 1;
+            if (last >= 0)
+            {
+                _viewModel.TopBar.RemoveTermAt(last);
+                _viewModel.TopBar.CommitSearchNow();
+                e.Handled = true;
+            }
+        }
+    }
+
+    // 0.20.0: 点击 chip 上的 × → 移除该 chip 并立即重新搜索
+    private void SearchChip_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn) return;
+        if (btn.Content is not StackPanel panel) return;
+        if (panel.Children.Count == 0) return;
+        if (panel.Children[0] is not TextBlock tb || tb.Text is null) return;
+
+        string target = tb.Text;
+        var terms = _viewModel.TopBar.SearchTerms;
+        for (int i = 0; i < terms.Count; i++)
+        {
+            if (string.Equals(terms[i], target, StringComparison.Ordinal))
+            {
+                _viewModel.TopBar.RemoveTermAt(i);
+                _viewModel.TopBar.CommitSearchNow();
+                break;
+            }
+        }
+
+        // 点击 chip 后把焦点还给末尾输入框
+        SearchTextBox.Focus();
+        Keyboard.Focus(SearchTextBox);
+    }
+
+    // 0.20.0: 点击筛选 chip 上的 × → 执行该 chip 的移除动作（清对应 Filter 字段并刷新）
+    private void FilterChip_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn) return;
+        if (btn.DataContext is not FilterChip chip) return;
+
+        chip.Remove();
+
+        // 点击 chip 后把焦点还给末尾输入框
+        SearchTextBox.Focus();
+        Keyboard.Focus(SearchTextBox);
+    }
+
+    private void SearchTextBox_GotFocus(object sender, RoutedEventArgs e)
+    {
+        // 选中文本方便快速覆盖
+        SearchTextBox.SelectAll();
     }
 
     private void GalleryList_SelectionChanged(object sender, SelectionChangedEventArgs e)

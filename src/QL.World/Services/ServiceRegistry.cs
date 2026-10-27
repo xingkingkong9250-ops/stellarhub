@@ -122,8 +122,16 @@ public sealed class ServiceRegistry
         }
     }
 
-    /// <summary>M6-F: permission checks based on the current user.</summary>
+    /// <summary>
+    /// M6-F: permission checks based on the current user.
+    /// </summary>
     public PermissionService Permissions { get; set; } = new(null);
+
+    /// <summary>
+    /// 0.20.0: 搜索词条日志 — 记录 chip 搜索词条（仅命中非空）。
+    /// 为 null 时 TopBar 静默跳过落库（例如测试环境未注入）。
+    /// </summary>
+    public SearchLogService? SearchLog { get; set; }
 
     public ServiceRegistry(
         AppSettingsService settings,

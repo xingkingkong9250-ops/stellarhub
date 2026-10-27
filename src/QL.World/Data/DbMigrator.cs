@@ -12,7 +12,7 @@ namespace QL.World.Data;
 /// </summary>
 internal static class DbMigrator
 {
-    private const int CURRENT_VERSION = 12;
+    private const int CURRENT_VERSION = 13;
 
     public static void Migrate(SqliteConnection connection)
     {

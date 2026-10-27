@@ -24,6 +24,13 @@ public sealed class LibraryFilter
     /// <summary>v0.14.6: 搜索自由文本，由 SearchQueryParser 自动识别意图。</summary>
     public string? Text { get; set; }
 
+    /// <summary>
+    /// 0.20.0: chip 搜索词条数组——每个 term 独立生成 (tag OR filename OR notes ...)
+    /// 括号子句，term 间 AND。保留原 Text 字段做单 chip 兼容：首个 chip 同时写入 Text，
+    /// 后续 chip 仅写入 SearchTerms。null 或空数组 = 不启用多 term 模式。
+    /// </summary>
+    public IReadOnlyList<string>? SearchTerms { get; set; }
+
     public SearchMode SearchMode { get; set; } = SearchMode.Tag;
 
     /// <summary>v0.14.6: 搜索文本的拼音版本（含中文时由 SearchQueryParser 生成），SQL 同步匹配 pinyin 列。</summary>
@@ -111,6 +118,7 @@ public sealed class LibraryFilter
         CollectionId = CollectionId,
         PbrGroupId = PbrGroupId,
         Text = Text,
+        SearchTerms = SearchTerms,
         SearchMode = SearchMode,
         SearchPinyin = SearchPinyin,
         Sort = Sort,

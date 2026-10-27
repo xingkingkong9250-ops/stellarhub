@@ -227,6 +227,7 @@ public partial class App : Application
                 networkMonitor,
                 userIdentity);
             _services = services;
+            services.SearchLog = new SearchLogService(_database);
 
             // ─── M6-B: login gate ─────────────────────────────────────
             CurrentUser? currentUser = ShowLoginGate(services);

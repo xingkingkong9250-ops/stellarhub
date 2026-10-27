@@ -679,6 +679,58 @@ public sealed class ImageQueryService
             }
         }
 
+        // ─── 0.20.0: chip 搜索词条 —— 每个 term 独立括号子句，term 间 AND ──
+        // 每个 term 调 SearchQueryParser 判断是否含中文→生成拼音子句。
+        // 保留原 filter.Text 块做单 chip 兼容（首个 chip 同时写 Text）。
+        if (filter.SearchTerms is { Count: > 0 } terms)
+        {
+            int idx = 0;
+            foreach (string rawTerm in terms)
+            {
+                string term = rawTerm.Trim();
+                if (term.Length == 0) continue;
+
+                SearchQuery q = SearchQueryParser.Parse(term);
+                if (string.IsNullOrEmpty(q.Text)) continue;
+
+                string termName = $"$st{idx}";
+                string pyName = $"$spy{idx}";
+                idx++;
+
+                sql.Append(HasWhere(sql) ? "\n  AND " : "\nWHERE ");
+                if (q.Mode == SearchMode.FileNameNotes)
+                {
+                    sql.Append($"(i.file_name LIKE '%' || {termName} || '%' OR i.notes LIKE '%' || {termName} || '%'");
+                    if (!string.IsNullOrWhiteSpace(q.Pinyin))
+                    {
+                        sql.Append($" OR i.file_name LIKE '%' || {pyName} || '%'");
+                        parameters.Add((pyName, q.Pinyin));
+                    }
+                    sql.Append(')');
+                }
+                else
+                {
+                    // Tag 模式：标签 + 文件名 + 备注 + 分类（拼音子句必须在括号内，否则 OR 会吞掉其它 AND 条件）
+                    sql.Append($"""
+                        (EXISTS (SELECT 1 FROM image_tags it WHERE it.image_id = i.id AND it.tag LIKE '%' || {termName} || '%')
+                         OR i.file_name LIKE '%' || {termName} || '%'
+                         OR i.notes LIKE '%' || {termName} || '%'
+                         OR i.primary_category LIKE '%' || {termName} || '%'
+                        """);
+                    if (!string.IsNullOrWhiteSpace(q.Pinyin))
+                    {
+                        sql.Append($"""
+                         OR EXISTS (SELECT 1 FROM image_tags it2 WHERE it2.image_id = i.id AND it2.pinyin LIKE '%' || {pyName} || '%')
+                         OR i.file_name LIKE '%' || {pyName} || '%'
+                        """);
+                        parameters.Add((pyName, q.Pinyin));
+                    }
+                    sql.Append(')');
+                }
+                parameters.Add((termName, q.Text));
+            }
+        }
+
         if (!string.IsNullOrWhiteSpace(filter.Text))
         {
             sql.Append(HasWhere(sql) ? "\n  AND " : "\nWHERE ");
@@ -694,7 +746,7 @@ public sealed class ImageQueryService
                               AND it.tag LIKE '%' || $text || '%')
                      OR i.file_name LIKE '%' || $text || '%'
                      OR i.notes LIKE '%' || $text || '%'
-                     OR i.primary_category LIKE '%' || $text || '%')
+                     OR i.primary_category LIKE '%' || $text || '%'
                     """);
                 if (!string.IsNullOrWhiteSpace(filter.SearchPinyin))
                 {
@@ -706,15 +758,17 @@ public sealed class ImageQueryService
                     """);
                     parameters.Add(("$pinyin", filter.SearchPinyin));
                 }
+                sql.Append(')');
             }
             else
             {
-                sql.Append("(i.file_name LIKE '%' || $text || '%' OR i.notes LIKE '%' || $text || '%')");
+                sql.Append("(i.file_name LIKE '%' || $text || '%' OR i.notes LIKE '%' || $text || '%'");
                 if (!string.IsNullOrWhiteSpace(filter.SearchPinyin))
                 {
                     sql.Append(" OR i.file_name LIKE '%' || $pinyin || '%'");
                     parameters.Add(("$pinyin", filter.SearchPinyin));
                 }
+                sql.Append(')');
             }
             parameters.Add(("$text", filter.Text.Trim()));
         }

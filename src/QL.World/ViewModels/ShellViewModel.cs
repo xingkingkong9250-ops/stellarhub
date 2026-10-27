@@ -33,7 +33,8 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         ThumbnailProvider = new GalleryThumbnailProvider(services.Thumbnails, services.NasFactory, services.Settings, services.NetworkMonitor);
         Gallery = new GalleryViewModel(services.ImageQuery, services.Settings, ThumbnailProvider);
         TopBar = new TopBarViewModel(Gallery, ImportAsync, services.Notifications, services.Ai,
-            services.AiAnalysis, services.Colors, services.SemanticSearch, services.Settings);
+            services.AiAnalysis, services.Colors, services.SemanticSearch, services.Settings,
+            services.SearchLog, services.UserIdentity);
         TagTree = new TagTreeViewModel(Gallery, services.ImageQuery, services.Tags);
         CollectionTree = new CollectionTreeViewModel(Gallery, services.Collections);
         PbrGroupTree = new PbrGroupTreeViewModel(Gallery, services.PbrGrouping);

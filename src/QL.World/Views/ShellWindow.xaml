@@ -7,6 +7,7 @@
         xmlns:conv="clr-namespace:QL.World.Views.Converters"
         xmlns:controls="clr-namespace:QL.World.Views.Controls"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
+        xmlns:vm="clr-namespace:QL.World.ViewModels"
         mc:Ignorable="d"
         d:Width="1400" d:Height="850"
         Width="1400" Height="850"
@@ -223,6 +224,39 @@
                     <Setter Property="Width" Value="140" />
                 </DataTrigger>
             </Style.Triggers>
+        </Style>
+
+        <!-- 0.20.0: chip 搜索框容器 Border 样式 -->
+        <Style x:Key="SearchChipEditorBorder" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource SurfaceInputBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="6,2,4,2" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- 0.20.0: 搜索词条 chip（深色背景 + × 按钮） -->
+        <Style x:Key="SearchChipStyle" TargetType="Button" BasedOn="{StaticResource ButtonBaseStyle}">
+            <Setter Property="Background" Value="{DynamicResource AccentBgBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentDimBrush}" />
+            <Setter Property="Padding" Value="6,2,2,2" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="0,0,4,0" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+
+        <!-- 0.20.0: 筛选标签 chip（浅色背景 + 前缀 + × 按钮） -->
+        <Style x:Key="FilterChipDisplayStyle" TargetType="Button" BasedOn="{StaticResource ButtonBaseStyle}">
+            <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+            <Setter Property="Padding" Value="6,2,2,2" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="0,0,4,0" />
+            <Setter Property="Cursor" Value="Hand" />
         </Style>
 
         <!-- U3-A (§4.B.2): B1-5 attribute filter chip — accent when active -->
@@ -695,15 +729,66 @@
                                Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                 </StackPanel>
 
-                <!-- W1/A1-4: 智能搜索框（自动识别标签/文件名/分类/拼音/语义） -->
-                <TextBox Grid.Column="1" x:Name="SearchTextBox" Style="{StaticResource CompactSearchBox}"
-                         Width="340" Height="32"
-                         WindowChrome.IsHitTestVisibleInChrome="True"
-                         AutomationProperties.Name="SearchBox"
-                         VerticalContentAlignment="Center"
-                         Text="{Binding TopBar.SearchText, UpdateSourceTrigger=PropertyChanged}"
-                         ToolTip="智能搜索：标签/文件名/分类/拼音/语义（300ms 防抖）"
-                         KeyDown="SearchTextBox_KeyDown" />
+                <!-- W1/A1-4: 智能搜索 chip 编辑器（0.20.0） -->
+                <Border Grid.Column="1" Style="{StaticResource SearchChipEditorBorder}"
+                        WindowChrome.IsHitTestVisibleInChrome="True"
+                        AutomationProperties.Name="SearchBox">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <!-- chip 区：筛选 chip（浅色）+ 搜索词条 chip（深色）混排 -->
+                        <ItemsControl>
+                            <ItemsControl.ItemsSource>
+                                <CompositeCollection>
+                                    <CollectionContainer Collection="{Binding TopBar.ActiveFilterChips}" />
+                                    <CollectionContainer Collection="{Binding TopBar.SearchTerms}" />
+                                </CompositeCollection>
+                            </ItemsControl.ItemsSource>
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.Resources>
+                                <DataTemplate DataType="{x:Type vm:FilterChip}">
+                                    <Button Style="{StaticResource FilterChipDisplayStyle}"
+                                            Click="FilterChip_Click">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding Label}" />
+                                            <TextBlock Text="×" Margin="4,0,0,0"
+                                                       Foreground="{DynamicResource TextMutedBrush}" />
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                                <DataTemplate DataType="{x:Type sys:String}">
+                                    <Button Style="{StaticResource SearchChipStyle}"
+                                            Click="SearchChip_Click">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding}" />
+                                            <TextBlock Text="×" Margin="4,0,0,0"
+                                                       Foreground="{DynamicResource TextMutedBrush}" />
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.Resources>
+                        </ItemsControl>
+                        <!-- 末尾内嵌输入框 -->
+                        <TextBox Grid.Column="1" x:Name="SearchTextBox"
+                                 Background="Transparent" BorderThickness="0"
+                                 CaretBrush="{DynamicResource TextPrimaryBrush}"
+                                 Foreground="{DynamicResource TextPrimaryBrush}"
+                                 SelectionBrush="{DynamicResource AccentBrush}"
+                                 VerticalContentAlignment="Center"
+                                 MinWidth="80" Width="Auto"
+                                 Text="{Binding TopBar.SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                 ToolTip="智能搜索：回车形成词条 chip，多 chip AND 组合检索（300ms 防抖）"
+                                 KeyDown="SearchTextBox_KeyDown"
+                                 PreviewKeyDown="SearchTextBox_PreviewKeyDown"
+                                 GotFocus="SearchTextBox_GotFocus" />
+                    </Grid>
+                </Border>
 
                 <!-- 剩余操作按钮依次排列：导入 / 扫描 / 刷新 / AI / 颜色 / 下载 / 审核 -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0"

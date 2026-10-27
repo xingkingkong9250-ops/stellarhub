@@ -49,7 +49,7 @@ public sealed class DatabaseServiceTests
             command.CommandText = "PRAGMA user_version;";
             return Convert.ToInt32(command.ExecuteScalar());
         });
-        Assert.Equal(12, version);
+        Assert.Equal(13, version);
 
         // Second Initialize must not throw or duplicate anything.
         library.Db.Initialize();
@@ -103,7 +103,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(12, migrated);
+            Assert.Equal(13, migrated);
 
             var (tableCount, imageCount) = db.Run(conn =>
             {
@@ -199,7 +199,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(12, version);
+            Assert.Equal(13, version);
 
             var families = db.Run(conn =>
             {
@@ -313,7 +313,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(12, version);
+            Assert.Equal(13, version);
 
             // source column exists with DEFAULT 'local' and backfilled the v5 row.
             string sourceDefault = db.Run(conn =>
@@ -414,7 +414,7 @@ public sealed class DatabaseServiceTests
                 command.CommandText = "PRAGMA user_version;";
                 return Convert.ToInt32(command.ExecuteScalar());
             });
-            Assert.Equal(12, version);
+            Assert.Equal(13, version);
 
             var (libraryHash, originalPath, libraryPath, entryCode) = db.Run(conn =>
             {
