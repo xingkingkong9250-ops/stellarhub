@@ -630,6 +630,7 @@ public partial class App : Application
             services.SharedStorage = storage;
             services.Accounts = accounts;
             services.SharedLibrary = sharedLibrary;
+            services.SharedCollections = new SharedCollectionService(storage);
             services.Submissions = submissions;
             services.Permissions = new PermissionService(currentUser);
 

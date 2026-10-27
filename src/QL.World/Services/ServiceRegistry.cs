@@ -81,6 +81,9 @@ public sealed class ServiceRegistry
     /// <summary>M6-D: shared library service (library.json on NAS). Null in local-only mode.</summary>
     public SharedLibraryService? SharedLibrary { get; set; }
 
+    /// <summary>PEND-004 (0.18.0): shared collections (collections.json on the primary NAS). Null in local-only mode.</summary>
+    public SharedCollectionService? SharedCollections { get; set; }
+
     /// <summary>M6-E: submission review service (pending/ on NAS). Null in local-only mode.</summary>
     public SubmissionService? Submissions { get; set; }
 

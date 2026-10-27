@@ -125,6 +125,7 @@
 | W3/A8 | 用户管理页签 | 已实现（M6-C/U6 编号确认） | 仅管理员可见；账号列表/新建用户/启用禁用/重置密码/删除用户；M6-C 初编 A7 与 NAS 页签撞号，U6 起统一改 A8 |
 | W1/B1-SCOPE | 本地库/共享库分段切换 | 已实现（U6-A） | 画廊上方分段控件；仅 NAS 登录用户可切共享段；切换时详情栏（B3）随作用域换模板，搜索词按作用域重新应用 |
 | W1/B2-SHARED | 共享库画廊 | 已实现（U6-A + M8-C 聚合 + M8-E 来源徽章） | SharedGalleryList：共享 ListBox 复用 B2-3 网格/列表 DataTemplate；缩略图走 SharedThumbnailCache（弱网同样跳过）；M8-C 起用 AggregatedSharedLibraryService 并发加载主+副 library.json 主库优先去重，每条注入 SourceNasId；SourceBadge 默认「共享」，M8-E 起当 ShowSourceBadge=true 改显「nas://{SourceNasId}」便于管理员区分来源 |
+| W1/B2-SHARED-COL | 共享收藏夹工具栏 | 已实现（0.18.0 PEND-004） | 共享库列表上方：收藏夹下拉（首项「全部共享图片」）+「＋ 新建 / 加入选中 / 移出选中 / 删除」；未选中具体收藏夹时三个操作按钮置灰；右侧显示「共 N 张」；数据存 `StellarHubShared/collections.json`（按图片内容哈希归组，主/副库聚合视图通用） |
 | W1/B2-3-SUB | 图卡右键「提交到共享库」 | 已实现（U6-B） | 仅本地项可见；上传原图+缩略图+pending JSON；hash 查重（库内已有/审核中均拒绝）；CanSubmitToShared=false 时置灰 |
 | W1/A1-REV | 「审核队列」入口 + 待审角标 | 已实现（U6-C） | 工具栏「🛡 审核队列」按钮，仅管理员可见；右上角红色圆角角标显示 pending 数，0 时隐藏；关闭 W6 后自动刷新 |
 | W6 | 审核队列窗口 | 已实现（U6-C） | 720×540，最小 600 宽；行：96×72 待审缩略图 + 提交人/时间/尺寸/大小/标签 + ✓通过/✕拒绝；空态「没有待审核的提交」；通过/拒绝后行即时移除 |

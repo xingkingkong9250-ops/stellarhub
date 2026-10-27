@@ -59,6 +59,28 @@ public class SharedStorageServiceTests
     }
 
     [Fact]
+    public async Task SaveCollections_then_Load_round_trips()
+    {
+        var collections = new List<SharedCollection>
+        {
+            new() { Id = "c1", Name = "Brick", ImageIds = ["h1"], CreatedBy = "alice" },
+        };
+
+        await _storage.SaveCollectionsAsync(collections, CancellationToken.None);
+        var loaded = await _storage.LoadCollectionsAsync(CancellationToken.None);
+
+        Assert.Single(loaded);
+        Assert.Equal("Brick", loaded[0].Name);
+        Assert.Equal(new[] { "h1" }, loaded[0].ImageIds);
+    }
+
+    [Fact]
+    public async Task LoadCollections_returns_empty_when_missing()
+    {
+        Assert.Empty(await _storage.LoadCollectionsAsync(CancellationToken.None));
+    }
+
+    [Fact]
     public async Task LoadLibrary_returns_empty_when_missing()
     {
         var images = await _storage.LoadLibraryAsync(CancellationToken.None);

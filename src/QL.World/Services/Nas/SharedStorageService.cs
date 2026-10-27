@@ -70,6 +70,20 @@ public sealed class SharedStorageService
         await WriteJsonAsync(SharedPaths.Library, wrapper, ct).ConfigureAwait(false);
     }
 
+    // ─── collections.json (PEND-004) ────────────────────────────────────
+
+    public async Task<IReadOnlyList<SharedCollection>> LoadCollectionsAsync(CancellationToken ct)
+    {
+        var wrapper = await ReadJsonAsync<CollectionsFile>(SharedPaths.Collections, ct).ConfigureAwait(false);
+        return wrapper?.Collections ?? [];
+    }
+
+    public async Task SaveCollectionsAsync(IReadOnlyList<SharedCollection> collections, CancellationToken ct)
+    {
+        var wrapper = new CollectionsFile { Version = 1, Collections = collections.ToList() };
+        await WriteJsonAsync(SharedPaths.Collections, wrapper, ct).ConfigureAwait(false);
+    }
+
     // ─── pending/*.json ─────────────────────────────────────────────────
 
     public async Task<IReadOnlyList<PendingSubmission>> LoadPendingAsync(CancellationToken ct)
@@ -139,5 +153,11 @@ public sealed class SharedStorageService
     {
         public int Version { get; set; }
         public List<SharedImageRecord> Images { get; set; } = [];
+    }
+
+    private sealed class CollectionsFile
+    {
+        public int Version { get; set; }
+        public List<SharedCollection> Collections { get; set; } = [];
     }
 }

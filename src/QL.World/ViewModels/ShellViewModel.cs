@@ -105,6 +105,12 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         SetCollectionCoverCommand = new RelayCommand(SetCollectionCover);
         AddSelectedToCollectionCommand = new RelayCommand(AddSelectedToCollection);
 
+        // PEND-004 (0.18.0): shared collections on the NAS (collections.json).
+        CreateSharedCollectionCommand = new AsyncRelayCommand(CreateSharedCollectionAsync);
+        DeleteSharedCollectionCommand = new AsyncRelayCommand(DeleteSharedCollectionAsync);
+        AddSelectedToSharedCollectionCommand = new AsyncRelayCommand(AddSelectedToSharedCollectionAsync);
+        RemoveSelectedFromSharedCollectionCommand = new AsyncRelayCommand(RemoveSelectedFromSharedCollectionAsync);
+
         // M6-D / U6-A: shared library (NAS). Available only when logged in with a NAS account.
         // M8-C: SharedDetailViewModel 改用 NasConnectionRegistry（按 SourceNasId 路由）。
         IsSharedLibraryAvailable = _services.SharedLibrary is not null;
@@ -133,7 +139,10 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
             SubmitToSecondaryNasAsync,
             spec => _services.Permissions.CanSubmitToSecondaryNas && spec is not null && Gallery.PrimarySelected is not null);
         if (IsSharedLibraryAvailable)
+        {
             _ = LoadSharedGalleryAsync();
+            _ = LoadSharedCollectionsAsync();
+        }
 
         // U6-C: admin review queue entry + pending badge count.
         IsReviewAvailable = _services.Permissions.CanApproveSubmissions;
@@ -208,6 +217,34 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>U6-C: NAS thumbnail cache (also feeds the review window).</summary>
     public SharedThumbnailCache? SharedThumbnails { get; }
+
+    // ─── PEND-004 (0.18.0): shared collections ───────────────────────────
+
+    /// <summary>Shared collection picker options (first entry = "all images").</summary>
+    public ObservableCollection<SharedCollectionOption> SharedCollectionOptions { get; } = [];
+
+    private SharedCollectionOption? _selectedSharedCollection;
+    /// <summary>Currently selected shared collection; null/id-null means "all images".</summary>
+    public SharedCollectionOption? SelectedSharedCollection
+    {
+        get => _selectedSharedCollection;
+        set
+        {
+            if (SetProperty(ref _selectedSharedCollection, value))
+            {
+                OnPropertyChanged(nameof(IsSharedCollectionSelected));
+                SharedGallery?.ApplyCollectionFilter(value?.Source?.ImageIds);
+            }
+        }
+    }
+
+    /// <summary>True when a real collection (not "all") is selected.</summary>
+    public bool IsSharedCollectionSelected => _selectedSharedCollection?.Id is not null;
+
+    public AsyncRelayCommand CreateSharedCollectionCommand { get; }
+    public AsyncRelayCommand DeleteSharedCollectionCommand { get; }
+    public AsyncRelayCommand AddSelectedToSharedCollectionCommand { get; }
+    public AsyncRelayCommand RemoveSelectedFromSharedCollectionCommand { get; }
 
     /// <summary>U6-C: true for admins (review queue entry visible).</summary>
     public bool IsReviewAvailable { get; }
@@ -307,6 +344,142 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[SHARED] Load failed: {ex.Message}");
+        }
+    }
+
+    // ─── PEND-004 (0.18.0): shared collection actions ────────────────────
+
+    private async Task LoadSharedCollectionsAsync()
+    {
+        if (_services.SharedCollections is not { } service) return;
+        string? selectedId = _selectedSharedCollection?.Id;
+        try
+        {
+            var all = await service.LoadAsync(CancellationToken.None).ConfigureAwait(true);
+            SharedCollectionOptions.Clear();
+            SharedCollectionOptions.Add(new SharedCollectionOption(null, "全部共享图片", null));
+            foreach (var collection in all)
+                SharedCollectionOptions.Add(
+                    new SharedCollectionOption(collection.Id, $"{collection.Name}（{collection.ImageIds.Count}）", collection));
+
+            SelectedSharedCollection = SharedCollectionOptions.FirstOrDefault(o => o.Id == selectedId)
+                                       ?? SharedCollectionOptions[0];
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[SHARED] Collections load failed: {ex.Message}");
+        }
+    }
+
+    private async Task CreateSharedCollectionAsync()
+    {
+        if (_services.SharedCollections is not { } service) return;
+        string? name = RequestInputDialog?.Invoke("新建共享收藏夹", "请输入收藏夹名称：", "");
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        try
+        {
+            var created = await service
+                .CreateAsync(name, _services.CurrentUser?.Username ?? string.Empty, CancellationToken.None)
+                .ConfigureAwait(true);
+            await LoadSharedCollectionsAsync();
+            SelectedSharedCollection = SharedCollectionOptions.FirstOrDefault(o => o.Id == created.Id)
+                                       ?? SelectedSharedCollection;
+            StatusBar.PublishMessage($"已创建共享收藏夹「{created.Name}」");
+        }
+        catch (InvalidOperationException ex)
+        {
+            StatusBar.PublishMessage(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            StatusBar.PublishMessage($"创建共享收藏夹失败：{ex.Message}");
+        }
+    }
+
+    private async Task DeleteSharedCollectionAsync()
+    {
+        if (_services.SharedCollections is not { } service) return;
+        if (SelectedSharedCollection is not { Id: { } id, Source: { } collection }) return;
+
+        var result = MessageBox.Show(
+            $"确定删除共享收藏夹「{collection.Name}」吗？\n（共享库中的图片不会被删除，仅移除该收藏夹分组）",
+            "删除共享收藏夹",
+            MessageBoxButton.OKCancel,
+            MessageBoxImage.Question,
+            MessageBoxResult.Cancel);
+        if (result != MessageBoxResult.OK) return;
+
+        try
+        {
+            await service.DeleteAsync(id, CancellationToken.None).ConfigureAwait(true);
+            SelectedSharedCollection = null;
+            await LoadSharedCollectionsAsync();
+            StatusBar.PublishMessage("已删除共享收藏夹");
+        }
+        catch (Exception ex)
+        {
+            StatusBar.PublishMessage($"删除共享收藏夹失败：{ex.Message}");
+        }
+    }
+
+    private async Task AddSelectedToSharedCollectionAsync()
+    {
+        if (_services.SharedCollections is not { } service) return;
+        if (SelectedSharedCollection is not { Id: { } id } selected || SharedGallery is not { } gallery) return;
+
+        var hashes = gallery.SelectedItems
+            .Select(i => i.FileHash)
+            .Where(h => !string.IsNullOrEmpty(h))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (hashes.Count == 0)
+        {
+            StatusBar.PublishMessage("请先在共享库中选中图片");
+            return;
+        }
+
+        try
+        {
+            int added = await service.AddImagesAsync(id, hashes, CancellationToken.None).ConfigureAwait(true);
+            await LoadSharedCollectionsAsync();
+            StatusBar.PublishMessage(added > 0
+                ? $"已加入共享收藏夹「{selected.Source!.Name}」{added} 张"
+                : "所选图片已在共享收藏夹中");
+        }
+        catch (Exception ex)
+        {
+            StatusBar.PublishMessage($"加入共享收藏夹失败：{ex.Message}");
+        }
+    }
+
+    private async Task RemoveSelectedFromSharedCollectionAsync()
+    {
+        if (_services.SharedCollections is not { } service) return;
+        if (SelectedSharedCollection is not { Id: { } id } selected || SharedGallery is not { } gallery) return;
+
+        var hashes = gallery.SelectedItems
+            .Select(i => i.FileHash)
+            .Where(h => !string.IsNullOrEmpty(h))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (hashes.Count == 0)
+        {
+            StatusBar.PublishMessage("请先在共享库中选中图片");
+            return;
+        }
+
+        try
+        {
+            int removed = await service.RemoveImagesAsync(id, hashes, CancellationToken.None).ConfigureAwait(true);
+            await LoadSharedCollectionsAsync();
+            StatusBar.PublishMessage(removed > 0
+                ? $"已从「{selected.Source!.Name}」移出 {removed} 张"
+                : "所选图片不在该共享收藏夹中");
+        }
+        catch (Exception ex)
+        {
+            StatusBar.PublishMessage($"移出共享收藏夹失败：{ex.Message}");
         }
     }
 
@@ -1158,3 +1331,10 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 public sealed record CategoryMenuItemOption(string Display, string? Value);
 
 public sealed record RatingMenuItemOption(string Display, int Value);
+
+/// <summary>
+/// PEND-004 (0.18.0): one entry in the shared-collection picker. A null
+/// <paramref name="Id"/> is the "all images" sentinel; <paramref name="Source"/>
+/// keeps the loaded record so the filter can read its image hashes.
+/// </summary>
+public sealed record SharedCollectionOption(string? Id, string Display, SharedCollection? Source);

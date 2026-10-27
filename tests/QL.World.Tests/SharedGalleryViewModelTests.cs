@@ -87,6 +87,36 @@ public sealed class SharedGalleryViewModelTests : IDisposable
         Assert.Equal(3, _vm.Items.Count);
     }
 
+    [Fact]
+    public void ApplyCollectionFilter_narrows_to_members_and_null_restores()
+    {
+        _vm.Load(SampleRecords(3));
+
+        _vm.ApplyCollectionFilter(["hash-1", "hash-3"]);
+        Assert.Equal(2, _vm.Items.Count);
+        Assert.True(_vm.HasCollectionFilter);
+
+        _vm.ApplyCollectionFilter(null);
+        Assert.Equal(3, _vm.Items.Count);
+        Assert.False(_vm.HasCollectionFilter);
+    }
+
+    [Fact]
+    public void Collection_filter_combines_with_text_filter()
+    {
+        _vm.Load(SampleRecords(3));
+        _vm.ApplyCollectionFilter(["hash-1", "hash-2"]);
+
+        _vm.ApplyFilter("b.webp");
+        Assert.Single(_vm.Items);
+        Assert.Equal("b.webp", _vm.Items[0].FileName);
+
+        // Reloading the shared library must not drop the active collection filter.
+        _vm.Load(SampleRecords(3));
+        _vm.ApplyFilter(string.Empty);
+        Assert.Equal(2, _vm.Items.Count);
+    }
+
     private static IReadOnlyList<SharedImageRecord> SampleRecords(int count)
     {
         var list = new List<SharedImageRecord>();

@@ -1401,7 +1401,40 @@
                             </ListBox.ContextMenu>
                         </ListBox>
 
-                        <!-- U6-A B2: 共享库 ListBox（与本地 ListBox 互斥，复用同一套卡片/行模板） -->
+                        <!-- U6-A B2: 共享库 ListBox（与本地 ListBox 互斥，复用同一套卡片/行模板）
+                             PEND-004: 工具栏（共享收藏夹）+ 列表置于同一 DockPanel，仅在共享作用域显示 -->
+                        <DockPanel Visibility="{Binding DataContext.IsSharedScope, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolVis}}">
+                            <Border DockPanel.Dock="Top" Background="{DynamicResource SurfaceBrush}"
+                                    BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1"
+                                    Padding="12,6">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="收藏夹" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource TextMutedBrush}" FontSize="12" />
+                                    <ComboBox x:Name="SharedCollectionCombo" Width="200" Margin="8,0,0,0"
+                                              ItemsSource="{Binding SharedCollectionOptions}"
+                                              DisplayMemberPath="Display"
+                                              SelectedItem="{Binding SelectedSharedCollection}"
+                                              AutomationProperties.Name="共享收藏夹" />
+                                    <Button Content="＋ 新建" Margin="8,0,0,0" Style="{StaticResource SubtleButtonStyle}"
+                                            Command="{Binding CreateSharedCollectionCommand}"
+                                            AutomationProperties.Name="新建共享收藏夹" />
+                                    <Button Content="加入选中" Margin="6,0,0,0" Style="{StaticResource SubtleButtonStyle}"
+                                            IsEnabled="{Binding IsSharedCollectionSelected}"
+                                            Command="{Binding AddSelectedToSharedCollectionCommand}"
+                                            AutomationProperties.Name="加入共享收藏夹" />
+                                    <Button Content="移出选中" Margin="6,0,0,0" Style="{StaticResource SubtleButtonStyle}"
+                                            IsEnabled="{Binding IsSharedCollectionSelected}"
+                                            Command="{Binding RemoveSelectedFromSharedCollectionCommand}"
+                                            AutomationProperties.Name="移出共享收藏夹" />
+                                    <Button Content="删除" Margin="6,0,0,0" Style="{StaticResource SubtleButtonStyle}"
+                                            IsEnabled="{Binding IsSharedCollectionSelected}"
+                                            Command="{Binding DeleteSharedCollectionCommand}"
+                                            AutomationProperties.Name="删除共享收藏夹" />
+                                    <TextBlock Margin="12,0,0,0" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource TextMutedBrush}" FontSize="12"
+                                               Text="{Binding SharedGallery.Items.Count, StringFormat='共 {0} 张'}" />
+                                </StackPanel>
+                            </Border>
                         <ListBox x:Name="SharedGalleryList"
                                  DataContext="{Binding SharedGallery}"
                                  ItemsSource="{Binding Items}"
@@ -1410,7 +1443,6 @@
                                  VirtualizingPanel.IsVirtualizing="True"
                                  VirtualizingPanel.VirtualizationMode="Recycling"
                                  VirtualizingPanel.ScrollUnit="Pixel"
-                                 Visibility="{Binding DataContext.IsSharedScope, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolVis}}"
                                  SelectionChanged="SharedGalleryList_SelectionChanged">
                             <ListBox.Style>
                                 <Style TargetType="ListBox" BasedOn="{StaticResource {x:Type ListBox}}">
@@ -1429,15 +1461,16 @@
                                 </Style>
                             </ListBox.Style>
                         </ListBox>
+                        </DockPanel>
 
-                        <!-- U6-A: 共享库空提示 -->
+                        <!-- U6-A: 共享库空提示（PEND-004：收藏夹筛选后为空也走这里） -->
                         <Border Visibility="{Binding DataContext.IsSharedScope, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolVis}}">
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
                                         Visibility="{Binding SharedGallery.Items.Count, Converter={StaticResource ZeroVis}}">
-                                <TextBlock Text="共享库中还没有图片" FontSize="18" FontWeight="SemiBold"
+                                <TextBlock Text="没有可显示的共享图片" FontSize="18" FontWeight="SemiBold"
                                            HorizontalAlignment="Center" />
                                 <TextBlock Margin="0,8" Foreground="{DynamicResource TextMutedBrush}"
-                                           Text="在本地库右键图片「提交到共享库」，等待管理员审核" />
+                                           Text="切换收藏夹或清空搜索；共享库为空时可在本地库右键图片「提交到共享库」" />
                             </StackPanel>
                         </Border>
 

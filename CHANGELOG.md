@@ -9,6 +9,27 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
 
 ## [Unreleased]
 
+## [0.18.0] — 2026-10-27 PEND-004：共享收藏夹（collections.json）
+
+### 新增
+
+- **共享收藏夹协议落地**：新增 `SharedCollection` 模型与
+  `SharedPaths.Collections`（`StellarHubShared/collections.json`），
+  `SharedStorageService` 增加 `LoadCollectionsAsync/SaveCollectionsAsync`。
+  成员存图片内容哈希（`SharedImageRecord.Id`），主/副库聚合视图下同样有效。
+- **SharedCollectionService**：加载、新建（名称不区分大小写去重）、删除、
+  加入图片（幂等、保序）、移出图片；写入走既有临时文件 + 上传的原子方式。
+- **共享作用域工具栏（W1/B2-SHARED-COL）**：共享库列表上方新增收藏夹下拉
+  （含「全部共享图片」）与「＋ 新建 / 加入选中 / 移出选中 / 删除」按钮，
+  并在右侧显示当前筛选后的图片数；未选中具体收藏夹时三个操作按钮置灰。
+- **收藏夹筛选**：`SharedGalleryViewModel` 新增 `ApplyCollectionFilter`，
+  与顶部搜索文本叠加生效；重新加载共享库后保留当前收藏夹与搜索条件。
+
+### 测试
+
+- 新增 10 项测试：存储层 collections.json 往返/缺失、服务层新建去重/幂等加入/
+  移出/删除/缺失收藏夹无操作、画廊收藏夹筛选与文本叠加。
+
 ## [0.17.0] — 2026-10-27 PEND-002：素材组织窗口（收藏夹 / 高频标签 / 贴图组）
 
 ### 新增

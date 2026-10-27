@@ -10,6 +10,8 @@ internal static class SharedPaths
     public const string Root = "StellarHubShared";
     public const string AccountsFile = "accounts.json";
     public const string LibraryFile = "library.json";
+    /// <summary>PEND-004: shared collections (curated groupings over library.json).</summary>
+    public const string CollectionsFile = "collections.json";
     public const string ThumbnailsDir = "thumbnails";
     public const string OriginalsDir = "originals";
     public const string PendingDir = "pending";
@@ -17,6 +19,7 @@ internal static class SharedPaths
 
     public static string Accounts => $"{Root}/{AccountsFile}";
     public static string Library => $"{Root}/{LibraryFile}";
+    public static string Collections => $"{Root}/{CollectionsFile}";
 
     /// <summary>Library thumbnail: thumbnails/&lt;hh&gt;/&lt;hash&gt;_thumb.webp.</summary>
     public static string Thumbnail(string hash) =>

@@ -18,6 +18,8 @@ public sealed class SharedGalleryViewModel : ObservableObject
     private readonly List<GalleryItemViewModel> _allItems = [];
     private readonly Dictionary<string, SharedImageRecord> _records = new(StringComparer.Ordinal);
     private string _viewMode = "Grid";
+    private string? _textFilter;
+    private HashSet<string>? _collectionIds;
 
     public SharedGalleryViewModel(
         AppSettingsService settings,
@@ -160,11 +162,17 @@ public sealed class SharedGalleryViewModel : ObservableObject
                 CreatedAt = record.ApprovedAt.DateTime,
             });
             _allItems.Add(item);
-            Items.Add(item);
         }
+        Rebuild();
         Refreshed?.Invoke();
         (Thumbnails as Services.Nas.SharedThumbnailCache)?.Prefetch(Items);
     }
+
+    /// <summary>
+    /// PEND-004: true when a collection filter is narrowing the list. Drives the
+    /// empty-state wording in the shell.
+    /// </summary>
+    public bool HasCollectionFilter => _collectionIds is not null;
 
     /// <summary>
     /// M8-C: 构造 <c>nas://{SourceNasId}{SourceNasPath}</c> 规范路径，供
@@ -187,22 +195,37 @@ public sealed class SharedGalleryViewModel : ObservableObject
     /// </summary>
     public void ApplyFilter(string? text)
     {
-        Items.Clear();
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            foreach (var item in _allItems)
-                Items.Add(item);
-            return;
-        }
+        _textFilter = text;
+        Rebuild();
+    }
 
-        string q = text.Trim();
+    /// <summary>
+    /// PEND-004: narrows the gallery to a shared collection's image hashes
+    /// (null = all images). Combines with the active text filter.
+    /// </summary>
+    public void ApplyCollectionFilter(IReadOnlyCollection<string>? imageIds)
+    {
+        _collectionIds = imageIds is null
+            ? null
+            : new HashSet<string>(imageIds, StringComparer.Ordinal);
+        OnPropertyChanged(nameof(HasCollectionFilter));
+        Rebuild();
+    }
+
+    private void Rebuild()
+    {
+        Items.Clear();
+        string? q = string.IsNullOrWhiteSpace(_textFilter) ? null : _textFilter.Trim();
         foreach (var item in _allItems)
         {
-            if (item.FileName.Contains(q, StringComparison.OrdinalIgnoreCase) ||
-                item.TagsCsv.Contains(q, StringComparison.OrdinalIgnoreCase))
+            if (_collectionIds is not null && !_collectionIds.Contains(item.FileHash)) continue;
+            if (q is not null &&
+                !item.FileName.Contains(q, StringComparison.OrdinalIgnoreCase) &&
+                !item.TagsCsv.Contains(q, StringComparison.OrdinalIgnoreCase))
             {
-                Items.Add(item);
+                continue;
             }
+            Items.Add(item);
         }
     }
 }
