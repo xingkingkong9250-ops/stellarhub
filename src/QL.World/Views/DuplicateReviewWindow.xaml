@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:conv="clr-namespace:QL.World.Views.Converters"
         mc:Ignorable="d"
         Width="980" Height="640"
         MinWidth="820" MinHeight="520"
@@ -11,6 +12,10 @@
         Background="{DynamicResource SurfaceBrush}"
         Foreground="{DynamicResource TextPrimaryBrush}"
         Title="重复审核 — 千星汇图">
+
+    <Window.Resources>
+        <conv:BoolToVisibilityConverter x:Key="BoolVis" />
+    </Window.Resources>
 
     <Grid Background="{DynamicResource BackgroundBrush}">
         <Grid.RowDefinitions>

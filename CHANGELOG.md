@@ -57,6 +57,20 @@ M2 组织与可靠性 → M3 AI 双轨 → M4 专业化与发布（v1.0.0）。
   用已缓存 256px Thumb，远程图无需下载整图。无云 AI 时结果与仅 L1/L2
   完全一致，W8 入口仍不置灰。
 
+### 修复
+
+- W8 `DuplicateReviewWindow.xaml` 未定义 `BoolVis` 转换器资源，打开窗口时抛
+  `XamlParseException` 导致窗口不显示；已在窗口资源中补 `BoolVis`。
+- `tools/smoke/UiSmokeDup.ps1`：预置隔离数据根的 `config.json`
+  （`libraryRootPath`/`dataRootPath`）以绕过 W7 首次设置向导，并自动关闭
+  W5 登录窗进入本地模式；12 项 UIA 断言全部通过。
+
+### 文档
+
+- `docs/USER_GUIDE.md`：新增「14. 图片查重」章节（入口、扫描阶段、筛选、
+  组动作与 L3 终审说明）；同步 W7 数据目录、三视图与计数位置、左栏双模式、
+  六分类与筛选标签组、B1-2/3/4 暂隐藏、登录窗本地模式等过期描述。
+
 ### 数据
 
 - schema v12：`images` 新增 `phash` 列；新增 `duplicate_candidates` 表

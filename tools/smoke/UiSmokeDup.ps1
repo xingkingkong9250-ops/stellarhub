@@ -1,4 +1,4 @@
-# QL World DUP-D UIA 冒烟测试 — W1/A1-11「查重」入口 + W8 重复审核窗口骨架
+﻿# QL World DUP-D UIA 冒烟测试 — W1/A1-11「查重」入口 + W8 重复审核窗口骨架
 # 用法: powershell -ExecutionPolicy Bypass -File tools\smoke\UiSmokeDup.ps1
 # 前置: .NET 10 SDK；脚本自建 Debug 构建并用隔离数据根，不影响真实数据。
 # 退出码: 0 = 全部通过；非 0 = 存在失败步骤。
@@ -13,10 +13,21 @@ $sourceProject = Join-Path $projectRoot 'src\QL.World'
 $outputDirectory = Join-Path $sourceProject 'bin\Debug\net10.0-windows'
 $applicationExe = Join-Path $outputDirectory 'StellarHub.exe'
 $dataRoot = Join-Path $env:TEMP ("QL_World_UiSmokeDup_" + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+$configPath = Join-Path $dataRoot 'config.json'
+$libraryRoot = Join-Path $dataRoot 'library'
 $shutdownEventName = 'Local\QL_World_UiTest_GracefulShutdown'
 
 $env:QL_WORLD_UI_TEST_MODE = '1'
 $env:QL_WORLD_DATA_ROOT = $dataRoot
+
+# M11 起未配置库目录会先弹 W7「首次设置」向导，冒烟无法交互；
+# 预置 config.json 写入 libraryRootPath/dataRootPath 以绕过向导。
+New-Item -ItemType Directory -Path $libraryRoot -Force | Out-Null
+$seedConfig = [ordered]@{ libraryRootPath = $libraryRoot; dataRootPath = $libraryRoot }
+[IO.File]::WriteAllText(
+    $configPath,
+    ($seedConfig | ConvertTo-Json),
+    (New-Object System.Text.UTF8Encoding($false)))
 
 $results = New-Object System.Collections.Generic.List[string]
 $script:failures = 0
@@ -133,6 +144,18 @@ try {
     Write-Host '[Smoke] Launch (isolated data root)'
     $app = Start-App
     $mainWin = $app.Window
+    Write-Host "  First window: $($mainWin.Current.Name)"
+
+    # W5 登录窗以模态方式先于 ShellWindow 出现（无 NAS 时关窗即本地模式）；
+    # 冒烟无法交互登录，直接关闭登录窗并等待主窗口。
+    if ($mainWin.Current.Name -like '*登录*') {
+        try {
+            ($mainWin.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern)).Close()
+        }
+        catch { }
+        $mainWin = Find-TopWindowByTitle $app.Process.Id '*3D 美术图片素材管理*' 20
+        if ($null -eq $mainWin) { throw '[Smoke] Shell window not found after closing login window.' }
+    }
     Write-Host "  Main window: $($mainWin.Current.Name)"
 
     # ── 1. A1-11 顶栏入口 ────────────────────────────────────
