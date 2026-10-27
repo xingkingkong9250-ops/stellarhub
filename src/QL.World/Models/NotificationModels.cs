@@ -15,6 +15,7 @@ public enum NotificationKind
     LocalModelDownloadCompleted,
     SemanticSearchUnavailable,
     SharedSubmission,
+    DuplicateDetected,
 }
 
 /// <summary>A single session-scoped notification entry.</summary>

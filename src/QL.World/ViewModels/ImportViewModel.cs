@@ -15,6 +15,7 @@ public sealed class ImportViewModel : ObservableObject
 {
     private readonly ImportService _import;
     private readonly Func<string> _getSuggestedFolder;
+    private readonly NotificationService? _notifications;
     private CancellationTokenSource? _cts;
 
     private string _sourceSummary = "尚未选择";
@@ -32,9 +33,11 @@ public sealed class ImportViewModel : ObservableObject
     private ImportReport? _lastReport;
 
     public ImportViewModel(ImportService import, Func<string>? getSuggestedFolder = null,
-        IEnumerable<AiBackendConfig>? aiBackends = null)
+        IEnumerable<AiBackendConfig>? aiBackends = null,
+        NotificationService? notifications = null)
     {
         _import = import;
+        _notifications = notifications;
         _getSuggestedFolder = getSuggestedFolder ?? (() => Environment.GetFolderPath(
             Environment.SpecialFolder.MyPictures));
 
@@ -264,6 +267,13 @@ public sealed class ImportViewModel : ObservableObject
                 : $"完成：新增 {report.AddedCount} 张，跳过 {report.SkippedCount} 张";
             if (report.LogLines.Count > 0)
                 CurrentFile = string.Empty;
+
+            // DUP-B: L1 命中的新图已照常入库，只在日志与通知中心提示。
+            if (report.Duplicates.Count > 0)
+                _notifications?.Publish(NotificationKind.DuplicateDetected,
+                    "发现疑似重复图片",
+                    $"本次导入发现 {report.Duplicates.Count} 张疑似重复（已照常入库），"
+                    + "详情见导入日志。");
 
             // v0.12.0: 导入完成后按所选后端自动分析本次新增图
             //（取消的导入只分析已入库部分；关闭 AI 则不触发）。

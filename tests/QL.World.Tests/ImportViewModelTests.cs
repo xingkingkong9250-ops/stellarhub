@@ -16,10 +16,11 @@ public sealed class ImportViewModelTests : IDisposable
 
     public void Dispose() => _lib.Dispose();
 
-    private ImportViewModel CreateVm()
+    private ImportViewModel CreateVm(NotificationService? notifications = null)
     {
         var importer = new ImportService(_lib.Db, new ImageInspector());
-        return new ImportViewModel(importer, () => _lib.DirectoryRoot);
+        return new ImportViewModel(importer, () => _lib.DirectoryRoot,
+            aiBackends: null, notifications: notifications);
     }
 
     [Fact]
@@ -63,4 +64,53 @@ public sealed class ImportViewModelTests : IDisposable
         Assert.Equal(7, raisedBackendId);
         Assert.Single(vm.AddedIds);
     }
+
+    [Fact]
+    public async Task Import_publishes_duplicate_notification_when_phash_hits()
+    {
+        // 先入库基线图，再用同一画面的 JPEG 转码变体走 W2 导入。
+        string baseline = Path.Combine(_lib.DirectoryRoot, "baseline");
+        TestImageFactory.CreateGradientPng(baseline, "gradient.png");
+        await new ImportService(_lib.Db, new ImageInspector())
+            .ImportAsync(OptionsFor(baseline));
+
+        var notifications = new NotificationService();
+        ImportViewModel vm = CreateVm(notifications);
+        string variant = Path.Combine(_lib.DirectoryRoot, "variant");
+        TestImageFactory.CreateGradientJpeg(variant, "gradient.jpg");
+        vm.SourcePaths.Add(variant);
+
+        await vm.StartCommand.ExecuteAsync();
+
+        Assert.Equal(1, vm.Added);
+        Assert.Contains(notifications.Items,
+            entry => entry.Kind == NotificationKind.DuplicateDetected);
+        Assert.Contains(vm.LogLines, line => line.Contains("疑似重复"));
+    }
+
+    [Fact]
+    public async Task Import_without_duplicates_publishes_no_duplicate_notification()
+    {
+        var notifications = new NotificationService();
+        ImportViewModel vm = CreateVm(notifications);
+        string source = Path.Combine(_lib.DirectoryRoot, "source");
+        TestImageFactory.CreatePng(source, "a.png");
+        vm.SourcePaths.Add(source);
+
+        await vm.StartCommand.ExecuteAsync();
+
+        Assert.Equal(1, vm.Added);
+        Assert.DoesNotContain(notifications.Items,
+            entry => entry.Kind == NotificationKind.DuplicateDetected);
+    }
+
+    private static ImportOptions OptionsFor(string root) => new()
+    {
+        InputPaths = [root],
+        RecurseSubfolders = true,
+        SkipHidden = true,
+        EnabledExtensions = new HashSet<string>(
+            ImportOptions.SupportedExtensions,
+            StringComparer.OrdinalIgnoreCase),
+    };
 }

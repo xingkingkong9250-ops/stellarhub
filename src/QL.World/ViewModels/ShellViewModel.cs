@@ -661,7 +661,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         try
         {
             var vm = new ImportViewModel(_services.Import, GetSuggestedImportFolder,
-                Settings.AiBackends);
+                Settings.AiBackends, _services.Notifications);
             // v0.12.0: 导入完成后按所选后端自动分析本次新增图。
             vm.ImportAnalysisRequested +=
                 (ids, backendId) => _ = RunImportAiAnalysisAsync(ids, backendId);

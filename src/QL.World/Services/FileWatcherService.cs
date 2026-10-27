@@ -205,6 +205,12 @@ public sealed class FileWatcherService : IDisposable
             {
                 _notifications.Publish(NotificationKind.WatcherImported,
                     "监控导入", $"自动导入 {report.AddedCount} 张新图片");
+                // DUP-B: 监控自动导入同样提示 L1 命中的疑似重复（不拦截）。
+                if (report.Duplicates.Count > 0)
+                    _notifications.Publish(NotificationKind.DuplicateDetected,
+                        "监控导入发现疑似重复",
+                        $"自动导入的 {report.Duplicates.Count} 张图片与库内已有图片疑似重复"
+                        + "（已照常入库）。");
                 // Fire-and-forget dominant-color backfill for the new images.
                 _ = Task.Run(async () =>
                 {
