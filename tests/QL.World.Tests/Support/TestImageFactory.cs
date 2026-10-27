@@ -3,6 +3,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Formats.Webp;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace QL.World.Tests.Support;
@@ -28,6 +29,11 @@ internal static class TestImageFactory
     public static string CreateGradientJpeg(
         string directory, string name, int width = 64, int height = 48)
         => CreateGradient(directory, name, new JpegEncoder { Quality = 80 }, width, height);
+
+    /// <summary>DUP-C: 渐变内容 WebP（模拟 256px 缩略图，供 phash 补算测试）。</summary>
+    public static string CreateGradientWebp(
+        string directory, string name, int width = 64, int height = 48)
+        => CreateGradient(directory, name, new WebpEncoder { Quality = 80 }, width, height);
 
     /// <summary>DUP-B: 16px 棋盘格 PNG，与渐变的 dHash 距离远超同图阈值。</summary>
     public static string CreateCheckerboardPng(
